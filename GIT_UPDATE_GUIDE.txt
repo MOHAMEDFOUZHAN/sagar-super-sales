@@ -1,0 +1,25 @@
+# SAGAR SUPER SALES - GIT UPDATE GUIDE
+# Use these commands to update your GitHub repository after making changes.
+
+# 1. VIEW CHANGES (Optional)
+# This shows you which files you have modified or added.
+git status
+
+# 2. STAGE CHANGES
+# This prepares all your changes to be saved.
+git add .
+
+# 3. COMMIT CHANGES
+# This saves your changes locally with a message. 
+# Replace "Your update message" with a description of what you did.
+git commit -m "Your update message"
+
+# 4. PUSH TO GITHUB
+# This uploads your local changes to the online repository.
+git push
+
+# ---------------------------------------------------------
+# HOW TO USE:
+# 1. Open your terminal in the "D:\Sales" folder.
+# 2. Copy and paste these commands one by one.
+# ---------------------------------------------------------
