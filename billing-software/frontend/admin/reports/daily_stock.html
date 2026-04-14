@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Stock Report - AdminPanel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .report-container {
+            padding: 20px;
+        }
+
+        .filter-panel {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 25px;
+            background: var(--glass-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+        }
+
+        .stock-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .stock-table th {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--glass-border);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .stock-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--text-main);
+        }
+
+        .stock-qty {
+            font-weight: 800;
+        }
+
+        .low-stock {
+            color: var(--danger);
+        }
+
+        .normal-stock {
+            color: var(--success);
+        }
+
+        @media print {
+            .low-stock {
+                color: #b91c1c !important;
+                font-weight: 900 !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>Daily Stock Report</h1>
+                <p style="color: var(--text-muted);">Current inventory availability overview.</p>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="report-container">
+            <div class="filter-panel">
+                <div class="form-group" style="flex: 1;">
+                    <input type="text" id="stockSearch" class="input-dark" placeholder="Search product or category..."
+                        onkeyup="filterStock()">
+                </div>
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-sync"></i> REFRESH DATA
+                </button>
+            </div>
+
+            <div class="print-only-header">
+                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET
+                </h1>
+                <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Daily Stock Status Report</p>
+                <p id="printRunDate" style="margin: 2px 0; font-weight: bold;"></p>
+                <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px;">
+                <div class="table-wrapper">
+                    <table class="stock-table" id="stockTable">
+                        <thead>
+                            <tr>
+                                <th>CODE</th>
+                                <th>ITEM NAME</th>
+                                <th>CATEGORY</th>
+                                <th style="text-align: center;">STOCK AVAILABILITY</th>
+                                <th>UNIT</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stockContent"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let fullStockData = [];
+
+        async function loadReport() {
+            const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+            document.getElementById('printRunDate').innerText = "Run Date: " + date;
+
+            try {
+                const res = await fetch('/api/stock/daily-report');
+                fullStockData = await res.json();
+                renderStock(fullStockData);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function renderStock(data) {
+            const tbody = document.getElementById('stockContent');
+            tbody.innerHTML = '';
+
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                const isLow = item.stock <= 5; // Simple threshold for visual alert
+
+                tr.innerHTML = `
+                    <td style="font-family: monospace; color: var(--text-muted);">${item.barcode || '-'}</td>
+                    <td style="font-weight: 600;">${item.name}</td>
+                    <td><span class="badge" style="background: rgba(255,255,255,0.05);">${item.category || 'General'}</span></td>
+                    <td style="text-align: center;" class="stock-qty ${isLow ? 'low-stock' : 'normal-stock'}">${item.stock}</td>
+                    <td style="color: var(--text-muted);">${item.unit || 'PCS'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterStock() {
+            const query = document.getElementById('stockSearch').value.toLowerCase();
+            const filtered = fullStockData.filter(item =>
+                item.name.toLowerCase().includes(query) ||
+                (item.category && item.category.toLowerCase().includes(query)) ||
+                (item.barcode && item.barcode.toLowerCase().includes(query))
+            );
+            renderStock(filtered);
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

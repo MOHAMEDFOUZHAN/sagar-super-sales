@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Control - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            width: 90%;
+            max-width: 450px;
+            animation: slideUp 0.3s var(--ease-out);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .mode-toggle {
+            display: flex;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 5px;
+            border-radius: var(--radius-sm);
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: var(--radius-sm);
+            background: transparent;
+            color: var(--text-muted);
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .mode-btn.active.add {
+            background: var(--success);
+            color: white;
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .mode-btn.active.sub {
+            background: var(--danger);
+            color: white;
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
+        }
+
+        .item-info-row {
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--radius-md);
+            margin-bottom: 20px;
+            border-left: 4px solid var(--primary);
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content animate-fade">
+        <header class="section-header">
+            <div>
+                <h1>Inventory Control</h1>
+                <p style="color: var(--text-muted);">Adjust stock levels and monitor product availability.</p>
+            </div>
+            <div class="search-box" style="position: relative; width: 350px;">
+                <i class="fa-solid fa-boxes-stacked"
+                    style="position: absolute; left: 15px; top: 15px; color: var(--primary);"></i>
+                <input type="text" id="searchInput" class="input-dark" placeholder="Quick find product..."
+                    onkeyup="filterStock()" style="padding-left: 45px;">
+            </div>
+        </header>
+
+        <div class="glass-panel" style="padding: 10px;">
+            <div class="table-wrapper">
+                <table id="stockTable">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Product Detail</th>
+                            <th>Category</th>
+                            <th style="text-align: center;">Inventory Status</th>
+                            <th style="text-align: right;">On Hand</th>
+                            <th style="text-align: right;">Precision Ops</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Adjustment Modal -->
+    <div id="adjustModal" class="modal">
+        <div class="modal-content glass-panel" style="padding: 30px;">
+            <div class="flex-between mb-20">
+                <h2 style="font-weight: 800; letter-spacing: -1px;">Stock Adjustment</h2>
+                <button class="btn" onclick="closeModal()"
+                    style="background: transparent; color: var(--text-muted); font-size: 1.5rem; padding: 0;">&times;</button>
+            </div>
+
+            <div class="item-info-row">
+                <h3 id="adjProduct" style="font-size: 1rem; margin-bottom: 4px;">ITEM NAME</h3>
+                <p id="adjStock" style="font-size: 0.8rem; color: var(--text-muted);">Current: 0 Units</p>
+            </div>
+
+            <input type="hidden" id="adjId">
+            <input type="hidden" id="adjMode" value="add">
+
+            <div class="mode-toggle">
+                <button class="mode-btn add active" id="btnAdd" onclick="setMode('add')">Increment (+)</button>
+                <button class="mode-btn sub" id="btnSub" onclick="setMode('sub')">Decrement (-)</button>
+            </div>
+
+            <div class="form-group mb-20">
+                <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Adjustment
+                    Quantity</label>
+                <input type="number" id="adjQty" class="input-dark" min="1" value="1"
+                    style="font-size: 1.5rem; text-align: center; font-weight: 800; color: var(--primary);">
+            </div>
+
+            <div class="form-group mb-20">
+                <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Reference /
+                    Reason</label>
+                <input type="text" id="adjReason" class="input-dark" placeholder="e.g., Stock Inward, Damage Return">
+            </div>
+
+            <button class="btn btn-primary w-full" id="confirmBtn" onclick="submitAdjustment()"
+                style="padding: 15px; margin-top: 10px;">
+                Confirm Transaction
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let products = [];
+        const modal = document.getElementById('adjustModal');
+
+        async function loadStock() {
+            const res = await fetch('/api/inventory/products');
+            products = await res.json();
+            renderStock(products);
+        }
+
+        function renderStock(data) {
+            const tbody = document.querySelector('#stockTable tbody');
+            tbody.innerHTML = '';
+
+            data.forEach(p => {
+                const isLow = p.current_stock <= 25;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-family: monospace; color: var(--accent);">${p.barcode || '-'}</td>
+                    <td>
+                        <div style="font-weight: 600;">${p.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">Unit: ${p.unit}</div>
+                    </td>
+                    <td style="font-size: 0.85rem; color: var(--text-muted);">${p.category}</td>
+                    <td style="text-align: center;">
+                        <span class="badge ${isLow ? 'badge-danger' : 'badge-success'}" style="min-width: 100px;">
+                            ${isLow ? 'REPLENISH' : 'OPTIMAL'}
+                        </span>
+                    </td>
+                    <td style="text-align: right; font-weight: 800; font-size: 1.1rem; color: ${isLow ? 'var(--danger)' : 'var(--text-main)'};">
+                        ${p.current_stock}
+                    </td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-primary" style="padding: 8px 16px; font-size: 0.7rem;" onclick='openAdjust(${JSON.stringify(p)})'>
+                            <i class="fa-solid fa-sliders"></i> ADJUST
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterStock() {
+            const term = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = products.filter(p => p.name.toLowerCase().includes(term) || (p.barcode && p.barcode.toLowerCase().includes(term)));
+            renderStock(filtered);
+        }
+
+        function openAdjust(p) {
+            document.getElementById('adjId').value = p.id;
+            document.getElementById('adjProduct').innerText = p.name;
+            document.getElementById('adjStock').innerText = `Current Ledger: ${p.current_stock} ${p.unit}`;
+            document.getElementById('adjQty').value = 1;
+            document.getElementById('adjReason').value = '';
+            setMode('add');
+            modal.style.display = 'flex';
+        }
+
+        function setMode(mode) {
+            document.getElementById('adjMode').value = mode;
+            const addBtn = document.getElementById('btnAdd');
+            const subBtn = document.getElementById('btnSub');
+            const confirmBtn = document.getElementById('confirmBtn');
+
+            if (mode === 'add') {
+                addBtn.classList.add('active');
+                subBtn.classList.remove('active');
+                confirmBtn.style.background = 'var(--success)';
+                confirmBtn.style.boxShadow = '0 5px 20px rgba(16, 185, 129, 0.3)';
+            } else {
+                subBtn.classList.add('active');
+                addBtn.classList.remove('active');
+                confirmBtn.style.background = 'var(--danger)';
+                confirmBtn.style.boxShadow = '0 5px 20px rgba(239, 68, 68, 0.3)';
+            }
+        }
+
+        function closeModal() { modal.style.display = 'none'; }
+
+        async function submitAdjustment() {
+            const id = document.getElementById('adjId').value;
+            const mode = document.getElementById('adjMode').value;
+            const qty = parseInt(document.getElementById('adjQty').value);
+            const reason = document.getElementById('adjReason').value || 'System Adjustment';
+
+            if (!qty || qty <= 0) return;
+
+            const res = await fetch('/api/inventory/stock-adjust', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, mode, qty, reason })
+            });
+            if ((await res.json()).status === 'success') {
+                closeModal();
+                loadStock();
+            }
+        }
+
+        loadStock();
+    </script>
+</body>
+
+</html>

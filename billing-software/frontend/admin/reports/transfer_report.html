@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transfer Report - AdminPanel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .report-container {
+            padding: 20px;
+        }
+
+        .filter-panel {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 25px;
+            background: var(--glass-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+        }
+
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .report-table th {
+            background: rgba(99, 102, 241, 0.1);
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--primary);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            color: var(--text-main);
+        }
+
+        .report-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--text-muted);
+        }
+
+        .qty-cell {
+            text-align: center;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .location-badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        @media print {
+            /* Keep location columns if user wants them on print, or hide them specifically */
+            .col-loc {
+                display: table-cell !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>Transfer Report</h1>
+                <p style="color: var(--text-muted);">Stock movements between locations (Godown ↔ Shop).</p>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="report-container">
+            <div class="filter-panel">
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">FROM DATE</label>
+                    <input type="date" id="startDate" class="input-dark">
+                </div>
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">TO DATE</label>
+                    <input type="date" id="endDate" class="input-dark">
+                </div>
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-sync"></i> REFRESH
+                </button>
+            </div>
+
+            <div class="print-only-header">
+                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET
+                </h1>
+                <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Stock Transfer Report</p>
+                <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
+                <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px;">
+                <div class="table-wrapper">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>DATE/TIME</th>
+                                <th>CODE</th>
+                                <th>ITEM</th>
+                                <th class="qty-cell">QTY</th>
+                                <th class="col-loc">FROM</th>
+                                <th class="col-loc">TO</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportContent"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+
+        async function loadReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const startF = new Date(start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const endF = new Date(end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+            document.getElementById('printDateRange').innerText = `Period: ${startF} to ${endF}`;
+
+            try {
+                const res = await fetch('/api/stock/transfers');
+                const data = await res.json();
+
+                const filtered = data.filter(t => {
+                    const tDate = new Date(t.transfer_date);
+                    const dStr = tDate.getFullYear() + '-' + String(tDate.getMonth() + 1).padStart(2, '0') + '-' + String(tDate.getDate()).padStart(2, '0');
+                    return dStr >= start && dStr <= end;
+                });
+
+                const tbody = document.getElementById('reportContent');
+                tbody.innerHTML = '';
+
+                filtered.forEach(t => {
+                    const tDate = new Date(t.transfer_date);
+                    const dateTime = tDate.toLocaleDateString('en-GB') + ' ' + tDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${dateTime}</td>
+                        <td style="font-family: monospace;">${t.product_barcode || '-'}</td>
+                        <td style="font-weight: 600; color: var(--text-main);">${t.product_name}</td>
+                        <td class="qty-cell">${t.qty}</td>
+                        <td class="col-loc"><span class="location-badge">${t.from_location}</span></td>
+                        <td class="col-loc"><span class="location-badge" style="color: var(--primary);">${t.to_location}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">No stock transfers recorded for this date.</td></tr>';
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

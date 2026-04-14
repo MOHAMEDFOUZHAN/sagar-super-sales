@@ -1,0 +1,48 @@
+Sagar reports
+Bill wise Sales Report Shows the entire bill entered for the day.
+DOC ID, DATE/TIME, GROSS, DISCOUNT , NET 
+Sales Report Shows the items in the bill with payment mode wise.
+DOC ID,DATE/TIME, BIZ AMT, ITEM, QTY , RATE, AMOUNT
+Daily Sales Report Shows the payment mode & category wise sales. Cash, UPI, 
+Card, oils, aromatics, tea, spices,,,,,,etc
+Detail Sales Report Shows the net amount followed by BIZ 80%,20% & TOTAL BIZ 
+and TSC total and TSC 80% 20%.
+Total Sales Report Shows the number of products sold under each category 
+headings. .
+Daily stock Report Shows the number of products availability [ stock availability ]
+Cancelled Report Shows the cancelled bill details. DOC ID, DATE/TIME, AMOUNT .
+Transfer Report Shows the products transferred from godown to shop & shop 
+to godown.  DATE/TIME, CODE, ITEM , QTY .
+1
+2
+3
+4
+5
+6
+7
+8
+9 Final Report Shows the everyday sales and expenses adjustments with 
+opening balance.
+Bill wise Sales Report Shows the entire bill entered for the day.
+DOC ID, DATE/TIME, GROSS, DISCOUNT , NET 1
+
+Sales Report Shows the items in the bill with payment mode wise.
+DOC ID,DATE/TIME, BIZ AMT, ITEM, QTY , RATE, AMOUNT2
+
+Daily Sales Report Shows the payment mode & category wise sales. Cash, UPI, 
+Card, oils, aromatics, tea, spices,,,,,,etc3
+
+Detail Sales Report Shows the net amount followed by BIZ 80%,20% & TOTAL BIZ 
+and TSC total and TSC 80% 20%.4
+
+Total Sales Report Shows the number of products sold under each category 
+headings. .5
+
+Daily stock Report Shows the number of products availability [ stock availability ]6
+
+Cancelled Report Shows the cancelled bill details. DOC ID, DATE/TIME, AMOUNT .7
+
+9 Final Report Shows the everyday sales and expenses adjustments with 
+opening balance.
+
+

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Category Lab - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .cat-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 25px;
+            border-radius: var(--radius-lg);
+            transition: all 0.3s var(--ease-out);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cat-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .cat-icon {
+            width: 45px;
+            height: 45px;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content animate-fade">
+        <header class="section-header">
+            <div>
+                <h1>Taxonomy Control</h1>
+                <p style="color: var(--text-muted);">Organize your product catalog into logical groups.</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="catName" class="input-dark" placeholder="New category name..."
+                    style="width: 250px;">
+                <button class="btn btn-primary" onclick="addCategory()">
+                    <i class="fa-solid fa-plus"></i> ADD GROUP
+                </button>
+            </div>
+        </header>
+
+        <div id="categoryContainer" class="category-grid">
+            <!-- Loaded via JS -->
+        </div>
+    </main>
+
+    <script>
+        async function loadCategories() {
+            const res = await fetch('/api/inventory/categories');
+            const cats = await res.json();
+            const container = document.getElementById('categoryContainer');
+            container.innerHTML = '';
+
+            cats.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'cat-card';
+                div.innerHTML = `
+                    <div class="cat-icon"><i class="fa-solid fa-layer-group"></i></div>
+                    <h3 style="font-weight: 800; letter-spacing: -0.5px; margin-bottom: 5px;">${c.name}</h3>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 20px;">Product Classification</p>
+                    <div style="display: flex; justify-content: flex-end;">
+                        <button class="btn" style="padding: 8px 12px; background: rgba(239, 68, 68, 0.1); color: var(--danger); font-size: 0.7rem;" onclick="deleteCategory(${c.id})">
+                            <i class="fa-solid fa-trash"></i> DELETE
+                        </button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        async function addCategory() {
+            const name = document.getElementById('catName').value.trim();
+            if (!name) return;
+
+            const res = await fetch('/api/inventory/categories', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            if ((await res.json()).status === 'success') {
+                document.getElementById('catName').value = '';
+                loadCategories();
+            }
+        }
+
+        async function deleteCategory(id) {
+            if (!confirm('Purge this category? Products in this group will remain uncategorized.')) return;
+            const res = await fetch('/api/inventory/categories/' + id, { method: 'DELETE' });
+            if ((await res.json()).status === 'success') loadCategories();
+        }
+
+        loadCategories();
+    </script>
+</body>
+
+</html>

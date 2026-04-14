@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detailed Admin Report - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .report-card {
+            background: white;
+            color: black;
+            padding: 20px 40px;
+            max-width: 850px;
+            margin: 20px auto;
+            font-family: 'Courier New', Courier, monospace;
+            border: 1px solid #000;
+        }
+
+        .report-title {
+            text-align: center;
+            text-transform: uppercase;
+            font-weight: 900;
+            font-size: 1.4rem;
+            margin: 0;
+        }
+
+        .report-subtitle {
+            text-align: center;
+            text-transform: uppercase;
+            font-weight: 900;
+            font-size: 1.8rem;
+            margin: 5px 0;
+        }
+
+        .report-meta {
+            text-align: center;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid black;
+        }
+
+        .report-table th,
+        .report-table td {
+            border: 1px solid #000;
+            padding: 6px 15px;
+            text-align: left;
+            font-size: 1rem;
+            line-height: 1.2;
+        }
+
+        .report-table th {
+            background-color: #ccc;
+            text-transform: uppercase;
+            font-weight: 900;
+        }
+
+        .report-table td:last-child {
+            text-align: right;
+            width: 180px;
+            font-weight: bold;
+        }
+
+        .section-header {
+            background-color: #eee;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .text-bold {
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .empty-row {
+            height: 15px;
+        }
+
+        .grand-footer {
+            margin-top: 10px;
+            text-align: right;
+            font-weight: 900;
+            font-size: 1.2rem;
+        }
+
+        @media print {
+            .report-card {
+                border: 1px solid black !important;
+                margin: 0 auto !important;
+                padding: 10mm !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-shadow: none !important;
+                break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header-top no-print"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h1 style="color: var(--text-main);">Final Report Admin</h1>
+            <div class="filters" style="display: flex; gap: 10px; align-items: center;">
+                <input type="date" id="reportDate" class="input-dark">
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-sync"></i> LOAD DATA
+                </button>
+                <button class="btn btn-success" onclick="window.print()">
+                    <i class="fa-solid fa-print"></i> PRINT
+                </button>
+            </div>
+        </header>
+
+        <div class="report-card" id="printableReport">
+            <div class="report-title">Final Report Admin</div>
+            <div class="report-subtitle">Maple Super Market</div>
+            <div class="report-meta">
+                Date : <span id="displayDate">--/--/----</span> &nbsp; Time : <span id="displayTime">--:--:--</span>
+            </div>
+
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>DESCRIPTION</th>
+                        <th>NET</th>
+                    </tr>
+                </thead>
+                <tbody id="reportBody">
+                    <!-- Section 1: Sales Summary -->
+                    <tr>
+                        <td class="text-bold">TOTAL SALES =</td>
+                        <td id="totalSales">0.00</td>
+                    </tr>
+                    <tr class="empty-row">
+                        <td colspan="2"></td>
+                    </tr>
+                    <tr>
+                        <td>CASH SALES =</td>
+                        <td id="cashSales">0.00</td>
+                    </tr>
+                    <tr>
+                        <td>CREDIT CARD =</td>
+                        <td id="cardSales">0.00</td>
+                    </tr>
+                    <tr>
+                        <td>DIGITAL SALES =</td>
+                        <td id="upiSales">0.00</td>
+                    </tr>
+                    <tr>
+                        <td>CREDIT</td>
+                        <td id="creditSales">0.00</td>
+                    </tr>
+                    <tr class="empty-row">
+                        <td colspan="2"></td>
+                    </tr>
+
+                    <!-- Section 2: Category Breakdown -->
+                <tbody id="categoryRows"></tbody>
+                <tr class="empty-row">
+                    <td colspan="2"></td>
+                </tr>
+
+                <!-- Section 3: Expenses & Bizz Breakdown -->
+                <tr class="section-header">
+                    <td colspan="2">CASH DEBIT EXP</td>
+                </tr>
+                <tbody id="expenseRows"></tbody>
+                <tbody id="bizzCatRows"></tbody>
+                <tbody id="tscRows"></tbody>
+
+                <tr class="empty-row">
+                    <td colspan="2"></td>
+                </tr>
+                <tr class="section-header">
+                    <td colspan="2">SHOP EXP</td>
+                </tr>
+                <tbody id="shopExpRows"></tbody>
+
+                <tr class="empty-row">
+                    <td colspan="2"></td>
+                </tr>
+                <tr>
+                    <td class="text-bold">TOTAL EXPENSE =</td>
+                    <td id="totalExpense">0.00</td>
+                </tr>
+                <tr class="empty-row">
+                    <td colspan="2"></td>
+                </tr>
+
+                <!-- Section 4: Godown/Bizz Split -->
+                <tr>
+                    <td class="text-bold">GODOWN BIZ @ 17%</td>
+                    <td id="godownBiz">0.00</td>
+                </tr>
+                <tr class="empty-row">
+                    <td colspan="2"></td>
+                </tr>
+
+                <!-- Section 5: Cash Balance Section -->
+                <tr>
+                    <td class="text-bold">O.B =</td>
+                    <td id="openingBal">0.00</td>
+                </tr>
+                <tr>
+                    <td class="text-bold">(+/- =)</td>
+                    <td id="cashPlusMinus">0.00</td>
+                </tr>
+                <tr>
+                    <td class="text-bold">C.B =</td>
+                    <td id="closingBal">0.00</td>
+                </tr>
+                <tr>
+                    <td class="text-bold">CASH / OFF =</td>
+                    <td id="cashOff" style="color: red;">0.00</td>
+                </tr>
+                <tr class="empty-row">
+                    <td colspan="2"></td>
+                </tr>
+
+                <!-- Section 6: Denominations -->
+                <tr class="section-header">
+                    <td colspan="2">DENOMINATION</td>
+                </tr>
+                <tbody id="denomRows"></tbody>
+                </tbody>
+            </table>
+
+            <div class="grand-footer">
+                Total C/F : <span id="totalCF">₹0.00</span>
+            </div>
+            <p style="text-align: center; font-size: 0.8rem; margin-top: 20px;">Page : 1 of 1</p>
+        </div>
+    </main>
+
+    <script>
+        // Use local date
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('reportDate').value = today;
+
+        async function loadReport() {
+            const date = document.getElementById('reportDate').value;
+            const res = await fetch(`/api/reports/closure?date=${date}`);
+            const data = await res.json();
+
+            // Meta
+            const [y, m, d] = date.split('-');
+            document.getElementById('displayDate').innerText = `${d}/${m}/${y}`;
+            document.getElementById('displayTime').innerText = data.meta.time;
+
+            // Sales Summary
+            const s = data.sales_summary;
+            document.getElementById('totalSales').innerText = s.total_sales.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('cashSales').innerText = s.cash_sales.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('cardSales').innerText = s.card_sales.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('upiSales').innerText = s.upi_sales.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('creditSales').innerText = s.credit_sales.toLocaleString(undefined, { minimumFractionDigits: 2 });
+
+            // Category Sales
+            const catRows = document.getElementById('categoryRows');
+            catRows.innerHTML = '';
+            data.category_sales.forEach(c => {
+                catRows.innerHTML += `<tr><td class="text-bold">${c.category}</td><td>${c.category_sales.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+            });
+
+            // Office Expenses
+            const expRows = document.getElementById('expenseRows');
+            expRows.innerHTML = '';
+            data.office_expenses.forEach(e => {
+                expRows.innerHTML += `<tr><td>${e.category.toUpperCase()}</td><td>${e.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+            });
+
+            // Bizz Breakdown
+            const bizzRows = document.getElementById('bizzCatRows');
+            bizzRows.innerHTML = '';
+            bizzRows.innerHTML += `<tr><td>BIZ @ 83%</td><td>${data.biz_83.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+            data.bizz_by_cat.forEach(b => {
+                bizzRows.innerHTML += `<tr><td>${b.category.toUpperCase()} BIZ</td><td>${b.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+            });
+
+            // TSC
+            const tscRows = document.getElementById('tscRows');
+            tscRows.innerHTML = `<tr><td>TSC</td><td>${data.total_tsc.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+
+            // Shop Expenses
+            const shopRows = document.getElementById('shopExpRows');
+            shopRows.innerHTML = '';
+            data.shop_expenses.forEach(e => {
+                shopRows.innerHTML += `<tr><td>${e.category.toUpperCase()}</td><td>${e.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+            });
+
+            // Total Expense
+            document.getElementById('totalExpense').innerText = data.total_expenses.toLocaleString(undefined, { minimumFractionDigits: 2 });
+
+            // Godown Biz (17%)
+            document.getElementById('godownBiz').innerText = data.biz_17.toLocaleString(undefined, { minimumFractionDigits: 2 });
+
+            // Cash Balance
+            const bal = data.balance;
+            document.getElementById('openingBal').innerText = bal.opening_balance.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            // (+/- =) logic: Opening + Cash Sales - Total Expenses (Actual Cash out)
+            // But let's simplify to match user's physical sheet if needed. 
+            // In the image, O.B is 12,000, C.B is 12,028. Difference is 28.
+            document.getElementById('closingBal').innerText = bal.actual_closing.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('cashOff').innerText = bal.difference.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('totalCF').innerText = '₹' + bal.actual_closing.toLocaleString(undefined, { minimumFractionDigits: 2 });
+
+            // Denominations
+            const dRows = document.getElementById('denomRows');
+            dRows.innerHTML = '';
+            data.denominations.forEach(dn => {
+                dRows.innerHTML += `<tr><td>${dn.note_value} * ${dn.count}</td><td>${(dn.note_value * dn.count).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+            });
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

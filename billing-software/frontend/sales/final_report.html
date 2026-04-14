@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final Admin Audit | Maple Pro</title>
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-darker: #020617;
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --secondary: #ec4899;
+            --accent: #06b6d4;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --radius-lg: 20px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top left, #1e1b4b, var(--bg-dark), var(--bg-darker));
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .main-content {
+            flex: 1;
+            margin-left: 260px;
+            padding: 30px;
+            overflow-y: auto;
+            height: 100vh;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: var(--radius-md);
+            transition: 0.2s;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.03);
+            color: white;
+        }
+
+        .nav-link.active {
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.15), transparent);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #818cf8;
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(15px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            margin-bottom: 24px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background: var(--glass-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--acc, var(--primary));
+        }
+
+        .kpi-card label {
+            display: block;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .kpi-card span {
+            display: block;
+            font-size: 1.4rem;
+            font-weight: 900;
+            margin-top: 5px;
+        }
+
+        .audit-section-title {
+            font-size: 0.8rem;
+            font-weight: 900;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            border-left: 3px solid var(--primary);
+            padding-left: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+        }
+
+        .input-glass {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            width: 100%;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        .input-glass:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        .btn-premium {
+            background: linear-gradient(135deg, var(--primary), #4f46e5);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-premium:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--primary-glow);
+        }
+
+        .denom-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .denom-input {
+            width: 60px;
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            color: white;
+            text-align: center;
+            border-radius: 4px;
+            padding: 2px;
+        }
+
+        @media print {
+            body {
+                background: white;
+                color: black;
+                overflow: visible;
+            }
+
+            .sidebar,
+            .no-print,
+            .main-content {
+                display: none !important;
+            }
+
+            /* Force Preview Modal to be visible and fill page */
+            #previewModal {
+                display: block !important;
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+                background: white !important;
+                z-index: 9999 !important;
+                backdrop-filter: none !important;
+            }
+
+            .modal-content {
+                width: 100% !important;
+                max-width: none !important;
+                height: auto !important;
+                box-shadow: none !important;
+                border: none !important;
+                background: white !important;
+                overflow: visible !important;
+            }
+
+            .modal-header,
+            .modal-footer {
+                display: none !important;
+            }
+
+            .modal-body {
+                padding: 0 !important;
+                margin: 0 !important;
+                background: white !important;
+                color: black !important;
+                overflow: visible !important;
+                max-width: none !important;
+            }
+
+            /* Ensure layout containers inside preview allow full width */
+            .modal-body>div {
+                max-width: none !important;
+                margin: 0 !important;
+                border: none !important;
+            }
+        }
+
+        /* Custom Scroll */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .bizz-summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .bizz-detail-item {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* MODAL */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: var(--bg-dark);
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(30, 41, 59, 0.5);
+        }
+
+        .modal-body {
+            padding: 40px;
+            overflow-y: auto;
+            background: white;
+            color: black;
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Preview specific overrides to simulate print */
+        .modal-body .glass-panel {
+            background: transparent;
+            border: 1px solid #e2e8f0;
+            box-shadow: none;
+            color: black;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+
+        .modal-body .audit-section-title {
+            color: #334155;
+            border-left-color: #334155;
+        }
+
+        .modal-body table th {
+            color: #64748b;
+            border-bottom-color: #e2e8f0;
+        }
+
+        .modal-body table td {
+            border-bottom-color: #f1f5f9;
+            color: #0f172a;
+        }
+
+        .modal-body h1,
+        .modal-body h2,
+        .modal-body h3,
+        .modal-body span {
+            color: inherit;
+        }
+
+        .modal-body .kpi-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: black;
+        }
+
+        .modal-body .kpi-card label {
+            color: #64748b;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            background: var(--glass-bg);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="brand" style="font-size: 1.5rem; font-weight: 900; margin-bottom: 40px; color: white;">
+            <i class="fa-solid fa-bolt" style="color: var(--primary);"></i> MAPLE PRO
+        </div>
+        <ul style="list-style: none; padding: 0;">
+            <li><a href="/sales/dashboard" class="nav-link"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+            <li><a href="/sales/billing" class="nav-link"><i class="fa-solid fa-cart-shopping"></i> Billing</a></li>
+            <li><a href="/sales/expenses" class="nav-link"><i class="fa-solid fa-receipt"></i> Expenses</a></li>
+            <li><a href="/sales/report" class="nav-link active"><i class="fa-solid fa-file-invoice-dollar"></i> Final Audit</a></li>
+            <li><a href="/sales/returns" class="nav-link"><i class="fa-solid fa-rotate-left"></i> Returns & Voids</a></li>
+        </ul>
+        
+        <div style="margin-top: auto; padding-bottom: 15px;">
+            <div style="padding: 12px 16px; margin-bottom: 15px; background: rgba(255,255,255,0.05); border-radius: var(--radius-md); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 12px;">
+                <div style="width: 32px; height: 32px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white;">
+                    {{ session.username[0].upper() if session.username else 'C' }}
+                </div>
+                <div>
+                    <div style="font-size: 0.85rem; font-weight: 600; color: white;">
+                        {% if session.username.startswith('counter') %}Counter - {{ session.username[7:] }}
+                        {% else %}{{ session.username|capitalize }}{% endif %}
+                    </div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Active Session</div>
+                </div>
+            </div>
+            
+            <div class="no-print" style="margin-bottom: 10px;">
+                <input type="date" id="reportDate" class="input-glass" style="margin-bottom: 10px;">
+                <button class="btn-premium" style="width: 100%; justify-content: center;" onclick="loadClosureReport()">SYNC DATE</button>
+            </div>
+            
+            <a href="/" class="nav-link" style="color: var(--danger);"><i class="fa-solid fa-power-off"></i> Logout</a>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1 style="font-size: 2.2rem; font-weight: 900; letter-spacing: -2px;">
+                    {% if session.username.startswith('counter') %}Daily Closure - Counter {{ session.username[7:] }}
+                    {% else %}Sales Audit Report{% endif %}
+                </h1>
+                <p style="color: var(--text-muted); font-weight: 500;">Dynamic data visualization of your counter performance</p>
+            </div>
+            <div class="no-print">
+                <button class="btn-premium" onclick="showPreview()"><i class="fa-solid fa-print"></i> PRINT
+                    LEDGER</button>
+            </div>
+        </header>
+
+        <!-- 1. META INFO -->
+        <div class="glass-panel"
+            style="padding: 15px 24px; display: flex; justify-content: space-between; border-bottom: 4px solid var(--primary); margin-bottom: 15px;">
+            <div>
+                <span style="font-weight: 900; font-size: 1.1rem;">SAGAR SUPER</span>
+                <span id="displayBranch" style="color: var(--text-muted); margin-left: 10px; font-size: 0.85rem;">Main
+                    Branch</span>
+            </div>
+            <div style="text-align: right;">
+                <span id="displayDate" style="font-weight: 800; color: var(--primary);">--/--/----</span>
+                <br>
+                <span id="genBy" style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">ADMIN:
+                    --</span>
+            </div>
+        </div>
+
+        <!-- 1. SALES SUMMARY KPI -->
+        <div class="audit-section-title">Sales Summary Report</div>
+        <div class="report-grid">
+            <div class="kpi-card" style="--acc: var(--primary);">
+                <label>Total Net Sales</label>
+                <span id="totalSales">₹0.00</span>
+            </div>
+            <div class="kpi-card" style="--acc: var(--accent);">
+                <label>No. of Bills</label>
+                <span id="billCount">0</span>
+            </div>
+            <div class="kpi-card" style="--acc: var(--secondary);">
+                <label>Avg Bill Value</label>
+                <span id="avgBill">₹0.00</span>
+            </div>
+        </div>
+
+        <!-- Sales Breakdown -->
+        <div class="glass-panel">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Payment Mode</th>
+                        <th style="text-align: right;">Amount Realized</th>
+                        <th style="text-align: right;">% Contrib</th>
+                    </tr>
+                </thead>
+                <tbody id="salesTableBody"></tbody>
+            </table>
+        </div>
+
+        <!-- 2. BIZZ SECTION -->
+        <div class="audit-section-title">Loyalty Rewards & Business Charges</div>
+        <div class="glass-panel" style="border-left: 5px solid var(--warning); padding: 20px;">
+            <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 20px;">
+                <div style="display: flex; flex-direction: column;">
+                    <span
+                        style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">TOTALBIZ:
+                        ₹</span>
+                    <span id="totalBizCharges"
+                        style="font-size: 3.2rem; font-weight: 900; color: var(--warning); line-height: 1; letter-spacing: -2px;">0.00</span>
+                </div>
+                <div class="bizz-summary-grid" style="width: 450px;">
+                    <div class="bizz-detail-item">
+                        <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800;">BIZ@80%:</span>
+                        <span id="biz80Val" style="font-size: 1.1rem; font-weight: 900;">₹0.00</span>
+                    </div>
+                    <div class="bizz-detail-item">
+                        <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800;">BIZ@20%:</span>
+                        <span id="biz20Val" style="font-size: 1.1rem; font-weight: 900;">₹0.00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TSC SECTION -->
+        <div class="audit-section-title">Transaction Sales Commission (TSC)</div>
+        <div class="glass-panel" style="border-left: 5px solid var(--accent); padding: 20px;">
+            <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 20px;">
+                <div style="display: flex; flex-direction: column;">
+                    <span
+                        style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">TOTAL
+                        TSC:
+                        ₹</span>
+                    <span id="totalTscVal"
+                        style="font-size: 3.2rem; font-weight: 900; color: var(--accent); line-height: 1; letter-spacing: -2px;">0.00</span>
+                </div>
+                <div class="bizz-summary-grid" style="width: 450px;">
+                    <div class="bizz-detail-item">
+                        <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800;">TSC@80%:</span>
+                        <span id="tsc80Val" style="font-size: 1.1rem; font-weight: 900;">₹0.00</span>
+                    </div>
+                    <div class="bizz-detail-item">
+                        <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800;">TSC@20%:</span>
+                        <span id="tsc20Val" style="font-size: 1.1rem; font-weight: 900;">₹0.00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. CATEGORY REPORT -->
+        <div class="audit-section-title">Category-Wise Performance</div>
+        <div class="glass-panel">
+            <table id="catTable">
+                <thead>
+                    <tr>
+                        <th>Category Name</th>
+                        <th style="text-align: right;">Sales Amount</th>
+                        <th style="text-align: right;">Share Percentage</th>
+                    </tr>
+                </thead>
+                <tbody id="catTableBody"></tbody>
+            </table>
+        </div>
+
+        <!-- 4, 5. EXPENSES -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+            <div class="glass-panel">
+                <div class="audit-section-title">Office Expenses</div>
+                <table id="officeExpTable">
+                    <tbody id="officeExpBody"></tbody>
+                </table>
+            </div>
+            <div class="glass-panel">
+                <div class="audit-section-title">Shop Expenses</div>
+                <table id="shopExpTable">
+                    <tbody id="shopExpBody"></tbody>
+                    <tfoot>
+                        <tr style="background: rgba(0,0,0,0.1);">
+                            <td style="font-weight: 800;">TOTAL SHOP</td>
+                            <td style="text-align: right; font-weight: 800;" id="totalShop">₹0.00</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- 8, 9, 10. CASH AUDIT -->
+        <div class="audit-section-title">Cash Flow Audit & Verification</div>
+        <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 24px;">
+            <div class="glass-panel">
+                <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); margin-bottom: 15px;">
+                    PHYSICAL CASH DENOMINATIONS</div>
+                <div id="denomInputs" style="max-height: 400px; overflow-y: auto; padding-right: 10px;">
+                    <!-- JS fills -->
+                </div>
+                <div
+                    style="margin-top: 15px; padding: 15px; background: rgba(99, 102, 241, 0.1); border: 1px solid var(--primary); border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 800;">PHYSICAL TOTAL</span>
+                    <span id="actualCashDisplay"
+                        style="font-size: 1.6rem; font-weight: 900; color: var(--success);">₹0</span>
+                </div>
+            </div>
+
+            <div class="glass-panel">
+                <div class="glass-panel">
+                    <table style="font-size: 0.95rem; border-spacing: 0 5px; border-collapse: separate; width: 100%;">
+                        <tr style="color: var(--text-muted);">
+                            <td style="padding: 8px;">(+) OPENING BALANCE</td>
+                            <td style="text-align: right; padding: 8px;" id="obVal">₹0.00</td>
+                        </tr>
+                        <tr style="color: var(--text-muted);">
+                            <td style="padding: 8px;">(+) CASH SALES</td>
+                            <td style="text-align: right; padding: 8px;" id="cashSalesVal">₹0.00</td>
+                        </tr>
+                        <tr style="color: var(--text-muted);">
+                            <td style="padding: 8px;">(-) EXPENSES</td>
+                            <td style="text-align: right; padding: 8px;" id="cashExpVal">₹0.00</td>
+                        </tr>
+                        <tr style="color: var(--text-muted);">
+                            <td style="padding: 8px;">(-) BIZ REWARDS</td>
+                            <td style="text-align: right; padding: 8px;" id="bizChargesVal">₹0.00</td>
+                        </tr>
+                        <tr style="font-weight: 800; color: var(--accent); border-top: 1px solid var(--glass-border);">
+                            <td style="padding: 10px;">EXPECTED CLOSING</td>
+                            <td style="text-align: right; padding: 10px;" id="expectedVal">₹0.00</td>
+                        </tr>
+                        <tr style="font-weight: 900;">
+                            <td
+                                style="padding: 15px; background: rgba(255,255,255,0.03); border-top-left-radius: 12px; border-bottom-left-radius: 12px;">
+                                ACTUAL COUNTED</td>
+                            <td style="text-align: right; color: var(--success); padding: 15px; background: rgba(255,255,255,0.03); border-top-right-radius: 12px; border-bottom-right-radius: 12px;"
+                                id="actualVal">₹0.00</td>
+                        </tr>
+                        <tr style="color: var(--text-muted);">
+                            <td style="padding: 15px;">(-) NEXT DAY FLOAT</td>
+                            <td style="text-align: right; padding: 15px;">-₹2,500.00</td>
+                        </tr>
+                        <tr style="font-weight: 900; color: var(--warning); border-top: 2px solid var(--glass-border);">
+                            <td style="padding: 20px; font-size: 1.3rem;">NET CASH TO OFFICE</td>
+                            <td style="text-align: right; padding: 20px; font-size: 1.5rem;" id="netToOfficeVal">₹0.00
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 11. C/F -->
+        <div class="audit-section-title">Carry Forward Summary</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 50px;">
+            <div class="glass-panel" style="border-top: 5px solid var(--primary);">
+                <label style="font-size: 0.65rem; color: var(--text-muted); font-weight: 800;">CASH TO OFFICE</label>
+                <h2 id="cfVal" style="font-size: 2rem; font-weight: 900; margin: 10px 0;">₹0.00</h2>
+            </div>
+            <div class="glass-panel" style="border-top: 5px solid var(--accent);">
+                <label style="font-size: 0.65rem; color: var(--text-muted); font-weight: 800;">NEXT DAY OPENING</label>
+                <h2 id="nextObVal" style="font-size: 2rem; font-weight: 900; margin: 10px 0;">₹0.00</h2>
+            </div>
+        </div>
+
+        <div class="no-print"
+            style="position: sticky; bottom: 20px; display: flex; gap: 15px; justify-content: flex-end; z-index: 1000;">
+            <button class="btn-premium" style="background: rgba(15,23,42,0.8); backdrop-filter: blur(10px);"
+                onclick="showPreview()"><i class="fa-solid fa-print"></i> PREVIEW & PRINT</button>
+            <button class="btn-premium" onclick="saveAudit()"><i class="fa-solid fa-cloud-arrow-up"></i> FINALIZE &
+                CLOSE DAY</button>
+        </div>
+    </main>
+
+    <!-- PRINT PREVIEW MODAL -->
+    <div id="previewModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 style="margin:0;"><i class="fa-solid fa-file-invoice"></i> Print Preview</h3>
+                <button onclick="closePreview()"
+                    style="background:none; border:none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem;"><i
+                        class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="previewBody">
+                <!-- Content will be cloned here -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-premium" style="background: transparent; border: 1px solid var(--glass-border);"
+                    onclick="closePreview()">Editing</button>
+                <button class="btn-premium" onclick="confirmPrint()"><i class="fa-solid fa-print"></i> CONFIRM
+                    PRINT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const notes = [500, 200, 100, 50, 20, 10, 5, 2, 1];
+
+        window.onload = () => {
+            // Fix: Use local date instead of UTC to avoid timezone mismatch
+            const now = new Date();
+            const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            document.getElementById('reportDate').value = today;
+
+            // Build denom inputs
+            const container = document.getElementById('denomInputs');
+            notes.forEach(note => {
+                container.innerHTML += `
+                    <div class="denom-row">
+                        <span style="font-weight: 800; width: 50px; color: var(--accent);">₹${note}</span>
+                        <input type="number" class="denom-input" data-note="${note}" min="0" value="0" oninput="calcPhysical()">
+                        <span style="color: var(--text-muted); font-size: 0.7rem; margin-left: auto;" id="total-${note}">0</span>
+                    </div>
+                `;
+            });
+
+            loadClosureReport();
+        };
+
+        async function loadClosureReport() {
+            const date = document.getElementById('reportDate').value;
+            try {
+                const res = await fetch(`/api/reports/closure?date=${date}`);
+                const data = await res.json();
+
+                // Meta
+                document.getElementById('displayDate').innerText = new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                document.getElementById('genBy').innerText = `ADMIN: ${data.meta.admin} | SYNC TIME: ${data.meta.time}`;
+
+                // Sales
+                document.getElementById('totalSales').innerText = '₹' + data.sales.total_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('billCount').innerText = data.sales.bill_count;
+                document.getElementById('avgBill').innerText = '₹' + data.sales.avg_bill.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+                // Bizz Breakdown (Top Panel)
+                document.getElementById('biz80Val').innerText = '₹' + data.biz_80.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('biz20Val').innerText = '₹' + data.biz_20.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('totalBizCharges').innerText = data.biz_charges.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+                // TSC Breakdown
+                document.getElementById('tsc80Val').innerText = '₹' + data.tsc_80.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('tsc20Val').innerText = '₹' + data.tsc_20.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('totalTscVal').innerText = data.tsc_total.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+                const sBody = document.getElementById('salesTableBody');
+                sBody.innerHTML = '';
+                ['CASH', 'CARD', 'UPI', 'CREDIT'].forEach(mode => {
+                    const amount = data.sales[mode.toLowerCase() + '_sales'] || 0;
+                    const perc = data.sales.total_sales > 0 ? (amount / data.sales.total_sales * 100).toFixed(1) : 0;
+                    sBody.innerHTML += `<tr><td>${mode} Sales</td><td style="text-align: right; font-weight: 800;">₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td><td style="text-align: right; color: var(--accent); font-weight: 700;">${perc}%</td></tr>`;
+                });
+
+                // Categories
+                const cBody = document.getElementById('catTableBody');
+                cBody.innerHTML = '';
+                data.categories.forEach(cat => {
+                    cBody.innerHTML += `<tr><td style="font-weight: 700;">${cat.category}</td><td style="text-align: right; font-weight: 900;">₹${cat.category_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td><td style="text-align: right;"><span style="color: var(--primary); font-weight: 800;">${cat.percent.toFixed(1)}%</span></td></tr>`;
+                });
+
+                // Expenses
+                const oBody = document.getElementById('officeExpBody'); oBody.innerHTML = '';
+                data.office_expenses.forEach(e => { oBody.innerHTML += `<tr><td>${e.category}</td><td style="text-align: right;">₹${e.amount.toFixed(2)}</td></tr>`; });
+
+                const shBody = document.getElementById('shopExpBody'); shBody.innerHTML = '';
+                data.shop_expenses.forEach(e => { shBody.innerHTML += `<tr><td>${e.category}</td><td style="text-align: right;">₹${e.amount.toFixed(2)}</td></tr>`; });
+                document.getElementById('totalShop').innerText = '₹' + data.total_shop.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+                // Balance Calc
+                document.getElementById('obVal').innerText = '₹' + data.balance.opening_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('cashSalesVal').innerText = '₹' + data.sales.cash_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('cashExpVal').innerText = '₹' + data.total_expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('bizChargesVal').innerText = '₹' + data.biz_charges.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+                const expected = data.balance.opening_balance + data.sales.cash_sales - data.total_expenses - data.biz_charges;
+                document.getElementById('expectedVal').innerText = '₹' + expected.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+                // Denoms
+                if (data.denominations.length > 0) {
+                    data.denominations.forEach(d => {
+                        const inp = document.querySelector(`.denom-input[data-note="${d.note_value}"]`);
+                        if (inp) inp.value = d.count;
+                    });
+                } else {
+                    document.querySelectorAll('.denom-input').forEach(i => i.value = 0);
+                }
+
+                calcPhysical();
+            } catch (err) { console.error(err); }
+        }
+
+        function calcPhysical() {
+            let total = 0;
+            document.querySelectorAll('.denom-input').forEach(inp => {
+                const note = parseInt(inp.dataset.note);
+                const count = parseInt(inp.value) || 0;
+                total += (note * count);
+                document.getElementById(`total-${note}`).innerText = (note * count).toLocaleString('en-IN');
+            });
+
+            document.getElementById('actualCashDisplay').innerText = '₹' + total.toLocaleString('en-IN');
+            document.getElementById('actualVal').innerText = '₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+            const toOffice = Math.max(0, total - 2500);
+            document.getElementById('netToOfficeVal').innerText = '₹' + toOffice.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+            document.getElementById('cfVal').innerText = '₹' + toOffice.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+            document.getElementById('nextObVal').innerText = '₹2,500.00';
+        }
+
+        async function saveAudit() {
+            const date = document.getElementById('reportDate').value;
+            const ob = parseFloat(document.getElementById('obVal').innerText.replace(/[₹,]/g, ''));
+            const actual = parseFloat(document.getElementById('actualVal').innerText.replace(/[₹,]/g, ''));
+            const denoms = Array.from(document.querySelectorAll('.denom-input')).map(i => ({ note_value: parseInt(i.dataset.note), count: parseInt(i.value) || 0 }));
+
+            if (!confirm("Finalize today's audit? This will lock the cash ledger for " + date)) return;
+
+            try {
+                const res = await fetch('/api/reports/closure/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date, opening_balance: ob, actual_closing: actual, denominations: denoms })
+                });
+                const resData = await res.json();
+                if (resData.status === 'success') {
+                    alert("Audit Saved Successfully.");
+                    loadClosureReport();
+                }
+            } catch (err) { alert("Error saving audit."); }
+        }
+
+        function showPreview() {
+            try {
+                const getText = (id) => document.getElementById(id)?.innerText || '₹ 0.00';
+                const getVal = (id) => document.getElementById(id)?.value || '';
+
+                // Data Extraction
+                const date = getVal('reportDate');
+                const admin = getText('genBy').replace('ADMIN: ', '').split('|')[0].trim();
+                const syncTime = getText('genBy').split('SYNC TIME: ')[1] || new Date().toLocaleTimeString();
+                const branch = document.getElementById('displayBranch').innerText;
+
+                const totalSales = getText('totalSales');
+                const cashSales = document.getElementById('cashSalesVal').innerText;
+                const cardCol = Array.from(document.querySelectorAll('#salesTableBody tr')).find(tr => tr.innerText.includes('CARD'));
+                const cardSales = cardCol ? cardCol.querySelector('td:nth-child(2)').innerText : '₹ 0.00';
+                const upiCol = Array.from(document.querySelectorAll('#salesTableBody tr')).find(tr => tr.innerText.includes('UPI'));
+                const upiSales = upiCol ? upiCol.querySelector('td:nth-child(2)').innerText : '₹ 0.00';
+
+                const catRows = Array.from(document.querySelectorAll('#catTableBody tr')).map(tr => ({
+                    label: tr.querySelector('td:nth-child(1)').innerText.toUpperCase(),
+                    val: tr.querySelector('td:nth-child(2)').innerText
+                }));
+
+                const officeExp = Array.from(document.querySelectorAll('#officeExpBody tr')).map(tr => ({
+                    label: tr.querySelector('td:nth-child(1)').innerText.toUpperCase(),
+                    val: tr.querySelector('td:nth-child(2)').innerText
+                }));
+                const shopExp = Array.from(document.querySelectorAll('#shopExpBody tr')).map(tr => ({
+                    label: tr.querySelector('td:nth-child(1)').innerText.toUpperCase(),
+                    val: tr.querySelector('td:nth-child(2)').innerText
+                }));
+
+                const bizTotal = getText('totalBizCharges');
+                const biz83 = getText('biz80Val');
+                const biz17 = getText('biz20Val');
+
+                const tscTotal = getText('totalTscVal');
+                const tsc80 = getText('tsc80Val');
+                const tsc20 = getText('tsc20Val');
+
+                const totalExp = getText('cashExpVal');
+                const ob = getText('obVal');
+                const cb = getText('actualVal');
+                const cashOff = getText('netToOfficeVal');
+
+                const denoms = Array.from(document.querySelectorAll('.denom-input')).map(inp => ({
+                    note: inp.dataset.note,
+                    count: parseInt(inp.value) || 0,
+                    total: document.getElementById(`total-${inp.dataset.note}`).innerText
+                }));
+
+                // --- BUILD TABLE HELPERS (The "Previous" Bordered Table Format) ---
+                const Row = (label, val, bold = false) => `
+                    <tr style="${bold ? 'font-weight:bold;' : ''}">
+                        <td style="border: 1px solid black; padding: 6px 10px; text-transform: uppercase; width: 65%;">${label}</td>
+                        <td style="border: 1px solid black; padding: 6px 10px; text-align: right;">${val}</td>
+                    </tr>
+                `;
+
+                const SectionHeader = (label) => `
+                    <tr style="background:#f1f5f9; font-weight:bold;">
+                        <td colspan="2" style="border: 1px solid black; padding: 6px 10px; text-transform: uppercase;">${label}</td>
+                    </tr>
+                `;
+
+                let tableRows = '';
+                tableRows += Row('TOTAL SALES:', totalSales, true);
+                tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
+
+                tableRows += SectionHeader('PAYMENT METHOD');
+                tableRows += Row('CARD SALES:', cardSales);
+                tableRows += Row('CASH SALES:', cashSales);
+                tableRows += Row('UPI SALES:', upiSales);
+                tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
+
+                tableRows += SectionHeader('CATEGORY');
+                catRows.forEach(c => { tableRows += Row(c.label + ':', c.val); });
+                tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
+
+                tableRows += SectionHeader('CASH DEBIT EXP');
+                officeExp.filter(e => !['TSC', 'BIZ'].includes(e.label)).forEach(e => {
+                    tableRows += Row(e.label + ':', e.val);
+                });
+                tableRows += Row('TotalBiz:', bizTotal);
+                tableRows += Row('BIZ@80%:', biz83);
+                tableRows += Row('BIZ@20%:', biz17);
+                shopExp.forEach(e => { tableRows += Row(e.label + ':', e.val); });
+                tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
+
+                tableRows += SectionHeader('TSC Super');
+                tableRows += Row('TSC:', '₹' + tscTotal);
+                tableRows += Row('80% :', '₹' + tsc80);
+                tableRows += Row('20% :', '₹' + tsc20);
+                tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
+
+                tableRows += Row('TOTAL EXPENSE:', totalExp, true);
+                tableRows += Row('OB(+/-):', ob);
+                tableRows += Row('C.B:', cb, true);
+                tableRows += Row('CASH / OFF:', cashOff, true);
+                tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
+
+                tableRows += SectionHeader('DENOMINATION');
+                denoms.forEach(d => {
+                    tableRows += Row(`${d.note} * ${d.count}`, parseFloat(d.total.replace(/,/g, '')).toFixed(2));
+                });
+                tableRows += Row('COINS * 0', '0.00');
+                tableRows += Row('TOTAL', parseFloat(cb.replace(/[₹,]/g, '')).toFixed(2), true);
+
+                const finalLayout = `
+                    <div style="background: white; color: black; font-family: 'Courier New', Courier, monospace; max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <h3 style="margin: 0; text-transform: uppercase;">Final Report</h3>
+                            <h2 style="margin: 5px 0; text-transform: uppercase;">Sagar - Super - Oils</h2>
+                            <p style="margin: 5px 0; font-size: 0.9rem;">Date: ${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')} &nbsp; Time: ${syncTime}<br>
+                            Report Date: ${date.split('-').reverse().join('-')}</p>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; border: 2px solid black;">
+                            <thead>
+                                <tr style="background: #e2e8f0; font-weight: bold;">
+                                    <td style="border: 1px solid black; padding: 8px;">DESCRIPTION</td>
+                                    <td style="border: 1px solid black; padding: 8px; text-align: right;">AMOUNT</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                const previewBody = document.getElementById('previewBody');
+                previewBody.innerHTML = finalLayout;
+
+                // Modal Adjustment
+                document.querySelector('#previewModal .modal-content').style.maxWidth = '700px';
+                document.querySelector('#previewModal .modal-body').style.background = '#f1f5f9';
+                document.getElementById('previewModal').style.display = 'flex';
+
+            } catch (err) { alert("Preview Error: " + err.message); }
+        }
+
+        function closePreview() {
+            document.getElementById('previewModal').style.display = 'none';
+        }
+
+        function confirmPrint() {
+            window.print();
+            // Optional: Close after print dialog is dismissed (interaction dependent)
+        }
+    </script>
+</body>
+
+</html>

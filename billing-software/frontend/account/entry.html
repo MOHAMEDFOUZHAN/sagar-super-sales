@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accounting Entry - Maple Software</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --accent-primary: #6366f1;
+            --accent-secondary: #0ea5e9;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        .entry-container {
+            max-width: 800px;
+            margin: 40px auto;
+            perspective: 1000px;
+        }
+
+        .glass-form {
+            background: linear-gradient(145deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .form-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 20px;
+        }
+
+        .premium-title {
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 1.8rem;
+            font-weight: 800;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            padding-left: 5px;
+        }
+
+        .premium-input,
+        .premium-select {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 15px 20px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            outline: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .premium-input:focus,
+        .premium-select:focus {
+            border-color: var(--accent-primary);
+            background: rgba(0, 0, 0, 0.4);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+        }
+
+        .premium-select option {
+            background: #1e1b4b;
+            color: white;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 16px;
+            font-size: 1rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);
+            margin-top: 10px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px rgba(99, 102, 241, 0.4);
+            filter: brightness(1.1);
+        }
+
+        .formula-reminder {
+            margin-top: 40px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            color: #6ee7b7;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .shop-login-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: 0.3s;
+        }
+
+        .shop-login-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: white;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'account/sidebar.html' %}
+
+    <main class="main-content">
+        <div class="entry-container">
+            <div class="glass-form">
+                <header class="form-header">
+                    <div>
+                        <span
+                            style="color: var(--accent-secondary); font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px;">Voucher
+                            Entry</span>
+                        <h1 class="premium-title">Transaction Entry Screen</h1>
+                    </div>
+                    <a href="{{ url_for('sales_expenses') }}" class="shop-login-btn">
+                        <i class="fa-solid fa-shop"></i> Shop Log In
+                    </a>
+                </header>
+
+                <form id="entryForm" onsubmit="submitEntry(event)">
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="description" class="premium-input"
+                            placeholder="e.g. Raw material purchase, Monthly rent" required>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="form-group">
+                            <label>Amount (₹)</label>
+                            <input type="number" id="amount" class="premium-input" placeholder="0.00" step="0.01"
+                                required>
+                        </div>
+                        <div class="form-group">
+                            <label>Payment Type</label>
+                            <select id="paymentType" class="premium-select">
+                                <option value="Cash">Cash</option>
+                                <option value="UPI">UPI</option>
+                                <option value="Bank">Bank Transfer</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="form-group">
+                            <label>Account Type</label>
+                            <select id="majorType" class="premium-select" onchange="updateSubTypes()">
+                                <option value="Asset">Asset</option>
+                                <option value="Liability">Liability</option>
+                                <option value="Equity">Equity</option>
+                                <option value="Revenue">Revenue</option>
+                                <option value="Direct Expense">Direct Expense (COGS)</option>
+                                <option value="Operating Expense">Operating Expense</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label id="subTypeLabel">Specific Account (Sub-type)</label>
+                            <select id="subType" class="premium-select">
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn">
+                        <i class="fa-solid fa-cloud-upload"></i> Save Entry
+                    </button>
+                </form>
+
+                <div class="formula-reminder">
+                    <i class="fa-solid fa-calculator"></i> Formula: Gross Profit - Operating Expense = Net Profit
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const subTypes = {
+            "Asset": ["Accounts Receivable", "Inventory", "Equipment", "Vehicles", "Cash in Hand", "Bank Balance"],
+            "Liability": ["Accounts Payable", "Payroll", "Tax", "Loan", "Accrued Expenses"],
+            "Equity": ["Capital", "Drawing", "Retained Earnings"],
+            "Revenue": ["Sales", "Other Income", "Interest Earned"],
+            "Direct Expense": ["Raw Materials", "Direct Wages", "Factory Rent", "Factory Utilities", "Freight Inward"],
+            "Operating Expense": ["Marketing", "Shop Rent", "Office Utilities", "Salaries", "Travelling", "Miscellaneous"]
+        };
+
+        function updateSubTypes() {
+            const majorType = document.getElementById('majorType').value;
+            const subTypeSelect = document.getElementById('subType');
+            subTypeSelect.innerHTML = "";
+
+            subTypes[majorType].forEach(sub => {
+                const opt = document.createElement('option');
+                opt.value = sub;
+                opt.textContent = sub;
+                subTypeSelect.appendChild(opt);
+            });
+        }
+
+        async function submitEntry(event) {
+            event.preventDefault();
+
+            const payload = {
+                description: document.getElementById('description').value,
+                amount: parseFloat(document.getElementById('amount').value),
+                payment_type: document.getElementById('paymentType').value,
+                major_type: document.getElementById('majorType').value,
+                sub_type: document.getElementById('subType').value
+            };
+
+            try {
+                const response = await fetch('/api/account/save-entry', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const res = await response.json();
+                if (res.status === 'success') {
+                    alert("Account Entry Saved Successfully!");
+                    document.getElementById('entryForm').reset();
+                    updateSubTypes();
+                } else {
+                    alert("Error: " + res.message);
+                }
+            } catch (err) {
+                alert("Server connection failed.");
+            }
+        }
+
+        // Initialize sub-types on load
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const typeParam = urlParams.get('type');
+            if (typeParam) {
+                const majorSelect = document.getElementById('majorType');
+                // Handle matching 'Operating Expense' which might be just 'Expense' in some places
+                for (let i = 0; i < majorSelect.options.length; i++) {
+                    if (majorSelect.options[i].value === typeParam) {
+                        majorSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+            updateSubTypes();
+        };
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,29 @@
+1. Shift Management (Clock-In / Clock-Out)
+What it does: The login doesn't just open the dashboard; it records the exact time the staff started their shift.
+Why it's useful: At the end of the day, you can generate a report showing exactly how many hours each person worked and who was responsible for the cash drawer during any specific hour.
+2. Multi-Role Permissions (Admin vs. Counter vs. Godown)
+What it does: The login determines what the person can see.
+Counter Staff: Can only see Billing and Dashboard.
+Admin: Can see everything, including Profit/Loss and Product Costs.
+Godown Head: Can only see Stock and Inventory.
+Why it's useful: It keeps your sensitive data (like purchase costs and total profit) hidden from regular staff.
+3. Session Auto-Lock (Idle Security)
+What it does: If the computer is left idle at the billing counter for 5 minutes, it automatically "locks" the screen.
+Why it's useful: Prevents customers or unauthorized people from making bills or checking your sales data if the staff walks away for a moment.
+4. Attendance & Payroll Integration
+What it does: Uses the login data to calculate monthly salary.
+Why it's useful: No need for a separate attendance register. You'll know if someone logged in late or left early directly from the sales software.
+5. Unclosed Shift Recovery
+What it does: If the power goes out or the system crashes, the next time someone logs in, it detects an "Active Unclosed Shift."
+Why it's useful: It asks: "You have an unclosed shift from 2:00 PM. Do you want to resume and continue the bills?" This ensures no data is lost between staff changes.
+6. Low Stock Alerts on Login
+What it does: Immediately after logging in, a popup shows: "Attention: 5 items are below critical stock levels. Notify godown?"
+Why it's useful: Ensures the staff knows what they cannot sell before the first customer arrives.
+7. Dual-User Authentication (Cashier & Supervisor)
+What it does: For things like "Cancelling a Bill," the system requires a Supervisor's login/PIN to approve the action.
+Why it's useful: Prevents internal theft where staff might bill a customer and then "cancel" it later to keep the cash.
+
+. WhatsApp "Silent" Marketing
+The Idea: Instead of just sending a bill, the software tracks what each customer buys.
+Difference: At the end of the week, the software gives you a list: "These 10 customers haven't bought Green Tea in 1 month, but they usually buy it every 20 days."
+Action: With one click, it sends them a "We miss you" discount specifically for Green Tea.

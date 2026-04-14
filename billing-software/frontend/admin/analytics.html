@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Intelligence - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+
+        .full-row {
+            grid-column: span 2;
+        }
+
+        .chart-box {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 25px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s var(--ease-out);
+        }
+
+        .chart-box:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: -0.5px;
+        }
+
+        .chart-title i {
+            color: var(--primary);
+        }
+
+        .momentum-meter {
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .momentum-val {
+            font-size: 3rem;
+            font-weight: 900;
+            background: linear-gradient(to right, #6366f1, #06b6d4);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .analytics-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .ai-badge {
+            background: linear-gradient(90deg, #6366f1, #ec4899);
+            padding: 6px 15px;
+            border-radius: 30px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+        }
+
+        canvas {
+            width: 100% !important;
+            height: auto !important;
+            max-height: 300px;
+        }
+
+        /* Loading Animation */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-darker);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        .scanline {
+            width: 200px;
+            height: 2px;
+            background: var(--primary);
+            box-shadow: 0 0 20px var(--primary);
+            animation: scan 2s infinite;
+        }
+
+        @keyframes scan {
+            0% {
+                transform: scaleX(0);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scaleX(1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scaleX(0);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="loading-overlay" id="loader">
+        <h2 style="font-weight: 900; letter-spacing: 2px; margin-bottom: 20px;">CALIBRATING ANALYTICS</h2>
+        <div class="scanline"></div>
+    </div>
+
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content animate-fade">
+        <header class="analytics-header">
+            <div>
+                <span class="ai-badge">Decision Intelligence</span>
+                <h1 style="font-size: 2.5rem; font-weight: 900; letter-spacing: -1.5px; margin-top: 10px;">Market
+                    Insights</h1>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Next Sync In</p>
+                <div id="countdown" style="font-size: 1.5rem; font-weight: 800; color: var(--accent);">59s</div>
+            </div>
+        </header>
+
+        <div class="analytics-grid">
+            <!-- 1. Revenue Velocity -->
+            <div class="chart-box full-row card-anim">
+                <div class="chart-title"><i class="fa-solid fa-chart-line"></i> Revenue Velocity (7-Day Projection)
+                </div>
+                <canvas id="velocityChart" height="100"></canvas>
+            </div>
+
+            <!-- 2. Momentum Score -->
+            <div class="chart-box card-anim">
+                <div class="chart-title"><i class="fa-solid fa-bolt"></i> Sales Momentum Score</div>
+                <div class="momentum-meter">
+                    <div id="momentumScore" class="momentum-val">0%</div>
+                    <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 10px;">Compared to previous week
+                        baseline</p>
+                </div>
+                <div style="margin-top: 15px;">
+                    <div
+                        style="display:flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 5px;">
+                        <span>ACCELERATION</span>
+                        <span id="accelTxt">NORMAL</span>
+                    </div>
+                    <div style="height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px;">
+                        <div id="momentumProgress"
+                            style="width: 0%; height: 100%; background: var(--primary); border-radius: 2px; transition: width 1s ease;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Payment Diversity -->
+            <div class="chart-box card-anim">
+                <div class="chart-title"><i class="fa-solid fa-credit-card"></i> Channel Distribution</div>
+                <canvas id="paymentChart"></canvas>
+            </div>
+
+            <!-- 4. Category Dominance -->
+            <div class="chart-box card-anim">
+                <div class="chart-title"><i class="fa-solid fa-layer-group"></i> Category Strength</div>
+                <canvas id="categoryChart"></canvas>
+            </div>
+
+            <!-- 5. Peak Hours -->
+            <div class="chart-box card-anim">
+                <div class="chart-title"><i class="fa-solid fa-clock"></i> Operation Heatmap (Hourly)</div>
+                <canvas id="hourChart"></canvas>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // GSAP Animations
+        window.onload = () => {
+            gsap.to("#loader", {
+                opacity: 0, duration: 1, delay: 1, onComplete: () => {
+                    document.getElementById('loader').style.display = 'none';
+                    startAnalysis();
+                }
+            });
+        }
+
+        async function startAnalysis() {
+            // Entrances
+            gsap.from(".card-anim", {
+                y: 50,
+                opacity: 0,
+                duration: 0.8,
+                stagger: 0.15,
+                ease: "power2.out"
+            });
+
+            // Load Data
+            try {
+                const [advRes, deepRes] = await Promise.all([
+                    fetch('/api/stats/advanced'),
+                    fetch('/api/analytics/deep')
+                ]);
+
+                const adv = await advRes.json();
+                const deep = await deepRes.json();
+
+                renderVelocity(adv.trend);
+                renderPayments(adv.payments);
+                renderCategories(deep.categories);
+                renderHourly(deep.hourly);
+                calculateMomentum(adv.trend);
+
+            } catch (e) { console.error("Analysis Failure:", e); }
+        }
+
+        function renderVelocity(trend) {
+            new Chart(document.getElementById('velocityChart'), {
+                type: 'line',
+                data: {
+                    labels: trend.map(d => d.date),
+                    datasets: [{
+                        label: 'Revenue',
+                        data: trend.map(d => d.amount),
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 4,
+                        pointRadius: 6,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#6366f1'
+                    }]
+                },
+                options: {
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function renderPayments(payments) {
+            new Chart(document.getElementById('paymentChart'), {
+                type: 'polarArea',
+                data: {
+                    labels: payments.map(p => p.payment_mode),
+                    datasets: [{
+                        data: payments.map(p => p.total),
+                        backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ec4899'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { r: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { display: false } } }
+                }
+            });
+        }
+
+        function renderCategories(cats) {
+            new Chart(document.getElementById('categoryChart'), {
+                type: 'radar',
+                data: {
+                    labels: cats.map(c => c.category),
+                    datasets: [{
+                        label: 'Revenue Contribution',
+                        data: cats.map(c => c.revenue),
+                        borderColor: '#06b6d4',
+                        backgroundColor: 'rgba(6, 182, 212, 0.2)',
+                        pointBackgroundColor: '#fff'
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(255,255,255,0.1)' },
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            pointLabels: { color: '#94a3b8' },
+                            ticks: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderHourly(hours) {
+            // Fill 24 hours
+            const fullHours = Array.from({ length: 24 }, (_, i) => ({ hour: i, revenue: 0 }));
+            hours.forEach(h => {
+                const idx = fullHours.findIndex(fh => fh.hour === h.hour);
+                if (idx !== -1) fullHours[idx].revenue = h.revenue;
+            });
+
+            new Chart(document.getElementById('hourChart'), {
+                type: 'bar',
+                data: {
+                    labels: fullHours.map(h => `${h.hour}:00`),
+                    datasets: [{
+                        data: fullHours.map(h => h.revenue),
+                        backgroundColor: '#ec4899',
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { display: false },
+                        x: { grid: { display: false }, ticks: { font: { size: 8 } } }
+                    }
+                }
+            });
+        }
+
+        function calculateMomentum(trend) {
+            if (trend.length < 2) return;
+            const current = trend[trend.length - 1].amount;
+            const prev = trend[trend.length - 2].amount;
+
+            let score = 0;
+            if (prev > 0) score = ((current - prev) / prev * 100).toFixed(0);
+            else score = current > 0 ? 100 : 0;
+
+            const scoreEl = document.getElementById('momentumScore');
+            const progEl = document.getElementById('momentumProgress');
+
+            gsap.to({ val: 0 }, {
+                val: score,
+                duration: 2,
+                onUpdate: function () {
+                    scoreEl.innerText = Math.floor(this.targets()[0].val) + "%";
+                }
+            });
+
+            const capped = Math.max(0, Math.min(100, score));
+            progEl.style.width = capped + "%";
+
+            if (score > 5) document.getElementById('accelTxt').innerText = "HIGH GROWTH";
+            else if (score < -5) {
+                document.getElementById('accelTxt').innerText = "CONTRACTING";
+                scoreEl.style.color = "var(--danger)";
+            }
+        }
+
+        // Countdown Timer
+        let timeLeft = 59;
+        setInterval(() => {
+            timeLeft--;
+            if (timeLeft < 0) {
+                location.reload(); // Refresh data
+                timeLeft = 59;
+            }
+            document.getElementById('countdown').innerText = timeLeft + "s";
+        }, 1000);
+    </script>
+</body>
+
+</html>

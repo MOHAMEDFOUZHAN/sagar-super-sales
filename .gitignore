@@ -1,0 +1,19 @@
+__pycache__/
+.venv/
+venv/
+*.pyc
+*.pyo
+*.pyd
+.db
+*.log
+billing-software/build/
+billing-software/dist/
+billing-software/scratch/
+.vscode/
+.idea/
+*.spec
+*.exe
+*.pdf
+*.zip
+*.db
+!sales_pro.db  # Including the main database if it's essential

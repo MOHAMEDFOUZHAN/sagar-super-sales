@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Change Sales Report - AdminPanel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .report-container {
+            padding: 20px;
+        }
+
+        .filter-panel {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 25px;
+            background: var(--glass-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+        }
+
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .report-table th {
+            background: rgba(99, 102, 241, 0.1);
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--primary);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            color: var(--text-main);
+        }
+
+        .report-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--text-muted);
+        }
+
+        .exchange-badge {
+            background: var(--warning);
+            color: black;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .return-badge {
+            background: var(--danger);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .badge-warning {
+            background: var(--warning);
+            color: black;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .doc-id {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        @media print {
+            @page {
+                size: landscape;
+                margin: 5mm;
+            }
+            .doc-id {
+                color: black !important;
+            }
+            .report-table th, .report-table td {
+                font-size: 0.75rem !important;
+                padding: 4px 6px !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>Change Sales Report</h1>
+                <p style="color: var(--text-muted);">Summary of product exchanges, returns and bill changes.</p>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="report-container">
+            <div class="filter-panel">
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">START DATE</label>
+                    <input type="date" id="startDate" class="input-dark">
+                </div>
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">END DATE</label>
+                    <input type="date" id="endDate" class="input-dark">
+                </div>
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-sync"></i> REFRESH
+                </button>
+            </div>
+
+            <div class="print-only-header">
+                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET
+                </h1>
+                <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Change Sales & Exchange Report</p>
+                <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
+                <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px;">
+                <div class="table-wrapper">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>DATE/TIME</th>
+                                <th>TYPE</th>
+                                <th>DOC ID</th>
+                                <th>ORIGINAL DOC</th>
+                                <th>PRODUCT</th>
+                                <th style="text-align: center;">QTY</th>
+                                <th style="text-align: right;">AMOUNT (₹)</th>
+                                <th>REASON</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportContent"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+
+        async function loadReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+
+            const startF = new Date(start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const endF = new Date(end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            document.getElementById('printDateRange').innerText = `Period: ${startF} to ${endF}`;
+
+            try {
+                const res = await fetch(`/api/reports/sales-changes?start=${start}&end=${end}`);
+                const changes = await res.json();
+
+                const tbody = document.getElementById('reportContent');
+                tbody.innerHTML = '';
+
+                changes.forEach(c => {
+                    const bDate = new Date(c.date);
+                    const dateTime = bDate.toLocaleDateString('en-GB') + ' ' + bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+                    let badgeClass = 'exchange-badge';
+                    if (c.type === 'FULL VOID') badgeClass = 'return-badge';
+                    if (c.type === 'RETURN') badgeClass = 'badge-warning';
+
+                    const isExchange = c.type === 'EXCHANGE';
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="font-size: 0.8rem; vertical-align: middle;">${dateTime}</td>
+                        <td style="vertical-align: middle;"><span class="${badgeClass}" style="padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 0.65rem;">${c.type}</span></td>
+                        <td class="doc-id" style="vertical-align: middle; font-weight: 800;">${c.original_doc}</td>
+                        <td style="vertical-align: middle;">
+                            ${isExchange ? '<span style="color: var(--primary); font-weight: 800;">NEW: ' + c.new_doc + '</span>' : '<span style="color: var(--text-muted);">---</span>'}
+                        </td>
+                        <td style="color: var(--text-main); font-weight: 600; vertical-align: middle;">${c.product || 'Full Bill'}</td>
+                        <td style="text-align: center; font-weight: 800; vertical-align: middle;">${c.qty || '-'}</td>
+                        <td style="text-align: right; font-weight: 800; color: var(--danger); vertical-align: middle;">₹${c.amount.toFixed(2)}</td>
+                        <td style="font-size: 0.9rem;">
+                            <div style="font-weight: 600; color: var(--text-main);">${c.reason}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">By: ${c.created_by} | Action: ${c.action}</div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                if (changes.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--text-muted);">No sales changes/exchanges found for this period.</td></tr>';
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error loading report: " + err.message);
+            }
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

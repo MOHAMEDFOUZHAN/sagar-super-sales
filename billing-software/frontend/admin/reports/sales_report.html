@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Report - AdminPanel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .report-container {
+            padding: 20px;
+        }
+
+        .filter-panel {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 25px;
+            background: var(--glass-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+        }
+
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .report-table th {
+            background: rgba(99, 102, 241, 0.1);
+            padding: 10px;
+            text-align: left;
+            border: 1px solid var(--glass-border);
+            text-transform: uppercase;
+            color: var(--text-main);
+        }
+
+        .report-table td {
+            padding: 8px 10px;
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+        }
+
+        .mode-header {
+            background: rgba(255, 255, 255, 0.05);
+            font-weight: 800;
+            color: var(--accent);
+            padding: 10px;
+        }
+
+        .amount-cell {
+            text-align: right;
+        }
+
+        .doc-id {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        @media print {
+            @page {
+                size: landscape;
+                margin: 5mm;
+            }
+            .mode-header {
+                background: #eee !important;
+                color: black !important;
+            }
+            .report-table th, .report-table td {
+                font-size: 0.7rem !important;
+                padding: 4px 6px !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>Sales Report</h1>
+                <p style="color: var(--text-muted);">Item-wise details with payment mode classification.</p>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="report-container">
+            <div class="filter-panel">
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">FROM DATE</label>
+                    <input type="date" id="startDate" class="input-dark">
+                </div>
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">TO DATE</label>
+                    <input type="date" id="endDate" class="input-dark">
+                </div>
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-sync"></i> REFRESH
+                </button>
+            </div>
+
+            <div class="print-only-header">
+                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET
+                </h1>
+                <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Sales Report (Item-wise)</p>
+                <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
+                <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px;">
+                <div style="text-align: center; margin-bottom: 20px;" class="hide-on-print">
+                    <h2 style="color: var(--primary);">SAGAR SUPER MARKET</h2>
+                    <p id="dateDisplay" style="color: var(--text-muted);"></p>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>DOC ID</th>
+                                <th>DATE/TIME</th>
+                                <th class="amount-cell">BIZ AMT</th>
+                                <th>ITEM</th>
+                                <th style="text-align: center;">QTY</th>
+                                <th class="amount-cell">RATE</th>
+                                <th class="amount-cell">AMOUNT</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportContent">
+                            <!-- Data injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+
+        async function loadReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const startF = new Date(start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const endF = new Date(end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+            document.getElementById('dateDisplay').innerText = `Detailed Sales Report from ${startF} to ${endF}`;
+            document.getElementById('printDateRange').innerText = `Period: ${startF} to ${endF}`;
+
+            try {
+                const res = await fetch('/api/reports/sales-detailed');
+                const data = await res.json();
+
+                const filtered = data.filter(r => {
+                    const rDate = new Date(r.bill_date);
+                    const dStr = rDate.getFullYear() + '-' + String(rDate.getMonth() + 1).padStart(2, '0') + '-' + String(rDate.getDate()).padStart(2, '0');
+                    return dStr >= start && dStr <= end && r.bill_status !== 'Cancelled';
+                });
+
+                // Group by payment mode
+                const grouped = {};
+                filtered.forEach(item => {
+                    const mode = (item.payment_mode || 'CASH').toUpperCase();
+                    if (!grouped[mode]) grouped[mode] = [];
+                    grouped[mode].push(item);
+                });
+
+                const tbody = document.getElementById('reportContent');
+                tbody.innerHTML = '';
+
+                Object.keys(grouped).sort().forEach(mode => {
+                    const headerRow = document.createElement('tr');
+                    headerRow.innerHTML = `<td colspan="7" class="mode-header">${mode}</td>`;
+                    tbody.appendChild(headerRow);
+
+                    let modeTotal = 0;
+
+                    grouped[mode].forEach(item => {
+                        const bDate = new Date(item.bill_date);
+                        const dateStr = bDate.toLocaleDateString('en-GB'); // dd/mm/yyyy
+                        const timeStr = bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                        const dateTimeStr = dateStr + ' ' + timeStr;
+                        const docID = `MP-#${String(item.bill_id).padStart(5, '0')}`;
+
+                        modeTotal += item.amount;
+
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td class="doc-id">${docID}</td>
+                            <td style="white-space: nowrap;">${dateTimeStr}</td>
+                            <td class="amount-cell">₹${item.bizz_amount.toFixed(2)}</td>
+                            <td style="color: var(--text-main);">${item.product_name}</td>
+                            <td style="text-align: center;">${item.qty}</td>
+                            <td class="amount-cell">₹${item.rate.toFixed(2)}</td>
+                            <td class="amount-cell" style="font-weight: 700; color: white;">₹${item.amount.toFixed(2)}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+
+                    const footerRow = document.createElement('tr');
+                    footerRow.style.background = 'rgba(16, 185, 129, 0.05)';
+                    footerRow.innerHTML = `
+                        <td colspan="6" style="text-align: right; font-weight: 700;">Total ${mode}</td>
+                        <td class="amount-cell" style="font-weight: 800; color: var(--success);">₹${modeTotal.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(footerRow);
+                });
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">No transactions for this date.</td></tr>';
+                }
+
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Sales - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @media print {
+            /* Add any product-specific print rules here if needed */
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1 style="font-size: 1.8rem; font-weight: 700;">Product Sales</h1>
+                <p style="color: var(--text-muted);">Analyze performance by product.</p>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.2); padding: 5px 10px; border-radius: 10px;"
+                class="filter-panel">
+                <input type="date" id="startDate" class="input-dark">
+                <span style="color: var(--text-muted);">to</span>
+                <input type="date" id="endDate" class="input-dark">
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-filter"></i> Filter
+                </button>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> PRINT
+            </button>
+        </header>
+
+        <div class="print-only-header">
+            <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET</h1>
+            <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Product Sales Performance Report</p>
+            <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
+            <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+        </div>
+
+        <div class="glass-panel" style="padding: 20px;">
+            <div class="table-wrapper">
+                <table id="prodTable">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Code</th>
+                            <th>Product Name</th>
+                            <th>Category</th>
+                            <th>Qty Sold</th>
+                            <th>Total Revenue (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Use local date to avoid timezone mismatch
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+
+        async function loadReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+
+            try {
+                const res = await fetch('/api/reports/sales-detailed');
+                const data = await res.json();
+
+                // Filter by Date using local comparison and Status (Exclude Cancelled)
+                const filtered = data.filter(r => {
+                    const rDate = new Date(r.bill_date);
+                    const d = rDate.getFullYear() + '-' + String(rDate.getMonth() + 1).padStart(2, '0') + '-' + String(rDate.getDate()).padStart(2, '0');
+                    return d >= start && d <= end && r.bill_status !== 'Cancelled';
+                });
+
+                // Aggregate
+                const grouped = {};
+                filtered.forEach(r => {
+                    if (!grouped[r.product_name]) {
+                        grouped[r.product_name] = {
+                            name: r.product_name,
+                            barcode: r.barcode,
+                            cat: r.category,
+                            qty: 0,
+                            revenue: 0
+                        };
+                    }
+                    grouped[r.product_name].qty += r.qty;
+                    grouped[r.product_name].revenue += r.amount;
+                });
+
+                // Convert to array and Sort Descending by Revenue
+                const arr = Object.values(grouped).sort((a, b) => b.revenue - a.revenue);
+
+                const tbody = document.querySelector('#prodTable tbody');
+                tbody.innerHTML = '';
+
+                arr.forEach((p, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="font-weight: 700; color: var(--accent);">#${idx + 1}</td>
+                        <td style="font-family: monospace; color: var(--text-muted);">${p.barcode || '-'}</td>
+                        <td style="font-weight: 600; color: var(--text-main);">${p.name}</td>
+                        <td><span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted);">${p.cat || 'General'}</span></td>
+                        <td style="font-weight: 700;">${p.qty}</td>
+                        <td style="font-weight: 800; color: var(--primary);">₹${p.revenue.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('printDateRange').innerText = `Period: ${new Date(start).toLocaleDateString()} to ${new Date(end).toLocaleDateString()}`;
+            } catch (e) { console.error(e); }
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

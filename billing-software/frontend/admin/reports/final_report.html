@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final Report - AdminPanel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .report-container {
+            padding: 20px;
+        }
+
+        .filter-panel {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 25px;
+            background: var(--glass-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+        }
+
+        .final-grid {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 20px;
+        }
+
+        .summary-card {
+            background: var(--glass-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--glass-border);
+            font-size: 1.1rem;
+        }
+
+        .summary-row:last-child {
+            border-bottom: none;
+            font-weight: 800;
+            font-size: 1.3rem;
+            color: var(--primary);
+        }
+
+        .summary-label {
+            color: var(--text-muted);
+        }
+
+        .summary-value {
+            color: var(--text-main);
+        }
+
+        .expense-list {
+            margin-top: 15px;
+        }
+
+        .expense-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        @media print {
+            .final-grid {
+                display: grid !important;
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 15px !important;
+            }
+            .summary-card {
+                border: 1px solid black !important;
+                margin-bottom: 10px !important;
+                padding: 10px !important;
+                break-inside: avoid;
+            }
+            .summary-row {
+                border-bottom: 1px solid black !important;
+                padding: 5px 0 !important;
+            }
+            .summary-label, .summary-value {
+                color: black !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>Final Report</h1>
+                <p style="color: var(--text-muted);">Daily financial closure: Sales, Expenses & Balance adjustments.</p>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="report-container">
+            <div class="filter-panel">
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">DATE</label>
+                    <input type="date" id="reportDate" class="input-dark">
+                </div>
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-sync"></i> REFRESH
+                </button>
+            </div>
+
+            <div class="print-only-header">
+                <h1 style="margin: 0; font-size: 2rem;">MAPLE SUPER MARKET</h1>
+                <p style="margin: 5px 0;">Final Daily Closure Report</p>
+                <p id="printDateRange" style="font-weight: bold;"></p>
+            </div>
+
+            <div class="final-grid">
+                <div>
+                    <div class="summary-card">
+                        <h3 style="color: var(--accent); margin-bottom: 15px;"><i class="fa-solid fa-chart-line"></i>
+                            Daily Financial Summary</h3>
+                        <div class="summary-row">
+                            <div class="summary-label">OPENING BALANCE</div>
+                            <div class="summary-value" id="valOpening">₹0.00</div>
+                        </div>
+                        <div class="summary-row">
+                            <div class="summary-label">TOTAL CASH SALES</div>
+                            <div class="summary-value" id="valCashSales" style="color: var(--success);">+ ₹0.00</div>
+                        </div>
+                        <div class="summary-row">
+                            <div class="summary-label">OTHER SALES (UPI/CARD/CREDIT)</div>
+                            <div class="summary-value" id="valOtherSales">₹0.00</div>
+                        </div>
+                        <div class="summary-row">
+                            <div class="summary-label">TOTAL EXPENSES</div>
+                            <div class="summary-value" id="valExpenses" style="color: var(--danger);">- ₹0.00</div>
+                        </div>
+                        <div class="summary-row">
+                            <div class="summary-label">EXPECTED CASH CLOSING</div>
+                            <div class="summary-value" id="valExpected">₹0.00</div>
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <h3 style="color: var(--primary); margin-bottom: 15px;"><i class="fa-solid fa-wallet"></i>
+                            Actual Status</h3>
+                        <div class="summary-row">
+                            <div class="summary-label">ACTUAL CASH IN HAND</div>
+                            <div class="summary-value" id="valActual">₹0.00</div>
+                        </div>
+                        <div class="summary-row">
+                            <div class="summary-label">DIFFERENCE (OVERAGE/SHORTAGE)</div>
+                            <div class="summary-value" id="valDiff">₹0.00</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="summary-card">
+                        <h3 style="color: var(--warning); margin-bottom: 15px;"><i class="fa-solid fa-receipt"></i>
+                            Expense Breakdown</h3>
+                        <div id="expenseList" class="expense-list">
+                            <!-- Expenses list -->
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <h3 style="color: var(--accent); margin-bottom: 15px;"><i class="fa-solid fa-users"></i>
+                            Counter Breakdown</h3>
+                        <div id="counterList" class="expense-list">
+                            <!-- Counters list -->
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <h3 style="color: var(--text-main); margin-bottom: 15px;"><i class="fa-solid fa-star"></i> BIZ
+                            Performance</h3>
+                        <div class="summary-row" style="font-size: 0.9rem;">
+                            <div class="summary-label">Total BIZ Collected</div>
+                            <div class="summary-value" id="valBizTotal">₹0.00</div>
+                        </div>
+                        <div class="summary-row" style="font-size: 0.9rem;">
+                            <div class="summary-label">BIZ 80% Adjustment</div>
+                            <div class="summary-value" id="valBiz80">₹0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('reportDate').value = today;
+
+        async function loadReport() {
+            const date = document.getElementById('reportDate').value;
+            const formattedDate = new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+            document.getElementById('printDateRange').innerText = "Date: " + formattedDate;
+
+            try {
+                const res = await fetch(`/api/reports/closure?date=${date}`);
+                const data = await res.json();
+
+                document.getElementById('valOpening').innerText = '₹' + data.balance.opening_balance.toFixed(2);
+                document.getElementById('valCashSales').innerText = '+ ₹' + data.sales.cash_sales.toFixed(2);
+                document.getElementById('valOtherSales').innerText = '₹' + (data.sales.total_sales - data.sales.cash_sales).toFixed(2);
+                document.getElementById('valExpenses').innerText = '- ₹' + data.total_expenses.toFixed(2);
+
+                const expected = data.balance.opening_balance + data.sales.cash_sales - data.total_expenses;
+                document.getElementById('valExpected').innerText = '₹' + expected.toFixed(2);
+
+                document.getElementById('valActual').innerText = '₹' + data.balance.actual_closing.toFixed(2);
+                const diff = data.balance.actual_closing - expected;
+                document.getElementById('valDiff').innerText = (diff >= 0 ? '+ ' : '') + '₹' + diff.toFixed(2);
+                document.getElementById('valDiff').style.color = diff < 0 ? 'var(--danger)' : 'var(--success)';
+
+                const expBody = document.getElementById('expenseList');
+                expBody.innerHTML = '';
+                [...data.office_expenses, ...data.shop_expenses].forEach(e => {
+                    const item = document.createElement('div');
+                    item.className = 'expense-item';
+                    item.innerHTML = `<span>${e.category}</span><span>₹${e.amount.toFixed(2)}</span>`;
+                    expBody.appendChild(item);
+                });
+
+                const counterBody = document.getElementById('counterList');
+                counterBody.innerHTML = '';
+                if (data.counter_breakdown) {
+                    data.counter_breakdown.forEach(c => {
+                        const item = document.createElement('div');
+                        item.className = 'expense-item';
+                        item.innerHTML = `<span><i class="fa-solid fa-user" style="margin-right: 5px;"></i> ${c.counter.toUpperCase()}</span><span style="font-weight:bold;color:var(--text-main);">₹${c.amount.toFixed(2)}</span>`;
+                        counterBody.appendChild(item);
+                    });
+                }
+
+                document.getElementById('valBizTotal').innerText = '₹' + data.total_bizz.toFixed(2);
+                document.getElementById('valBiz80').innerText = '₹' + (data.total_bizz * 0.8).toFixed(2);
+
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

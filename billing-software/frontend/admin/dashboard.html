@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Dashboard - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .kpi-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+            border: 1px solid var(--glass-border);
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            transition: all 0.3s var(--ease-out);
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-8px);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--primary);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .kpi-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+        }
+
+        .kpi-info h3 {
+            font-size: 1.9rem;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: -0.5px;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .kpi-info p {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 600;
+        }
+
+        .dashboard-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chart-container {
+            height: 300px;
+            width: 100%;
+            position: relative;
+        }
+
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .status-low {
+            background: rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .status-good {
+            background: rgba(16, 185, 129, 0.15);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .top-selling-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .top-selling-item:last-child {
+            border: none;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 3px;
+            transition: width 1s ease;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1 style="font-size: 2rem; font-weight: 800; letter-spacing: -1px;">Intelligence Hub</h1>
+                <p style="color: var(--text-muted);">Real-time metrics & business analytics.</p>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <div class="date-display"
+                    style="background: rgba(255,255,255,0.03); padding: 10px 20px; border-radius: var(--radius-md); border: 1px solid var(--glass-border); font-weight: 600;">
+                    <i class="fa-regular fa-clock" style="color: var(--primary); margin-right: 8px;"></i> <span
+                        id="currentDate">Loading...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+            <div class="kpi-card" style="border-bottom: 3px solid #6366f1;">
+                <div class="kpi-icon" style="color: #6366f1; background: rgba(99, 102, 241, 0.15);">
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+                <div class="kpi-info">
+                    <p>Today's Sales</p>
+                    <h3>₹<span id="kpiSales">0</span></h3>
+                </div>
+            </div>
+
+            <div class="kpi-card" style="border-bottom: 3px solid #10b981;">
+                <div class="kpi-icon" style="color: #10b981; background: rgba(16, 185, 129, 0.15);">
+                    <i class="fa-solid fa-receipt"></i>
+                </div>
+                <div class="kpi-info">
+                    <p>Invoices</p>
+                    <h3 id="kpiBillCount">0</h3>
+                </div>
+            </div>
+
+            <div class="kpi-card" style="border-bottom: 3px solid #f59e0b;">
+                <div class="kpi-icon" style="color: #f59e0b; background: rgba(245, 158, 11, 0.15);">
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+                <div class="kpi-info">
+                    <p>Daily Expense</p>
+                    <h3>₹<span id="kpiExpense">0</span></h3>
+                </div>
+            </div>
+
+            <div class="kpi-card" style="border-bottom: 3px solid #ec4899;">
+                <div class="kpi-icon" style="color: #ec4899; background: rgba(236, 72, 153, 0.15);">
+                    <i class="fa-solid fa-fire"></i>
+                </div>
+                <div class="kpi-info">
+                    <p>Avg Ticket</p>
+                    <h3 id="kpiAvgBill">₹0</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="dashboard-row">
+            <div class="glass-panel" style="padding: 24px;">
+                <div class="flex-between mb-20">
+                    <h2 style="font-size: 1.2rem; font-weight: 700;">Sales Velocity (7 Days)</h2>
+                    <span
+                        style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 4px;">LIVE
+                        TREND</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="salesTrendChart"></canvas>
+                </div>
+            </div>
+            <div class="glass-panel" style="padding: 24px;">
+                <h2 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 20px;">Payment Breakdown</h2>
+                <div class="chart-container" style="height: 250px;">
+                    <canvas id="paymentModeChart"></canvas>
+                </div>
+                <div id="paymentStats" style="margin-top: 20px;">
+                    <!-- JS fills this -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Lower Row -->
+        <div class="dashboard-row">
+            <div class="glass-panel" style="padding: 24px;">
+                <div class="flex-between mb-20">
+                    <h2 style="font-size: 1.2rem; font-weight: 700;">Critical Inventory</h2>
+                    <button class="btn" onclick="location.href='/admin/stock/manage'"
+                        style="padding: 6px 14px; font-size: 0.7rem; background: rgba(99, 102, 241, 0.1);">VIEW
+                        ALL</button>
+                </div>
+                <div class="table-wrapper">
+                    <table style="border: none;">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Category</th>
+                                <th style="text-align: right;">Stock</th>
+                                <th style="text-align: right;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lowStockTable">
+                            <tr>
+                                <td colspan="4" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                                    Analyzing inventory...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="glass-panel" style="padding: 24px;">
+                <h2 style="font-size: 1.2rem; font-weight: 700; margin-bottom: 20px;">Top Performers</h2>
+                <div id="topProductsList">
+                    <!-- JS fills this -->
+                </div>
+
+                <div style="margin-top: 30px; border-top: 1px solid var(--glass-border); padding-top: 20px;">
+                    <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">Smart Actions</h3>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                        <button class="btn btn-primary" onclick="location.href='/admin/masters/products'"
+                            style="flex: 1;"><i class="fa-solid fa-plus"></i> NEW ITEM</button>
+                        <button class="btn" onclick="location.href='/admin/reports/sales'"
+                            style="flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white;"><i
+                                class="fa-solid fa-file-contract"></i> EXPORT</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Set Date
+        const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+        setInterval(() => {
+            document.getElementById('currentDate').innerText = new Date().toLocaleDateString('en-US', dateOptions);
+        }, 1000);
+
+        async function initDashboard() {
+            try {
+                // 1. Basic Stats
+                const statsRes = await fetch('/api/stats');
+                const stats = await statsRes.json();
+
+                document.getElementById('kpiSales').innerText = stats.daily_sales.toLocaleString();
+                document.getElementById('kpiBillCount').innerText = stats.bill_count;
+                document.getElementById('kpiExpense').innerText = stats.expenses.toLocaleString();
+                document.getElementById('kpiAvgBill').innerText = '₹' + Math.floor(stats.avg_bill_value).toLocaleString();
+
+                // 2. Advanced Stats (Trends/Charts)
+                const advRes = await fetch('/api/stats/advanced');
+                const advData = await advRes.json();
+
+                renderTrendChart(advData.trend);
+                renderPaymentChart(advData.payments);
+                renderTopProducts(advData.top_products);
+
+                // 3. Stock Alerts
+                const abcRes = await fetch('/api/stats/abc');
+                const products = await abcRes.json();
+                const tableBody = document.getElementById('lowStockTable');
+                tableBody.innerHTML = '';
+
+                // Show items with stock <= 25
+                const lowItems = products.filter(p => p.stock <= 25).slice(0, 6);
+
+                if (lowItems.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--success); padding: 40px;"><i class="fa-solid fa-circle-check"></i> All items well stocked</td></tr>';
+                } else {
+                    lowItems.forEach(p => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="font-weight: 600;">${p.name}</td>
+                            <td style="font-size: 0.8rem; color: var(--text-muted);">${p.category}</td>
+                            <td style="text-align: right; font-weight: 800;">${p.stock}</td>
+                            <td style="text-align: right;"><span class="status-badge status-low">RESTOCK</span></td>
+                        `;
+                        tableBody.appendChild(tr);
+                    });
+                }
+
+            } catch (error) {
+                console.error("Dashboard Sync Error:", error);
+            }
+        }
+
+        function renderTrendChart(trend) {
+            const ctx = document.getElementById('salesTrendChart').getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.4)');
+            gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: trend.map(d => d.date),
+                    datasets: [{
+                        label: 'Sales (₹)',
+                        data: trend.map(d => d.amount),
+                        borderColor: '#6366f1',
+                        borderWidth: 3,
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#6366f1',
+                        pointBorderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#94a3b8', font: { size: 10 } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderPaymentChart(payments) {
+            const ctx = document.getElementById('paymentModeChart').getContext('2d');
+            const total = payments.reduce((acc, p) => acc + p.total, 0);
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: payments.map(p => p.payment_mode),
+                    datasets: [{
+                        data: payments.map(p => p.total),
+                        backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ec4899'],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            const statsList = document.getElementById('paymentStats');
+            statsList.innerHTML = '';
+            payments.forEach(p => {
+                const perc = total > 0 ? (p.total / total * 100).toFixed(1) : 0;
+                const div = document.createElement('div');
+                div.style = 'display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 8px;';
+                div.innerHTML = `<span style="color: var(--text-muted);"><i class="fa-solid fa-circle" style="color: ${getColor(p.payment_mode)}; font-size: 8px; margin-right: 8px;"></i>${p.payment_mode}</span><span>${perc}%</span>`;
+                statsList.appendChild(div);
+            });
+        }
+
+        function getColor(mode) {
+            if (mode === 'Cash') return '#6366f1';
+            if (mode === 'UPI') return '#10b981';
+            if (mode === 'Card') return '#f59e0b';
+            return '#ec4899';
+        }
+
+        function renderTopProducts(products) {
+            const list = document.getElementById('topProductsList');
+            list.innerHTML = '';
+            if (products.length === 0) {
+                list.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding: 20px;">No sales data yet</p>';
+                return;
+            }
+            const maxVal = Math.max(...products.map(p => p.revenue));
+
+            products.forEach(p => {
+                const perc = (p.revenue / maxVal * 100);
+                const item = document.createElement('div');
+                item.className = 'top-selling-item';
+                item.innerHTML = `
+                    <div style="flex:1;">
+                        <span style="font-weight: 600; font-size: 0.9rem;">${p.product_name}</span>
+                        <div class="progress-bar"><div class="progress-fill" style="width: ${perc}%"></div></div>
+                    </div>
+                    <div style="text-align: right; margin-left: 20px;">
+                        <span style="font-weight: 800; color: var(--success); font-size: 0.9rem;">₹${p.revenue.toLocaleString()}</span>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        initDashboard();
+
+        // --- REAL-TIME STREAM LISTENER ---
+        const eventSource = new EventSource("/api/realtime/stream");
+        eventSource.addEventListener("billing_update", (event) => {
+            console.log("Real-time billing update received:", event.data);
+            initDashboard(); // Instantly refresh all stats
+        });
+
+        eventSource.onerror = () => {
+            console.error("EventSource failed. Dashboard will fallback to manual refresh.");
+            eventSource.close();
+        };
+    </script>
+</body>
+
+</html>

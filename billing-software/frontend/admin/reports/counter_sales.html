@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Counter-wise Sales - AdminPanel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .counter-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+        }
+        .counter-card:hover { transform: translateY(-3px); }
+        .counter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .counter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .counter-name {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: var(--primary);
+            text-transform: uppercase;
+        }
+        .stat-line {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        .stat-label { color: var(--text-muted); }
+        .stat-value { font-weight: 700; color: var(--text-main); }
+        .btn-view {
+            width: 100%;
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+        }
+        .btn-view:hover { background: var(--primary); color: white; }
+
+        /* Detail Modal-like section */
+        #detailSection { display: none; margin-top: 20px; }
+        .detail-header {
+            background: var(--primary);
+            color: white;
+            padding: 15px;
+            border-radius: var(--radius-md) var(--radius-md) 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        @media print {
+            .counter-grid {
+                display: grid !important;
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 15px !important;
+            }
+            .counter-card {
+                background: white !important;
+                border: 1px solid black !important;
+                break-inside: avoid;
+                padding: 15px !important;
+            }
+            .counter-name, .stat-value {
+                color: black !important;
+            }
+            .btn-view {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>Counter-wise Sales Analysis</h1>
+                <p style="color: var(--text-muted);">Compare performance across all billing counters.</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <input type="date" id="reportDate" class="input-dark">
+                <button class="btn btn-primary" onclick="loadCounters()">
+                    <i class="fa-solid fa-sync"></i> REFRESH
+                </button>
+            </div>
+        </header>
+
+        <div class="report-container">
+            <!-- Summary Grid -->
+            <div class="counter-grid" id="counterGrid">
+                <!-- Cards injected here -->
+            </div>
+
+            <!-- Drill-down Details -->
+            <div id="detailSection">
+                <div class="detail-header">
+                    <h2 id="activeCounterName">COUNTER DETAILS</h2>
+                    <button class="btn" style="background:rgba(0,0,0,0.2); color:white;" onclick="closeDetails()">CLOSE</button>
+                </div>
+                <div class="glass-panel" style="border-radius: 0 0 var(--radius-md) var(--radius-md); padding: 20px;">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>INVOICE</th>
+                                <th>TIME</th>
+                                <th>MODE</th>
+                                <th style="text-align: right;">AMOUNT (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Set default date
+        document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+        let allData = null;
+
+        async function loadCounters() {
+            const date = document.getElementById('reportDate').value;
+            const grid = document.getElementById('counterGrid');
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 50px;">Loading counter data...</div>';
+            closeDetails();
+
+            try {
+                const res = await fetch(`/api/reports/counter-wise?date=${date}`);
+                allData = await res.json();
+                
+                if (!allData.summary || allData.summary.length === 0) {
+                    grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 50px; color: var(--text-muted);">No sales found for this date.</div>';
+                    return;
+                }
+
+                grid.innerHTML = '';
+                allData.summary.forEach(s => {
+                    const card = document.createElement('div');
+                    card.className = 'counter-card';
+                    card.innerHTML = `
+                        <div class="counter-header">
+                            <span class="counter-name">${s.counter_name}</span>
+                            <span class="badge badge-success">${s.bill_count} Bills</span>
+                        </div>
+                        <div class="stat-line">
+                            <span class="stat-label">Total Net Sales</span>
+                            <span class="stat-value" style="font-size:1.1rem; color:var(--success);">₹${s.total_sales.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                        </div>
+                        <div class="stat-line">
+                            <span class="stat-label">Cash Sales</span>
+                            <span class="stat-value">₹${s.cash_sales.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                        </div>
+                        <div class="stat-line">
+                            <span class="stat-label">Card/UPI</span>
+                            <span class="stat-value">₹${(s.card_sales + s.upi_sales).toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
+                        </div>
+                        <button class="btn-view" onclick="viewDetails('${s.counter_name}')">VIEW BILL LIST</button>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (err) {
+                grid.innerHTML = `<div style="color:red; text-align:center;">Error: ${err.message}</div>`;
+            }
+        }
+
+        function viewDetails(counterName) {
+            const section = document.getElementById('detailSection');
+            const tbody = document.getElementById('detailTableBody');
+            document.getElementById('activeCounterName').innerText = `Sales History for ${counterName}`;
+            
+            section.style.display = 'block';
+            tbody.innerHTML = '';
+            
+            const filtered = allData.details.filter(d => d.created_by === counterName);
+            filtered.forEach(d => {
+                const tr = document.createElement('tr');
+                const timeStr = new Date(d.bill_date).toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: true});
+                tr.innerHTML = `
+                    <td class="doc-id">${d.invoice_no}</td>
+                    <td>${timeStr}</td>
+                    <td><span class="badge">${d.payment_mode}</span></td>
+                    <td style="text-align: right; font-weight:700;">₹${d.total_amount.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            section.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function closeDetails() {
+            document.getElementById('detailSection').style.display = 'none';
+        }
+
+        loadCounters();
+    </script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bill wise Sales Report - AdminPanel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .report-container {
+            padding: 20px;
+        }
+
+        .filter-panel {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 25px;
+            background: var(--glass-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+        }
+
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .report-table th {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--glass-border);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+        }
+
+        .report-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--text-main);
+        }
+
+        .report-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .doc-id {
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .amount-cell {
+            text-align: right;
+            font-weight: 600;
+        }
+
+        .net-amount {
+            color: var(--success);
+            font-weight: 800;
+        }
+
+        @media print {
+            .doc-id,
+            .net-amount {
+                color: black !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>Bill wise Sales Report</h1>
+                <p style="color: var(--text-muted);">Summary of all bills entered for the day.</p>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="report-container">
+            <div class="filter-panel">
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">FROM DATE</label>
+                    <input type="date" id="startDate" class="input-dark">
+                </div>
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">TO DATE</label>
+                    <input type="date" id="endDate" class="input-dark">
+                </div>
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-sync"></i> REFRESH
+                </button>
+            </div>
+
+            <div class="print-only-header">
+                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET
+                </h1>
+                <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Bill wise Sales Report</p>
+                <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
+                <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px;">
+                <div style="text-align: center; margin-bottom: 20px;" class="hide-on-print">
+                    <h2 style="color: var(--primary);">SAGAR SUPER MARKET</h2>
+                    <p id="dateDisplay" style="color: var(--text-muted);"></p>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>DOC ID</th>
+                                <th>DATE/TIME</th>
+                                <th class="amount-cell">GROSS (₹)</th>
+                                <th class="amount-cell">DISCOUNT (₹)</th>
+                                <th class="amount-cell">NET (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportContent">
+                            <!-- Data injected here -->
+                        </tbody>
+                        <tfoot>
+                            <tr style="background: rgba(255,255,255,0.05); font-weight: 800;">
+                                <td colspan="2">TOTAL</td>
+                                <td id="totalGross" class="amount-cell">0.00</td>
+                                <td id="totalDiscount" class="amount-cell">0.00</td>
+                                <td id="totalNet" class="amount-cell">0.00</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+
+        async function loadReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const startF = new Date(start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const endF = new Date(end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+            document.getElementById('dateDisplay').innerText = `Sales Report from ${startF} to ${endF}`;
+            document.getElementById('printDateRange').innerText = `Period: ${startF} to ${endF}`;
+
+            try {
+                const res = await fetch('/api/bills/all');
+                const allBills = await res.json();
+
+                const filtered = allBills.filter(b => {
+                    const bDate = new Date(b.bill_date);
+                    const dStr = bDate.getFullYear() + '-' + String(bDate.getMonth() + 1).padStart(2, '0') + '-' + String(bDate.getDate()).padStart(2, '0');
+                    return dStr >= start && dStr <= end;
+                });
+
+                const tbody = document.getElementById('reportContent');
+                tbody.innerHTML = '';
+
+                let gGross = 0, gDisc = 0, gNet = 0;
+
+                filtered.forEach(b => {
+                    const bDate = new Date(b.bill_date);
+                    const dateTime = bDate.toLocaleDateString('en-GB') + ' ' + bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+                    const status = b.status;
+                    const isCancelled = (status === 'Cancelled');
+                    const isReturned = (status === 'RETURNED' || b.source_bill_id);
+                    
+                    const gross = (b.prev_total || b.total_amount) + (b.discount || 0);
+                    const discount = (b.discount || 0);
+                    const net = b.total_amount;
+
+                    if (!isCancelled) {
+                        gGross += gross;
+                        gDisc += discount;
+                        gNet += net;
+                    }
+
+                    const rowClass = isCancelled ? 'cancelled-row' : (isReturned ? 'returned-row' : '');
+                    const tr = document.createElement('tr');
+                    tr.className = rowClass;
+                    tr.innerHTML = `
+                        <td class="doc-id">
+                            MP-${String(b.id).padStart(5, '0')}
+                            ${isCancelled ? '<span class="badge badge-danger" style="font-size: 0.6rem; margin-left: 5px;">VOID</span>' : ''}
+                            ${status === 'RETURNED' ? '<span class="badge badge-warning" style="font-size: 0.6rem; margin-left: 5px;">RET</span>' : ''}
+                        </td>
+                        <td>${dateTime}</td>
+                        <td class="amount-cell">₹${gross.toFixed(2)}</td>
+                        <td class="amount-cell">₹${discount.toFixed(2)}</td>
+                        <td class="amount-cell net-amount ${isCancelled ? 'total-amount' : ''}">₹${net.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('totalGross').innerText = '₹' + gGross.toFixed(2);
+                document.getElementById('totalDiscount').innerText = '₹' + gDisc.toFixed(2);
+                document.getElementById('totalNet').innerText = '₹' + gNet.toFixed(2);
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted);">No transactions found for this date.</td></tr>';
+                }
+
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventry Master - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            width: 90%;
+            max-width: 600px;
+            animation: modalSlide 0.4s var(--ease-out);
+        }
+
+        @keyframes modalSlide {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .full-width {
+            grid-column: span 2;
+        }
+
+        .floating-add {
+            position: fixed;
+            bottom: 40px;
+            right: 40px;
+            width: 60px;
+            height: 60px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 10px 30px var(--primary-glow);
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content animate-fade">
+        <header class="section-header">
+            <div>
+                <h1>Product Master</h1>
+                <p style="color: var(--text-muted);">Configure your item database and pricing.</p>
+            </div>
+            <div style="display: flex; gap: 15px;">
+                <div class="search-box" style="position: relative; width: 300px;">
+                    <i class="fa-solid fa-search"
+                        style="position: absolute; left: 15px; top: 15px; color: var(--text-muted);"></i>
+                    <input type="text" id="searchInput" class="input-dark" placeholder="Search products..."
+                        onkeyup="filterProducts()" style="padding-left: 45px;">
+                </div>
+                <button class="btn btn-primary" onclick="openModal()">
+                    <i class="fa-solid fa-plus"></i> NEW PRODUCT
+                </button>
+            </div>
+        </header>
+
+        <div class="glass-panel" style="padding: 10px;">
+            <div class="table-wrapper">
+                <table id="productsTable">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Product Name</th>
+                            <th>Category</th>
+                            <th style="text-align: right;">Rate</th>
+                            <th style="text-align: center;">Bizz%</th>
+                            <th style="text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal -->
+    <div id="productModal" class="modal">
+        <div class="modal-content glass-panel" style="padding: 30px;">
+            <div class="flex-between mb-20">
+                <h2 id="modalTitle" style="font-weight: 800; letter-spacing: -1px;">Catalog Item</h2>
+                <button class="btn" onclick="closeModal()"
+                    style="background: transparent; color: var(--text-muted); font-size: 1.5rem; padding: 0;">&times;</button>
+            </div>
+
+            <form id="productForm" onsubmit="saveProduct(event)">
+                <input type="hidden" id="productId">
+
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Product
+                            Identity / Barcode</label>
+                        <input type="text" id="barcode" class="input-dark" required placeholder="SKU-XXXX">
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Item
+                            Description</label>
+                        <input type="text" id="name" class="input-dark" required placeholder="Brand & Generic Name">
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label
+                            style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Classification</label>
+                        <select id="category" class="input-dark"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Unit Rate
+                            (₹)</label>
+                        <input type="number" step="0.01" id="price" class="input-dark" required placeholder="0.00">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Bizz
+                            Reward %</label>
+                        <input type="number" step="0.01" id="bizz" class="input-dark" value="0">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">UOM
+                            (Unit)</label>
+                        <select id="unit" class="input-dark">
+                            <option value="PCS">PCS (Pieces)</option>
+                            <option value="KG">KG (Kilograms)</option>
+                            <option value="PKT">PKT (Packet)</option>
+                            <option value="BOX">BOX (Carton)</option>
+                            <option value="LTR">LTR (Liters)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Expiry
+                            Date</label>
+                        <input type="date" id="expiry_date" class="input-dark">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Min stock
+                            Threshold</label>
+                        <input type="number" id="min_threshold" class="input-dark" value="25">
+                    </div>
+
+
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 15px; margin-top: 30px;">
+                    <button type="button" class="btn" style="background: rgba(255,255,255,0.05);"
+                        onclick="closeModal()">Discard</button>
+                    <button type="submit" class="btn btn-primary">Commit Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let products = [];
+        let categories = [];
+
+        async function init() {
+            await Promise.all([loadProducts(), loadCategories()]);
+        }
+
+        async function loadProducts() {
+            try {
+                const res = await fetch('/api/inventory/products');
+                products = await res.json();
+                renderTable(products);
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadCategories() {
+            try {
+                const res = await fetch('/api/inventory/categories');
+                categories = await res.json();
+                const select = document.getElementById('category');
+                select.innerHTML = '<option value="General">Uncategorized / General</option>';
+                categories.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.name;
+                    opt.innerText = c.name;
+                    select.appendChild(opt);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        function renderTable(data) {
+            const tbody = document.querySelector('#productsTable tbody');
+            tbody.innerHTML = '';
+
+            data.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-family: monospace; color: var(--accent);">${p.barcode || '-'}</td>
+                    <td style="font-weight: 600;">${p.name}</td>
+                    <td style="color: var(--text-muted); font-size: 0.85rem;">${p.category}</td>
+                    <td style="text-align: right; font-weight: 800; color: var(--success);">₹${p.price.toFixed(2)}</td>
+                    <td style="text-align: center;"><span class="badge" style="background: rgba(99,102,241,0.1); color: var(--primary);">${p.bizz || 0}%</span></td>
+                    <td style="text-align: right;">
+                        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                            <button class="btn" style="padding: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);" onclick='editProduct(${JSON.stringify(p)})'>
+                                <i class="fa-solid fa-pen-to-square" style="color: var(--primary);"></i>
+                            </button>
+                            <button class="btn" style="padding: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);" onclick="deleteProduct(${p.id})">
+                                <i class="fa-solid fa-trash-can" style="color: var(--danger);"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filterProducts() {
+            const term = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = products.filter(p =>
+                p.name.toLowerCase().includes(term) ||
+                (p.barcode && p.barcode.toLowerCase().includes(term)) ||
+                p.category.toLowerCase().includes(term)
+            );
+            renderTable(filtered);
+        }
+
+        function openModal() {
+            document.getElementById('productForm').reset();
+            document.getElementById('productId').value = '';
+            document.getElementById('modalTitle').innerText = 'Register New Product';
+            document.getElementById('productModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('productModal').style.display = 'none';
+        }
+
+        function editProduct(p) {
+            document.getElementById('productId').value = p.id;
+            document.getElementById('barcode').value = p.barcode || '';
+            document.getElementById('name').value = p.name;
+            document.getElementById('category').value = p.category;
+            document.getElementById('price').value = p.price;
+            document.getElementById('bizz').value = p.bizz || 0;
+            document.getElementById('unit').value = p.unit || 'PCS';
+            document.getElementById('expiry_date').value = p.expiry_date || '';
+            document.getElementById('min_threshold').value = p.min_threshold || 25;
+            document.getElementById('modalTitle').innerText = 'Refine Product Specs';
+            document.getElementById('productModal').style.display = 'flex';
+        }
+
+        async function saveProduct(e) {
+            e.preventDefault();
+            const id = document.getElementById('productId').value;
+            const data = {
+                id: id ? parseInt(id) : null,
+                barcode: document.getElementById('barcode').value,
+                name: document.getElementById('name').value,
+                category: document.getElementById('category').value,
+                price: parseFloat(document.getElementById('price').value),
+                bizz: parseFloat(document.getElementById('bizz').value),
+                unit: document.getElementById('unit').value,
+                expiry_date: document.getElementById('expiry_date').value || null,
+                min_threshold: parseInt(document.getElementById('min_threshold').value) || 25
+            };
+
+            const res = await fetch('/api/inventory/products', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if ((await res.json()).status === 'success') {
+                closeModal();
+                loadProducts();
+            }
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm('Eliminate this product from catalog?')) return;
+            const res = await fetch('/api/inventory/products/' + id, { method: 'DELETE' });
+            if ((await res.json()).status === 'success') loadProducts();
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

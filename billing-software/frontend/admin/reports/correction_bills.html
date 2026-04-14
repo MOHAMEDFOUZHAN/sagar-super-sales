@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Correction Bill - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1 style="font-size: 1.8rem; font-weight: 700;">Correction Bill</h1>
+                <p style="color: var(--text-muted);">Manage bill corrections, returns, and adjustments.</p>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.2); padding: 5px 10px; border-radius: 10px;"
+                class="filter-panel">
+                <input type="date" id="startDate" class="input-dark">
+                <span style="color: var(--text-muted);">to</span>
+                <input type="date" id="endDate" class="input-dark">
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-filter"></i> Filter
+                </button>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="print-only-header">
+            <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET</h1>
+            <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Correction Bill Report</p>
+            <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
+            <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+        </div>
+
+        <div class="glass-panel" style="padding: 20px;">
+            <div style="text-align: center; padding: 60px; color: var(--text-muted);">
+                <i class="fa-solid fa-hammer" style="font-size: 3rem; margin-bottom: 20px; opacity: 0.5;"></i>
+                <h2>Correction Module Pending</h2>
+                <p>The logic for bill correction and returns is being prepared.</p>
+            </div>
+
+            <!-- Table structure ready for future implementation -->
+            <div class="table-wrapper" style="display: none;" id="correctionTableWrapper">
+                <table id="correctionTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Bill No</th>
+                            <th>Original Amt</th>
+                            <th>Corrected Amt</th>
+                            <th>Difference</th>
+                            <th>Reason</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Use local date to avoid timezone mismatch
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+
+        function loadReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            document.getElementById('printDateRange').innerText = `Period: ${new Date(start).toLocaleDateString()} to ${new Date(end).toLocaleDateString()}`;
+            // Logic to be implemented as per user requirements
+            console.log("Loading correction report...");
+        }
+    </script>
+</body>
+
+</html>

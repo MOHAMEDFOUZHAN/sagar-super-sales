@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Intelligence - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        .intel-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+        }
+
+        .full-row {
+            grid-column: span 2;
+        }
+
+        .intel-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 30px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s var(--ease-out);
+        }
+
+        .intel-card:hover {
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .shopping-list-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: var(--radius-md);
+            margin-bottom: 12px;
+            border-left: 4px solid var(--warning);
+        }
+
+        .expiry-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: rgba(239, 68, 68, 0.05);
+            border-radius: var(--radius-md);
+            margin-bottom: 12px;
+            border-left: 4px solid var(--danger);
+        }
+
+        .urgent-badge {
+            background: var(--danger);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            margin-left: 10px;
+        }
+
+        .print-btn {
+            background: var(--primary);
+            color: white;
+            padding: 10px 20px;
+            border-radius: var(--radius-md);
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 5px 15px var(--primary-glow);
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content animate-fade">
+        <header class="section-header">
+            <div>
+                <h1>Stock Intelligence</h1>
+                <p style="color: var(--text-muted);">Predictive inventory management & expiry tracking.</p>
+            </div>
+            <button class="print-btn" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> PRINT SHOPPING LIST
+            </button>
+        </header>
+
+        <div class="intel-grid">
+            <!-- 1. Auto-Purchase / Shopping List -->
+            <div class="intel-card full-row">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 25px;">
+                    <div>
+                        <h2 style="font-weight: 800; letter-spacing: -0.5px;"><i class="fa-solid fa-cart-shopping"
+                                style="color: var(--warning); margin-right: 10px;"></i> Auto-Generated Shopping List
+                        </h2>
+                        <p style="color: var(--text-muted); font-size: 0.85rem;">Items that need immediate restocking
+                            (Stock < Threshold).</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Total
+                            Items</span>
+                        <div id="lowCount" style="font-size: 1.5rem; font-weight: 900; color: var(--warning);">0</div>
+                    </div>
+                </div>
+
+                <div id="shoppingList">
+                    <!-- Loaded via JS -->
+                </div>
+            </div>
+
+            <!-- 2. Expiry Tracking -->
+            <div class="intel-card">
+                <h2 style="font-weight: 800; letter-spacing: -0.5px; margin-bottom: 20px;"><i
+                        class="fa-solid fa-hourglass-half" style="color: var(--danger); margin-right: 10px;"></i> Expiry
+                    Watchlist</h2>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px;">Safety Check: Items
+                    expiring within 30 days.</p>
+
+                <div id="expiryList">
+                    <!-- Loaded via JS -->
+                </div>
+            </div>
+
+            <!-- 3. Stock Health Insights -->
+            <div class="intel-card">
+                <h2 style="font-weight: 800; letter-spacing: -0.5px; margin-bottom: 20px;"><i
+                        class="fa-solid fa-shield-virus" style="color: var(--accent); margin-right: 10px;"></i>
+                    Inventory Health</h2>
+
+                <div style="display: flex; align-items: center; gap: 30px; margin-bottom: 30px;">
+                    <div style="position: relative; width: 100px; height: 100px;">
+                        <svg viewBox="0 0 100 100" style="transform: rotate(-90deg); width: 100px; height: 100px;">
+                            <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.05)"
+                                stroke-width="8" />
+                            <circle id="healthCircle" cx="50" cy="50" r="45" fill="none" stroke="var(--accent)"
+                                stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283"
+                                style="transition: stroke-dashoffset 2s ease-out; stroke-linecap: round;" />
+                        </svg>
+                        <div
+                            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                            <div id="healthScore" style="font-size: 1.5rem; font-weight: 900; color: white;">0%</div>
+                            <div style="font-size: 0.5rem; color: var(--text-muted); text-transform: uppercase;">Score
+                            </div>
+                        </div>
+                    </div>
+                    <div style="flex: 1;">
+                        <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5;">The system is
+                            monitoring your rotation patterns. A score of <b>100%</b> means all items are well-stocked.
+                        </p>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div
+                        style="padding: 15px; background: rgba(16, 185, 129, 0.05); border-radius: var(--radius-md); border: 1px solid rgba(16, 185, 129, 0.1);">
+                        <div style="font-size: 1.2rem; font-weight: 800; color: var(--success);" id="fastCount">0</div>
+                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Fast
+                            Moving Items</div>
+                    </div>
+                    <div
+                        style="padding: 15px; background: rgba(255,255,255,0.02); border-radius: var(--radius-md); border: 1px solid var(--glass-border);">
+                        <div style="font-size: 1.2rem; font-weight: 800; color: white;" id="totalTracked">0</div>
+                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Total
+                            Items Tracked</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        async function loadIntel() {
+            try {
+                const res = await fetch('/api/intelligence/stock-alerts');
+                const data = await res.json();
+
+                renderShoppingList(data.low_stock);
+                renderExpiryList(data.expiring_soon);
+                renderHealth(data.health);
+            } catch (e) {
+                console.error("Intel Sync Error:", e);
+            }
+        }
+
+        function renderHealth(health) {
+            document.getElementById('totalTracked').innerText = health.total_items;
+            document.getElementById('fastCount').innerText = health.fast_moving;
+
+            const scoreVal = health.score;
+            const scoreEl = document.getElementById('healthScore');
+            const circle = document.getElementById('healthCircle');
+
+            // Animate Score
+            gsap.to({ val: 0 }, {
+                val: scoreVal,
+                duration: 2,
+                onUpdate: function () {
+                    scoreEl.innerText = Math.floor(this.targets()[0].val) + "%";
+                }
+            });
+
+            // Animate Circle (Circumference is ~283)
+            const offset = 283 - (283 * scoreVal / 100);
+            circle.style.strokeDashoffset = offset;
+
+            // Color mapping
+            if (scoreVal < 50) circle.style.stroke = "var(--danger)";
+            else if (scoreVal < 80) circle.style.stroke = "var(--warning)";
+            else circle.style.stroke = "var(--accent)";
+        }
+
+        function renderShoppingList(items) {
+            const container = document.getElementById('shoppingList');
+            document.getElementById('lowCount').innerText = items.length;
+            container.innerHTML = '';
+
+            if (items.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--success);"><i class="fa-solid fa-check-circle"></i> All stock levels optimal.</div>';
+                return;
+            }
+
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'shopping-list-item';
+                div.innerHTML = `
+                    <div style="flex: 1;">
+                        <h4 style="font-weight: 700;">${item.name}</h4>
+                        <p style="font-size: 0.75rem; color: var(--text-muted);">${item.category} • Code: ${item.barcode || 'N/A'}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="color: var(--danger); font-weight: 800;">${item.stock} ${item.unit} Left</div>
+                        <div style="font-size: 0.65rem; color: var(--text-muted);">Threshold: ${item.min_threshold}</div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderExpiryList(items) {
+            const container = document.getElementById('expiryList');
+            container.innerHTML = '';
+
+            if (items.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">No items expiring soon.</div>';
+                return;
+            }
+
+            items.forEach(item => {
+                const expiryDate = new Date(item.expiry_date);
+                const diffDays = Math.ceil((expiryDate - new Date()) / (1000 * 60 * 60 * 24));
+
+                const div = document.createElement('div');
+                div.className = 'expiry-item';
+                div.innerHTML = `
+                    <div style="flex: 1;">
+                        <h4 style="font-weight: 700;">${item.name}</h4>
+                        <p style="font-size: 0.75rem; color: var(--text-muted);">${expiryDate.toLocaleDateString()}</p>
+                    </div>
+                    <div style="text-align: right;">
+                        <span class="urgent-badge">${diffDays <= 7 ? 'CRITICAL' : 'WARNING'}</span>
+                        <div style="font-weight: 800; margin-top: 5px;">${diffDays} Days</div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        loadIntel();
+    </script>
+</body>
+
+</html>

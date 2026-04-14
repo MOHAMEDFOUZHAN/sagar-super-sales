@@ -1,0 +1,5 @@
+--- Registered Users ---
+User: counter, Role: sales, Password: 123
+User: admin, Role: admin, Password: 123
+User: fouzhan, Role: ai, Password: 123
+User: accountant, Role: account, Password: account123

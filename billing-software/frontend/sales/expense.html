@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Analytics | Maple Pro Premium</title>
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #020617;
+            --bg-card: rgba(15, 23, 42, 0.6);
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --secondary: #ec4899;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+            --radius-xl: 24px;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --font-main: 'Inter', sans-serif;
+            --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            background-image:
+                radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(236, 72, 153, 0.1) 0%, transparent 50%);
+            overflow: hidden;
+        }
+
+        /* Sidebar Styling */
+        .sidebar {
+            width: 280px;
+            background: rgba(2, 6, 23, 0.8);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            padding: 30px 20px;
+            z-index: 100;
+        }
+
+        .brand {
+            font-size: 1.6rem;
+            font-weight: 900;
+            letter-spacing: -1px;
+            margin-bottom: 50px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: white;
+        }
+
+        .brand i {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-menu {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 18px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: var(--radius-md);
+            transition: 0.3s var(--ease-in-out);
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .nav-link:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateX(5px);
+        }
+
+        .nav-link.active {
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.15), rgba(99, 102, 241, 0.03));
+            color: var(--primary-light);
+            border-left: 4px solid var(--primary);
+            box-shadow: 10px 0 30px rgba(99, 102, 241, 0.1);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .page-title h1 {
+            font-size: 2.4rem;
+            font-weight: 900;
+            letter-spacing: -2px;
+            margin-bottom: 8px;
+            background: linear-gradient(to bottom, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .page-title p {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .btn-close-shift {
+            background: linear-gradient(135deg, var(--danger), #b91c1c);
+            color: white;
+            padding: 14px 28px;
+            border-radius: var(--radius-md);
+            border: none;
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 10px 20px rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-close-shift:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 15px 30px rgba(239, 68, 68, 0.3);
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 24px;
+        }
+
+        /* Glass Card */
+        .glass-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: 30px;
+            box-shadow: var(--glass-shadow);
+            transition: 0.3s;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .card-title {
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title i {
+            color: var(--primary);
+            font-size: 1rem;
+        }
+
+        /* Inputs */
+        .input-group {
+            margin-bottom: 18px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            padding-left: 4px;
+        }
+
+        .premium-input {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            color: white;
+            padding: 14px 18px;
+            font-size: 1rem;
+            font-weight: 600;
+            outline: none;
+            transition: 0.3s;
+            text-align: right;
+        }
+
+        .premium-input:focus {
+            border-color: var(--primary);
+            background: rgba(15, 23, 42, 1);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+        }
+
+        .premium-input[readonly] {
+            border-color: transparent;
+            background: transparent;
+            font-size: 1.4rem;
+            color: var(--accent);
+        }
+
+        /* Vouchers Grid */
+        .vouchers-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .voucher-input-wrapper {
+            position: relative;
+        }
+
+        .voucher-input-wrapper label {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.65rem;
+            font-weight: 800;
+            color: var(--text-muted);
+            pointer-events: none;
+            transition: 0.3s;
+        }
+
+        .voucher-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            color: white;
+            padding: 14px 15px 14px 80px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            text-align: right;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        .voucher-input:focus {
+            border-color: var(--primary);
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        /* Reconciliation Card */
+        .reconcile-info {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .reconcile-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--glass-border);
+        }
+
+        .reconcile-item label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .reconcile-item span {
+            font-size: 1.1rem;
+            font-weight: 800;
+        }
+
+        .reconcile-total {
+            margin-top: 10px;
+            padding: 25px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.1));
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: var(--radius-lg);
+            text-align: center;
+        }
+
+        .reconcile-total .val {
+            font-size: 2.2rem;
+            font-weight: 900;
+            display: block;
+            margin-top: 10px;
+            letter-spacing: -1px;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+        }
+
+        .status-balanced {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .status-mismatch {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Animation */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .glass-card {
+            animation: fadeIn 0.6s var(--ease-in-out) forwards;
+        }
+
+        .dashboard-grid>div:nth-child(2) {
+            animation-delay: 0.1s;
+        }
+
+        .dashboard-grid>div:nth-child(3) {
+            animation-delay: 0.2s;
+        }
+
+        .dashboard-grid>div:nth-child(4) {
+            animation-delay: 0.3s;
+        }
+
+        .btn-save {
+            width: 100%;
+            padding: 18px;
+            margin-top: 25px;
+            background: linear-gradient(135deg, var(--primary), #4f46e5);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-weight: 800;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-save:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-save i {
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="brand"><i class="fa-solid fa-bolt"></i> MAPLE PRO</div>
+        <ul class="nav-menu">
+            <li><a href="/sales/dashboard" class="nav-link"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+            <li><a href="/sales/billing" class="nav-link"><i class="fa-solid fa-cart-shopping"></i> Billing</a></li>
+            <li><a href="/sales/expenses" class="nav-link active"><i class="fa-solid fa-receipt"></i> Expenses</a></li>
+            <li><a href="/sales/report" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Reports</a></li>
+            <li><a href="/sales/returns" class="nav-link"><i class="fa-solid fa-rotate-left"></i> Returns & Voids</a></li>
+        </ul>
+        <div style="margin-top: auto;">
+            <div style="padding: 12px 16px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: var(--radius-md); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 12px;">
+                <div style="width: 32px; height: 32px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white;">
+                    {{ session.username[0].upper() if session.username else 'C' }}
+                </div>
+                <div>
+                    <div style="font-size: 0.85rem; font-weight: 600; color: white;">
+                        {% if session.username.startswith('counter') %}Counter - {{ session.username[7:] }}
+                        {% else %}{{ session.username|capitalize }}{% endif %}
+                    </div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Active Session</div>
+                </div>
+            </div>
+            <a href="/" class="nav-link" style="color: var(--danger);"><i class="fa-solid fa-power-off"></i> Logout</a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header>
+            <div class="page-title">
+                <h1>Expense Analytics
+                    {% if session.username.startswith('counter') %}(Counter {{ session.username[7:] }})
+                    {% endif %}
+                </h1>
+                <p>Advanced Real-time Cash Flow Management</p>
+            </div>
+            <button class="btn-close-shift" onclick="finalizeDay()"><i class="fa-solid fa-shield-halved"></i> CLOSE
+                SHIFT</button>
+        </header>
+
+        <div class="dashboard-grid">
+
+            <!-- LEFT COLUMN: CASHFLOW INFLOW & DENOMINATIONS -->
+            <div style="grid-column: span 3; display: flex; flex-direction: column; gap: 24px;">
+                <div class="glass-card" style="padding: 25px;">
+                    <div class="card-title"><i class="fa-solid fa-vault"></i> Inflow Control</div>
+                    <div class="input-group">
+                        <label>Opening Cash (O.B)</label>
+                        <input type="number" id="opening_bal" class="premium-input" value="2500">
+                    </div>
+                    <div class="input-group" style="margin-bottom: 0;">
+                        <label>Additional Cash In</label>
+                        <input type="number" id="inflow" class="premium-input" value="0">
+                    </div>
+                </div>
+
+                <div class="glass-card" style="padding: 25px; flex: 1;">
+                    <div class="card-title"><i class="fa-solid fa-coins"></i> Denominations</div>
+                    <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 15px;">
+                        <div class="voucher-input-wrapper">
+                            <label>500 X</label>
+                            <input type="number" class="voucher-input denom-in" data-note="500">
+                        </div>
+                        <div class="voucher-input-wrapper">
+                            <label>200 X</label>
+                            <input type="number" class="voucher-input denom-in" data-note="200">
+                        </div>
+                        <div class="voucher-input-wrapper">
+                            <label>100 X</label>
+                            <input type="number" class="voucher-input denom-in" data-note="100">
+                        </div>
+                        <div class="voucher-input-wrapper">
+                            <label>50 X</label>
+                            <input type="number" class="voucher-input denom-in" data-note="50">
+                        </div>
+                        <div class="voucher-input-wrapper">
+                            <label>20 X</label>
+                            <input type="number" class="voucher-input denom-in" data-note="20">
+                        </div>
+                        <div class="voucher-input-wrapper">
+                            <label>10 X</label>
+                            <input type="number" class="voucher-input denom-in" data-note="10">
+                        </div>
+                    </div>
+                    <div
+                        style="margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--glass-border); text-align: right;">
+                        <span
+                            style="font-size: 0.65rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Total
+                            Counted</span>
+                        <div id="denom_total" style="font-size: 1.8rem; font-weight: 900; color: var(--accent);">₹ 0
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CENTER COLUMN: EXPENSE CATEGORIES -->
+            <div style="grid-column: span 5; display: flex; flex-direction: column; gap: 24px;">
+                <div class="glass-card" style="flex: 1; display: flex; flex-direction: column;">
+                    <div class="card-title"><i class="fa-solid fa-receipt"></i> Quick Expense Vouchers</div>
+
+                    <div style="margin-top: 20px; flex: 1; overflow-y: auto; padding-right: 5px;">
+                        <span
+                            style="font-size: 0.6rem; font-weight: 800; color: var(--primary-light); text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 15px;">Office
+                            / Debit Categories</span>
+                        <div class="vouchers-grid">
+                            <div class="voucher-input-wrapper"><label>BETA</label><input type="number"
+                                    class="voucher-input exp-in" data-cat="BETA" data-grp="OFFICE"></div>
+                            <div class="voucher-input-wrapper"><label>TSC</label><input type="number"
+                                    class="voucher-input exp-in" data-cat="TSC" data-grp="OFFICE"></div>
+                            <div class="voucher-input-wrapper"><label>OFFICE</label><input type="number"
+                                    class="voucher-input exp-in" data-cat="OFFICE" data-grp="OFFICE"></div>
+                            <div class="voucher-input-wrapper"><label>RCS-ZIGMA</label><input type="number"
+                                    class="voucher-input exp-in" data-cat="RCS-ZIGMA" data-grp="OFFICE"></div>
+                            <div class="voucher-input-wrapper"><label>GODOWN</label><input type="number"
+                                    class="voucher-input exp-in" data-cat="GODOWN" data-grp="OFFICE"></div>
+                            <div class="voucher-input-wrapper"><label>SALARY</label><input type="number"
+                                    class="voucher-input exp-in" data-cat="SALARY" data-grp="OFFICE"></div>
+                        </div>
+
+                        <span
+                            style="font-size: 0.6rem; font-weight: 800; color: var(--secondary); text-transform: uppercase; letter-spacing: 1px; display: block; margin: 30px 0 15px;">Shop
+                            / Miscellaneous</span>
+                        <div class="vouchers-grid">
+                            <div class="voucher-input-wrapper"><label>FLOWER</label><input type="number"
+                                    class="voucher-input exp-in" data-cat="FLOWER" data-grp="SHOP"></div>
+                            <div class="voucher-input-wrapper"><label>PACKING</label><input type="number"
+                                    class="voucher-input exp-in" data-cat="PACKING" data-grp="SHOP"></div>
+                            <div class="voucher-input-wrapper"><label>MISC</label><input type="number"
+                                    class="voucher-input exp-in" data-cat="MISC" data-grp="SHOP"></div>
+                        </div>
+                    </div>
+
+                    <button class="btn-save" id="save-btn">
+                        <i class="fa-solid fa-circle-check"></i> Save Daily Reconciliation
+                    </button>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: RECONCILIATION & ANALYTICS -->
+            <div style="grid-column: span 4; display: flex; flex-direction: column; gap: 24px;">
+                <div class="glass-card"
+                    style="height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                    <div class="card-header" style="width: 100%; position: absolute; top: 30px; left: 30px; margin: 0;">
+                        <div class="card-title"><i class="fa-solid fa-chart-pie"></i> Distribution</div>
+                    </div>
+                    <div style="width: 220px; height: 220px; position: relative; margin-top: 20px;">
+                        <canvas id="expenseChart"></canvas>
+                        <div
+                            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+                            <span
+                                style="font-size: 0.6rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase; display: block;">Total
+                                Exp</span>
+                            <span id="label_expense_center" style="font-size: 1.4rem; font-weight: 900;">₹ 0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card" style="flex: 1;">
+                    <div class="card-title"><i class="fa-solid fa-scale-balanced"></i> Live Reconciliation</div>
+
+                    <div class="reconcile-info" style="margin-top: 25px;">
+                        <div style="text-align: center;">
+                            <div id="statusBadge" class="status-badge status-balanced">
+                                <i class="fa-solid fa-check-circle"></i> Counter Balanced
+                            </div>
+                        </div>
+
+                        <div class="reconcile-item">
+                            <label>Cash Sales (Today)</label>
+                            <span id="label_sales" style="color: var(--success);">+ ₹ 0</span>
+                        </div>
+                        <div class="reconcile-item">
+                            <label>Total Expenses</label>
+                            <span id="label_expense" style="color: var(--danger);">- ₹ 0</span>
+                        </div>
+
+                        <div class="reconcile-total">
+                            <label
+                                style="font-size: 0.65rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">System
+                                Expected Balance</label>
+                            <span class="val" id="label_final">₹ 0.00</span>
+                        </div>
+
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; padding: 10px 5px;">
+                            <span
+                                style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Variance
+                                / Mismatch</span>
+                            <span id="label_variance"
+                                style="font-weight: 900; font-size: 1.1rem; color: var(--warning);">₹ 0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        let expenseChart;
+        let dailySales = 0;
+
+        function initChart() {
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            expenseChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['No Data'],
+                    datasets: [{
+                        data: [1],
+                        backgroundColor: ['#6366f1', '#ec4899', '#06b6d4', '#f59e0b', '#10b981', '#64748b'],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    cutout: '80%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(2, 6, 23, 0.9)',
+                            padding: 12,
+                            titleFont: { size: 10, weight: 'bold' },
+                            bodyFont: { size: 13, weight: 'bold' },
+                            displayColors: false
+                        }
+                    },
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+
+        async function fetchDailySales() {
+            try {
+                // Using the specific date from system time for simulation
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+                dailySales = data.daily_sales || 0;
+                document.getElementById('label_sales').innerText = '+ ₹ ' + dailySales.toLocaleString('en-IN');
+                updateCalculations();
+            } catch (e) { console.error("Sales fetch failed"); }
+        }
+
+        function updateCalculations() {
+            // 1. Denominations
+            let denomTotal = 0;
+            document.querySelectorAll('.denom-in').forEach(inp => {
+                const note = parseInt(inp.dataset.note);
+                const count = parseInt(inp.value) || 0;
+                denomTotal += (note * count);
+            });
+            document.getElementById('denom_total').innerText = '₹ ' + denomTotal.toLocaleString('en-IN');
+
+            // 2. Expenses
+            let expTotal = 0;
+            let expData = [];
+            let expLabels = [];
+            document.querySelectorAll('.exp-in').forEach(inp => {
+                const val = parseFloat(inp.value) || 0;
+                expTotal += val;
+                if (val > 0) {
+                    expLabels.push(inp.dataset.cat);
+                    expData.push(val);
+                }
+            });
+            document.getElementById('label_expense').innerText = '- ₹ ' + expTotal.toLocaleString('en-IN');
+            document.getElementById('label_expense_center').innerText = '₹ ' + expTotal.toLocaleString('en-IN');
+
+            // 3. System Balance
+            const ob = parseFloat(document.getElementById('opening_bal').value) || 0;
+            const inflow = parseFloat(document.getElementById('inflow').value) || 0;
+            const expectedBalance = (ob + inflow + dailySales) - expTotal;
+            document.getElementById('label_final').innerText = '₹ ' + expectedBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+            // 4. Variance
+            const variance = denomTotal - expectedBalance;
+            const varDisplay = document.getElementById('label_variance');
+            const statusBadge = document.getElementById('statusBadge');
+
+            if (Math.abs(variance) < 1) {
+                varDisplay.innerText = '₹ 0';
+                varDisplay.style.color = 'var(--success)';
+                statusBadge.className = 'status-badge status-balanced';
+                statusBadge.innerHTML = '<i class="fa-solid fa-check-circle"></i> Counter Balanced';
+            } else {
+                varDisplay.innerText = (variance > 0 ? '+ ₹ ' : '- ₹ ') + Math.abs(variance).toLocaleString('en-IN');
+                varDisplay.style.color = (variance > 0 ? 'var(--accent)' : 'var(--danger)');
+                statusBadge.className = 'status-badge status-mismatch';
+                statusBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Drawer Mismatch';
+            }
+
+            // Chart Update
+            if (expData.length > 0) {
+                expenseChart.data.labels = expLabels;
+                expenseChart.data.datasets[0].data = expData;
+            } else {
+                expenseChart.data.labels = ['No Data'];
+                expenseChart.data.datasets[0].data = [1];
+            }
+            expenseChart.update();
+        }
+
+        // Interactivity
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', updateCalculations);
+        });
+
+        document.getElementById('save-btn').addEventListener('click', async () => {
+            const expenses = [];
+            document.querySelectorAll('.exp-in').forEach(inp => {
+                const amount = parseFloat(inp.value) || 0;
+                if (amount > 0) {
+                    expenses.push({
+                        category: inp.dataset.cat,
+                        amount: amount,
+                        expense_group: inp.dataset.grp
+                    });
+                }
+            });
+
+            const denoms = [];
+            document.querySelectorAll('.denom-in').forEach(inp => {
+                const count = parseInt(inp.value) || 0;
+                if (count > 0) {
+                    denoms.push({
+                        note_value: parseInt(inp.dataset.note),
+                        count: count
+                    });
+                }
+            });
+
+            const payload = {
+                opening_balance: parseFloat(document.getElementById('opening_bal').value) || 0,
+                inflow: parseFloat(document.getElementById('inflow').value) || 0,
+                expenses: expenses,
+                denominations: denoms
+            };
+
+            try {
+                const response = await fetch('/api/save-shift-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const res = await response.json();
+                if (res.status === 'success') {
+                    alert("Shift Data Synchronized Successfully!");
+                } else {
+                    alert("Error saving: " + res.message);
+                }
+            } catch (err) { alert("Server connection lost"); }
+        });
+
+        function finalizeDay() {
+            if (confirm("Are you sure you want to CLOSE SHIFT? This will finalize all transactions for the day.")) {
+                window.location.href = "/sales/report";
+            }
+        }
+
+        // Init
+        window.onload = () => {
+            initChart();
+            fetchDailySales();
+        };
+    </script>
+</body>
+
+</html>

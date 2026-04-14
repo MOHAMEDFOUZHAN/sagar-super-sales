@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cancelled Report - AdminPanel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .report-container {
+            padding: 20px;
+        }
+
+        .filter-panel {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 25px;
+            background: var(--glass-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+        }
+
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .report-table th {
+            background: rgba(239, 68, 68, 0.1);
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--danger);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            color: var(--danger);
+        }
+
+        .report-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--text-main);
+        }
+
+        .amount-cell {
+            text-align: right;
+            font-weight: 700;
+            color: var(--danger);
+        }
+
+        @media print {
+            /* Hide Method column on print */
+            .col-method {
+                display: none !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1 style="color: var(--danger);">Cancelled Report</h1>
+                <p style="color: var(--text-muted);">Audit log of all voided/cancelled transactions.</p>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="report-container">
+            <div class="filter-panel">
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">PERIOD START</label>
+                    <input type="date" id="startDate" class="input-dark">
+                </div>
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">PERIOD END</label>
+                    <input type="date" id="endDate" class="input-dark">
+                </div>
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-sync"></i> REFRESH
+                </button>
+            </div>
+
+            <div class="print-only-header">
+                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET
+                </h1>
+                <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Cancelled Transactions Report</p>
+                <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
+                <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+            </div>
+
+            <div class="glass-panel" style="padding: 20px;">
+                <div class="table-wrapper">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>DOC ID</th>
+                                <th>DATE/TIME</th>
+                                <th class="col-method">METHOD</th>
+                                <th class="amount-cell">AMOUNT (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportContent"></tbody>
+                        <tfoot>
+                            <tr style="background: rgba(239, 68, 68, 0.05); font-weight: 800;">
+                                <td colspan="2" id="totalLabel">TOTAL CANCELLED VALUE</td>
+                                <td class="col-method"></td>
+                                <td id="totalCancelled" class="amount-cell">0.00</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+
+        async function loadReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+
+            const startF = new Date(start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const endF = new Date(end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            document.getElementById('printDateRange').innerText = `Period: ${startF} to ${endF}`;
+
+            try {
+                const res = await fetch('/api/bills/all');
+                const bills = await res.json();
+
+                const filtered = bills.filter(b => {
+                    const bDate = new Date(b.bill_date);
+                    const dStr = bDate.getFullYear() + '-' + String(bDate.getMonth() + 1).padStart(2, '0') + '-' + String(bDate.getDate()).padStart(2, '0');
+                    return dStr >= start && dStr <= end && b.status === 'Cancelled';
+                });
+
+                const tbody = document.getElementById('reportContent');
+                tbody.innerHTML = '';
+                let total = 0;
+
+                filtered.forEach(b => {
+                    const bDate = new Date(b.bill_date);
+                    const dateTime = bDate.toLocaleDateString('en-GB') + ' ' + bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    const amt = b.prev_total || 0; 
+                    total += amt;
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="font-weight: 700;">MP-${String(b.id).padStart(5, '0')}</td>
+                        <td>${dateTime}</td>
+                        <td class="col-method"><span class="badge" style="background: rgba(255,255,255,0.05);">${b.payment_mode}</span></td>
+                        <td class="amount-cell">₹${amt.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('totalCancelled').innerText = '₹' + total.toFixed(2);
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 40px; color: var(--text-muted);">No cancelled bills found for this period.</td></tr>';
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

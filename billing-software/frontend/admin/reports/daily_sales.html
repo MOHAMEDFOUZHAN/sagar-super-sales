@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Sales Report - AdminPanel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .report-container {
+            padding: 20px;
+        }
+
+        .filter-panel {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 25px;
+            background: var(--glass-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+        }
+
+        .grid-reports {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .report-table th {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--glass-border);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .report-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--text-main);
+        }
+
+        .amount-cell {
+            text-align: right;
+            font-weight: 600;
+        }
+
+        .category-name {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .total-row {
+            background: rgba(99, 102, 241, 0.1);
+            font-weight: 800;
+        }
+
+        @media print {
+            @page {
+                size: landscape;
+                margin: 5mm;
+            }
+            .report-table th,
+            .report-table td {
+                font-size: 0.65rem !important;
+                padding: 2px 4px !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>Daily Sales Report</h1>
+                <p style="color: var(--text-muted);">Summary of sales by payment mode and product categories.</p>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="report-container">
+            <div class="filter-panel">
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">START DATE</label>
+                    <input type="date" id="startDate" class="input-dark">
+                </div>
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">END DATE</label>
+                    <input type="date" id="endDate" class="input-dark">
+                </div>
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-sync"></i> REFRESH
+                </button>
+            </div>
+
+            <div class="print-only-header">
+                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET
+                </h1>
+                <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Daily Sales Report (Tabular Summary)</p>
+                <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
+                <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+            </div>
+
+            <div class="glass-panel" style="padding: 15px; overflow-x: auto;">
+                <table class="report-table" id="dailyTable">
+                    <thead>
+                        <tr>
+                            <th style="min-width: 100px;">DATE</th>
+                            <th>CASH</th>
+                            <th>UPI</th>
+                            <th>CARD</th>
+                            <th>SALES</th>
+                            <th>OILS</th>
+                            <th>SPICES</th>
+                            <th>TEA</th>
+                            <th>AROM</th>
+                            <th>NATU</th>
+                            <th>OTHERS</th>
+                            <th>C-MRD</th>
+                            <th>C-CFC</th>
+                            <th>FJ</th>
+                            <th>VARKEY</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dailyContent">
+                        <!-- Data injected here -->
+                    </tbody>
+                    <tfoot id="dailyTotal" style="background: rgba(99, 102, 241, 0.1); font-weight: bold;">
+                        <!-- Totals injected here -->
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+
+        async function loadReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+
+            const startF = new Date(start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const endF = new Date(end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            document.getElementById('printDateRange').innerText = `Period: ${startF} to ${endF}`;
+
+            try {
+                const res = await fetch(`/api/reports/daily-range?start_date=${start}&end_date=${end}`);
+                const data = await res.json();
+
+                const tbody = document.getElementById('dailyContent');
+                tbody.innerHTML = '';
+
+                let grandTotals = {
+                    cash: 0, upi: 0, card: 0, sales: 0, oils: 0, spices: 0, tea: 0, arom: 0, natu: 0, others: 0, cmard: 0, ccfc: 0, fj: 0, varkey: 0
+                };
+
+                data.forEach(day => {
+                    const row = document.createElement('tr');
+                    const d = day.sales;
+                    const c = day.categories;
+
+                    // Accumulate totals
+                    grandTotals.cash += d.cash;
+                    grandTotals.upi += d.upi;
+                    grandTotals.card += d.card;
+                    grandTotals.sales += d.total_sales;
+                    grandTotals.oils += c['OILS'];
+                    grandTotals.spices += c['SPICES'];
+                    grandTotals.tea += c['TEA'];
+                    grandTotals.arom += c['AROM'];
+                    grandTotals.natu += c['NATUR'];
+                    grandTotals.others += c['OTHERS'];
+                    grandTotals.cmard += c['C-MRD'];
+                    grandTotals.ccfc += c['C-CFC'];
+                    grandTotals.fj += c['FJ'];
+                    grandTotals.varkey += c['VARKEY'];
+
+                    row.innerHTML = `
+                        <td>${new Date(day.date).toLocaleDateString('en-GB')}</td>
+                        <td class="amount-cell">${d.cash.toFixed(0)}</td>
+                        <td class="amount-cell">${d.upi.toFixed(0)}</td>
+                        <td class="amount-cell">${d.card.toFixed(0)}</td>
+                        <td class="amount-cell" style="font-weight:bold;">${d.total_sales.toFixed(0)}</td>
+                        <td class="amount-cell">${c['OILS'].toFixed(0)}</td>
+                        <td class="amount-cell">${c['SPICES'].toFixed(0)}</td>
+                        <td class="amount-cell">${c['TEA'].toFixed(0)}</td>
+                        <td class="amount-cell">${c['AROM'].toFixed(0)}</td>
+                        <td class="amount-cell">${c['NATUR'].toFixed(0)}</td>
+                        <td class="amount-cell">${c['OTHERS'].toFixed(0)}</td>
+                        <td class="amount-cell">${c['C-MRD'].toFixed(0)}</td>
+                        <td class="amount-cell">${c['C-CFC'].toFixed(0)}</td>
+                        <td class="amount-cell">${c['FJ'].toFixed(0)}</td>
+                        <td class="amount-cell">${c['VARKEY'].toFixed(0)}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+                document.getElementById('dailyTotal').innerHTML = `
+                    <tr>
+                        <td>TOTAL</td>
+                        <td class="amount-cell">${grandTotals.cash.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.upi.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.card.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.sales.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.oils.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.spices.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.tea.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.arom.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.natu.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.others.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.cmard.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.ccfc.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.fj.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.varkey.toFixed(0)}</td>
+                    </tr>
+                `;
+
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

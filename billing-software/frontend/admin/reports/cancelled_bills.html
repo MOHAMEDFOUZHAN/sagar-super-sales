@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cancelled Bills - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        @media print {
+            tfoot tr {
+                background: #fecaca !important;
+                color: #b91c1c !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1 style="font-size: 1.8rem; font-weight: 700;">Cancelled Bills</h1>
+                <p style="color: var(--text-muted);">Audit cancelled transactions and returned stock.</p>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.2); padding: 5px 10px; border-radius: 10px;"
+                class="filter-panel">
+                <input type="date" id="startDate" class="input-dark">
+                <span style="color: var(--text-muted);">to</span>
+                <input type="date" id="endDate" class="input-dark">
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-filter"></i> Filter
+                </button>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> PRINT
+            </button>
+        </header>
+
+        <div class="print-only-header">
+            <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET</h1>
+            <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Cancelled Bills Detailed Audit</p>
+            <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
+            <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+        </div>
+
+        <div class="glass-panel" style="padding: 20px;">
+            <div class="table-wrapper">
+                <table id="cancelTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Bill No</th>
+                            <th>Code</th>
+                            <th>Product</th>
+                            <th>Qty Reversed</th>
+                            <th>Amount Voided</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot>
+                        <tr style="font-weight: bold; background: rgba(239, 68, 68, 0.1);">
+                            <td colspan="3">TOTAL VOIDED</td>
+                            <td id="totalQty">0</td>
+                            <td id="totalAmt">₹0</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Use local date to avoid timezone mismatch
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+
+        async function loadReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+
+            try {
+                const res = await fetch('/api/reports/sales-detailed');
+                const data = await res.json();
+
+                // Filter for Cancelled with local date comparison
+                const filtered = data.filter(r => {
+                    const rDate = new Date(r.bill_date);
+                    const d = rDate.getFullYear() + '-' + String(rDate.getMonth() + 1).padStart(2, '0') + '-' + String(rDate.getDate()).padStart(2, '0');
+                    return d >= start && d <= end && r.bill_status === 'Cancelled';
+                });
+
+                const tbody = document.querySelector('#cancelTable tbody');
+                tbody.innerHTML = '';
+
+                let grandQty = 0;
+                let grandAmt = 0;
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;">No cancellations found in this period.</td></tr>';
+                }
+
+                filtered.forEach(r => {
+                    grandQty += r.qty;
+                    grandAmt += r.amount;
+
+                    const tr = document.createElement('tr');
+                    const bDate = new Date(r.bill_date);
+                    const dateTimeStr = bDate.toLocaleDateString('en-GB') + ' ' + bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    tr.innerHTML = `
+                        <td style="white-space: nowrap;">${dateTimeStr}</td>
+                        <td>MP-${String(r.bill_id).padStart(5, '0')}</td>
+                        <td>${r.barcode || '-'}</td>
+                        <td>${r.product_name}</td>
+                        <td style="color: #fca5a5;">-${r.qty}</td>
+                        <td style="color: #fca5a5;">-₹${r.amount.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('totalQty').innerText = '-' + grandQty;
+                document.getElementById('totalAmt').innerText = '-₹' + grandAmt.toFixed(2);
+                document.getElementById('printDateRange').innerText = `Period: ${new Date(start).toLocaleDateString()} to ${new Date(end).toLocaleDateString()}`;
+            } catch (e) { console.error(e); }
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

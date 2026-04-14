@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Category Sales - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @media print {
+            canvas {
+                display: none !important;
+            }
+
+            h3 {
+                color: black !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1 style="font-size: 1.8rem; font-weight: 700;">Category Analysis</h1>
+                <p style="color: var(--text-muted);">Sales performance by category.</p>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.2); padding: 5px 10px; border-radius: 10px;"
+                class="filter-panel">
+                <input type="date" id="startDate" class="input-dark">
+                <span style="color: var(--text-muted);">to</span>
+                <input type="date" id="endDate" class="input-dark">
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-filter"></i> Filter
+                </button>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> PRINT
+            </button>
+        </header>
+
+        <div class="print-only-header">
+            <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET</h1>
+            <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Category Sales Performance Report</p>
+            <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
+            <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+            <div class="glass-panel" style="padding: 20px;">
+                <div class="table-wrapper">
+                    <table id="catTable">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Items Sold</th>
+                                <th>Revenue (₹)</th>
+                                <th>% of Sales</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="glass-panel"
+                style="padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <h3 style="margin-bottom: 20px;">Revenue Distribution</h3>
+                <canvas id="catChart"></canvas>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Use local date to avoid timezone mismatch
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+        let chartInstance = null;
+
+        async function loadReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+
+            try {
+                const res = await fetch('/api/reports/sales-detailed');
+                const data = await res.json();
+
+                const filtered = data.filter(r => {
+                    const rDate = new Date(r.bill_date);
+                    const d = rDate.getFullYear() + '-' + String(rDate.getMonth() + 1).padStart(2, '0') + '-' + String(rDate.getDate()).padStart(2, '0');
+                    return d >= start && d <= end && r.bill_status !== 'Cancelled';
+                });
+
+                const grouped = {};
+                let totalRevenue = 0;
+
+                filtered.forEach(r => {
+                    const cat = r.category || 'Uncategorized';
+                    if (!grouped[cat]) grouped[cat] = { name: cat, qty: 0, revenue: 0 };
+
+                    grouped[cat].qty += r.qty;
+                    grouped[cat].revenue += r.amount;
+                    totalRevenue += r.amount;
+                });
+
+                const arr = Object.values(grouped).sort((a, b) => b.revenue - a.revenue);
+
+                const tbody = document.querySelector('#catTable tbody');
+                tbody.innerHTML = '';
+
+                const labels = [];
+                const dPoints = [];
+
+                arr.forEach(c => {
+                    const perp = totalRevenue > 0 ? (c.revenue / totalRevenue * 100).toFixed(1) : 0;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${c.name}</td>
+                        <td>${c.qty}</td>
+                        <td>₹${c.revenue.toFixed(2)}</td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div style="width: 50px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px;">
+                                    <div style="width: ${perp}%; height: 100%; background: var(--primary); border-radius: 2px;"></div>
+                                </div>
+                                ${perp}%
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    labels.push(c.name);
+                    dPoints.push(c.revenue);
+                });
+
+                document.getElementById('printDateRange').innerText = `Period: ${new Date(start).toLocaleDateString()} to ${new Date(end).toLocaleDateString()}`;
+
+                // Chart
+                if (chartInstance) chartInstance.destroy();
+                const ctx = document.getElementById('catChart').getContext('2d');
+                chartInstance = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: dPoints,
+                            backgroundColor: ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#06b6d4'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#94a3b8' } }
+                        }
+                    }
+                });
+
+            } catch (e) { console.error(e); }
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

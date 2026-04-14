@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Reports - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @media print {
+            canvas {
+                display: none !important;
+            }
+            .glass-panel h1 {
+                color: #059669 !important;
+                font-size: 2rem !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1 style="font-size: 1.8rem; font-weight: 700;">Stock Valuation</h1>
+                <p style="color: var(--text-muted);">Current inventory value and category breakdown.</p>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="print-only-header">
+            <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET</h1>
+            <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Stock Valuation Report</p>
+            <p id="printRunDate" style="margin: 2px 0; font-weight: bold;"></p>
+            <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+            <!-- Table Side -->
+            <div class="glass-panel" style="padding: 20px;">
+                <h2 style="font-size: 1.1rem; margin-bottom: 20px;">Category Breakdown</h2>
+                <div class="table-wrapper">
+                    <table id="stockReportTable">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th>Total Items</th>
+                                <th>Total Qty</th>
+                                <th>Stock Value (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                        <tfoot>
+                            <tr style="font-weight: bold; background: rgba(255,255,255,0.05);">
+                                <td>TOTAL</td>
+                                <td id="totalItems">0</td>
+                                <td id="totalQty">0</td>
+                                <td id="totalValue">₹0</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Chart Side -->
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                <div class="glass-panel" style="padding: 20px; text-align: center;">
+                    <p
+                        style="color: var(--text-muted); text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em;">
+                        Total Inventory Value</p>
+                    <h1 id="grandTotal"
+                        style="font-size: 2.5rem; color: var(--success); text-shadow: 0 0 30px rgba(16, 185, 129, 0.4);">
+                        ₹0</h1>
+                </div>
+
+                <div class="glass-panel"
+                    style="padding: 20px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                    <canvas id="stockChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        async function loadReport() {
+            try {
+                const res = await fetch('/api/inventory/products');
+                const products = await res.json();
+
+                // Process Data
+                const cats = {};
+                let grandTotal = 0;
+                let grandQty = 0;
+                let grandItems = 0;
+
+                products.forEach(p => {
+                    const cat = p.category || 'Uncategorized';
+                    if (!cats[cat]) cats[cat] = { qty: 0, value: 0, items: 0 };
+
+                    const val = p.current_stock * p.price;
+                    cats[cat].qty += p.current_stock;
+                    cats[cat].value += val;
+                    cats[cat].items += 1;
+
+                    grandTotal += val;
+                    grandQty += p.current_stock;
+                    grandItems += 1;
+                });
+
+                // Render Table
+                const tbody = document.querySelector('#stockReportTable tbody');
+                tbody.innerHTML = '';
+
+                const labels = [];
+                const dataPoints = [];
+
+                Object.keys(cats).forEach(c => {
+                    const row = cats[c];
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${c}</td>
+                        <td>${row.items}</td>
+                        <td>${row.qty}</td>
+                        <td>₹${row.value.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    labels.push(c);
+                    dataPoints.push(row.value);
+                });
+
+                // Render Totals
+                document.getElementById('totalItems').innerText = grandItems;
+                document.getElementById('totalQty').innerText = grandQty;
+                document.getElementById('totalValue').innerText = '₹' + grandTotal.toFixed(2);
+                document.getElementById('grandTotal').innerText = '₹' + grandTotal.toLocaleString();
+
+                // Render Chart
+                const ctx = document.getElementById('stockChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: dataPoints,
+                            backgroundColor: [
+                                '#6366f1', '#ec4899', '#10b981', '#f59e0b', '#06b6d4', '#8b5cf6'
+                            ],
+                            borderColor: 'transparent',
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#94a3b8' } },
+                            title: { display: true, text: 'Value by Category', color: '#f1f5f9' }
+                        }
+                    }
+                });
+
+                document.getElementById('printRunDate').innerText = `Run Date: ${new Date().toLocaleDateString()}`;
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

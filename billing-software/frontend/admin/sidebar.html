@@ -1,0 +1,182 @@
+<nav class="sidebar">
+    <div class="brand">
+        <i class="fa-solid fa-cube"></i> AdminPanel
+    </div>
+    <ul class="nav-menu">
+        <li>
+            <a href="{{ url_for('admin_dashboard') }}"
+                class="nav-link {{ 'active' if request.endpoint == 'admin_dashboard' else '' }}">
+                <i class="fa-solid fa-gauge-high"></i> Dashboard
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_analytics') }}"
+                class="nav-link {{ 'active' if request.endpoint == 'admin_analytics' else '' }}">
+                <i class="fa-solid fa-brain"></i> Intelligence
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_intelligence_stock') }}"
+                class="nav-link {{ 'active' if request.endpoint == 'admin_intelligence_stock' else '' }}">
+                <i class="fa-solid fa-microchip"></i> Stock AI
+            </a>
+        </li>
+
+        <li
+            style="margin-top: 10px; padding-left: 16px; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
+            Masters</li>
+        <li>
+            <a href="{{ url_for('admin_products') }}"
+                class="nav-link {{ 'active' if request.endpoint == 'admin_products' else '' }}">
+                <i class="fa-solid fa-box"></i> Products
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_categories') }}"
+                class="nav-link {{ 'active' if request.endpoint == 'admin_categories' else '' }}">
+                <i class="fa-solid fa-layer-group"></i> Categories
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_users') }}"
+                class="nav-link {{ 'active' if request.endpoint == 'admin_users' else '' }}">
+                <i class="fa-solid fa-user-shield"></i> User Management
+            </a>
+        </li>
+
+        <li
+            style="margin-top: 10px; padding-left: 16px; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
+            Stock</li>
+        <li>
+            <a href="{{ url_for('admin_stock_manage') }}" class="nav-link {{ 'active' if " stock_manage" in
+                request.endpoint else '' }}">
+                <i class="fa-solid fa-boxes-stacked"></i> Manage Stock
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_stock_transfer') }}" class="nav-link {{ 'active' if " stock_transfer" in
+                request.endpoint else '' }}">
+                <i class="fa-solid fa-truck-ramp-box"></i> Transfer
+            </a>
+        </li>
+
+        <li
+            style="margin-top: 10px; padding-left: 16px; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
+            Reports</li>
+        <li>
+            <a href="{{ url_for('admin_reports_billwise_sales') }}"
+                class="nav-link {{ 'active' if 'billwise_sales' in request.endpoint else '' }}">
+                <i class="fa-solid fa-file-invoice-dollar"></i> Bill wise Sales Report
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_sales_report') }}"
+                class="nav-link {{ 'active' if 'sales_report' in request.endpoint else '' }}">
+                <i class="fa-solid fa-receipt"></i> Sales Report
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_daily_sales') }}"
+                class="nav-link {{ 'active' if 'daily_sales' in request.endpoint else '' }}">
+                <i class="fa-solid fa-calendar-day"></i> Daily Sales Report
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_detail_sales') }}"
+                class="nav-link {{ 'active' if 'detail_sales' in request.endpoint else '' }}">
+                <i class="fa-solid fa-circle-info"></i> Detail Sales Report
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_total_sales') }}"
+                class="nav-link {{ 'active' if 'total_sales' in request.endpoint else '' }}">
+                <i class="fa-solid fa-chart-pie"></i> Total Sales Report
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_daily_stock') }}"
+                class="nav-link {{ 'active' if 'daily_stock' in request.endpoint else '' }}">
+                <i class="fa-solid fa-boxes-stacked"></i> Daily Stock Report
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_cancelled_report') }}"
+                class="nav-link {{ 'active' if 'cancelled_report' in request.endpoint else '' }}">
+                <i class="fa-solid fa-ban"></i> Cancelled Report
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_transfer_report') }}"
+                class="nav-link {{ 'active' if 'transfer_report' in request.endpoint else '' }}">
+                <i class="fa-solid fa-truck-arrow-right"></i> Transfer Report
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_counter_wise') }}"
+                class="nav-link {{ 'active' if 'counter_wise' in request.endpoint else '' }}">
+                <i class="fa-solid fa-users-viewfinder"></i> Counter wise Sales
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_final_report') }}"
+                class="nav-link {{ 'active' if 'final_report' in request.endpoint else '' }}">
+                <i class="fa-solid fa-file-contract"></i> Final Report
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_expenses') }}"
+                class="nav-link {{ 'active' if 'reports_expenses' in request.endpoint else '' }}">
+                <i class="fa-solid fa-wallet"></i> Expenses
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_correction') }}"
+                class="nav-link {{ 'active' if 'reports_correction' in request.endpoint else '' }}">
+                <i class="fa-solid fa-pen-to-square"></i> Correction Bill
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_change_sales') }}"
+                class="nav-link {{ 'active' if 'change_sales' in request.endpoint else '' }}">
+                <i class="fa-solid fa-right-left"></i> Change Sales Report
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_cash') }}"
+                class="nav-link {{ 'active' if 'reports_cash' in request.endpoint else '' }}">
+                <i class="fa-solid fa-calculator"></i> Cash Calculator
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_returns') }}"
+                class="nav-link {{ 'active' if 'admin_returns' in request.endpoint else '' }}">
+                <i class="fa-solid fa-rotate-left"></i> Returns & Voids
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('account_dashboard') }}"
+                class="nav-link {{ 'active' if 'account_dashboard' in request.endpoint else '' }}">
+                <i class="fa-solid fa-file-invoice-dollar"></i> Accounts Section
+            </a>
+        </li>
+    </ul>
+
+    <div style="margin-top: auto;">
+        <div style="padding: 12px 16px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: var(--radius-md); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 12px;">
+            <div style="width: 32px; height: 32px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white;">
+                {{ session.username[0].upper() if session.username else 'A' }}
+            </div>
+            <div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: white;">
+                    {% if session.username == 'admin' %}Administrator
+                    {% elif session.username.startswith('counter') %}Counter - {{ session.username[7:] }}
+                    {% else %}{{ session.username|capitalize }}{% endif %}
+                </div>
+                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Active Session</div>
+            </div>
+        </div>
+        <a href="{{ url_for('login') }}" class="nav-link" style="color: var(--danger);">
+            <i class="fa-solid fa-sign-out-alt"></i> Logout
+        </a>
+    </div>
+</nav>

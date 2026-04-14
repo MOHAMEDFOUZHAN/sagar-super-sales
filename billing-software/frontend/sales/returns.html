@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Returns & Voids | Maple Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-darker: #020617;
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --secondary: #ec4899;
+            --accent: #06b6d4;
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --radius-lg: 16px;
+            --radius-md: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top left, #1e1b4b, var(--bg-dark), var(--bg-darker));
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+        }
+
+        .brand {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        .brand i {
+            color: var(--primary);
+        }
+
+        .nav-menu {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: var(--radius-md);
+            transition: 0.2s;
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.03);
+            color: white;
+        }
+
+        .nav-link.active {
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.15), transparent);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #818cf8;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .input-dark {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            outline: none;
+            width: 100%;
+            font-size: 0.9rem;
+        }
+
+        .input-dark:focus {
+            border-color: var(--primary);
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th {
+            text-align: left;
+            padding: 10px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--glass-border);
+            font-size: 0.8rem;
+        }
+
+        td {
+            padding: 15px 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .return-card {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            margin-top: 20px;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="sidebar">
+        <div class="brand"><i class="fa-solid fa-bolt"></i> Maple Pro</div>
+        <ul class="nav-menu">
+            <li><a href="/sales/dashboard" class="nav-link"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+            <li><a href="/sales/billing" class="nav-link"><i class="fa-solid fa-cart-shopping"></i> Billing</a></li>
+            <li><a href="/sales/expenses" class="nav-link"><i class="fa-solid fa-receipt"></i> Expenses</a></li>
+            <li><a href="/sales/report" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Reports</a></li>
+            <li><a href="/sales/returns" class="nav-link active"><i class="fa-solid fa-rotate-left"></i> Returns & Voids</a></li>
+        </ul>
+        <div style="margin-top: auto;">
+            <div style="padding: 12px 16px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: var(--radius-md); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 12px;">
+                <div style="width: 32px; height: 32px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white;">
+                    {{ session.username[0].upper() if session.username else 'C' }}
+                </div>
+                <div>
+                    <div style="font-size: 0.85rem; font-weight: 600; color: white;">
+                        {% if session.username.startswith('counter') %}Counter - {{ session.username[7:] }}
+                        {% else %}{{ session.username|capitalize }}{% endif %}
+                    </div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Active Session</div>
+                </div>
+            </div>
+            <a href="/" class="nav-link" style="color: var(--danger);"><i class="fa-solid fa-power-off"></i> Logout</a>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <h1 style="margin-bottom: 10px; font-size: 1.8rem;">
+            Returns & Bill Voids
+            {% if session.username.startswith('counter') %}(Counter {{ session.username[7:] }})
+            {% endif %}
+        </h1>
+        <p style="color: var(--text-muted); margin-bottom: 30px;">Process item returns or cancel entire bills for
+            corrections.</p>
+
+        <div class="glass-panel" style="display: flex; gap: 15px; align-items: center;">
+            <div style="flex: 1;">
+                <label style="display: block; color: var(--text-muted); margin-bottom: 5px; font-size: 0.8rem;">BILL ID
+                    / DOC ID</label>
+                <input id="bill_search" type="text" class="input-dark" placeholder="e.g. MP-00045">
+            </div>
+            <button onclick="searchBill()" class="btn" style="height: 42px; margin-top: 20px;"><i
+                    class="fa-solid fa-search"></i> SEARCH</button>
+        </div>
+
+        <div id="bill_content" class="glass-panel" style="display: none;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;">
+                <div>
+                    <h3 id="display_bill_id" style="color: var(--primary);">Bill #MP-00000</h3>
+                    <span id="display_date" style="font-size: 0.8rem; color: var(--text-muted);">October 24, 2024</span>
+                </div>
+                <div style="text-align: right; display: flex; flex-direction: column; gap: 10px;">
+                    <div>
+                        <span style="display: block; font-size: 0.8rem; color: var(--text-muted);">TOTAL AMOUNT</span>
+                        <span id="display_total" style="font-size: 1.4rem; font-weight: bold;">₹ 0.00</span>
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button onclick="voidFullBill(false)" class="btn btn-danger"
+                            style="padding: 6px 12px; font-size: 0.75rem;"><i class="fa-solid fa-trash-can"></i> VOID FULL
+                            BILL</button>
+                        <button onclick="voidFullBill(true)" class="btn"
+                            style="padding: 6px 12px; font-size: 0.75rem; background: var(--warning); color: black;"><i class="fa-solid fa-edit"></i> VOID & RE-BILL</button>
+                    </div>
+                </div>
+            </div>
+
+            <table id="items_table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">Select</th>
+                        <th>Product Name</th>
+                        <th>Sold Qty</th>
+                        <th>Rate</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody id="items_body">
+                    <!-- Items go here -->
+                </tbody>
+            </table>
+        </div>
+
+        <div id="action_card" class="return-card">
+            <h3 style="color: var(--danger); margin-bottom: 15px;"><i class="fa-solid fa-circle-exclamation"></i>
+                Confirm Return</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                <div>
+                    <label style="display: block; font-size: 0.8rem; margin-bottom: 5px;">Return Qty</label>
+                    <input id="return_qty" type="number" class="input-dark" value="1">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.8rem; margin-bottom: 5px;">Reason</label>
+                    <select id="return_reason" class="input-dark">
+                        <option value="Damaged">Damaged / Defective</option>
+                        <option value="Expired">Expired</option>
+                        <option value="Customer Return">Customer Changed Mind</option>
+                        <option value="Mistake">Billing Mistake</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.8rem; margin-bottom: 5px;">Refund Amount</label>
+                    <input id="refund_amt" type="number" class="input-dark" readonly
+                        style="font-weight: bold; color: var(--warning);">
+                </div>
+            </div>
+
+            <div style="margin-top: 20px; display: flex; gap: 15px;">
+                <label
+                    style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-muted); font-size: 0.9rem;">
+                    <input type="checkbox" id="restock_check" checked> Add back to Inventory?
+                </label>
+            </div>
+
+            <div style="margin-top: 20px; text-align: right; display: flex; justify-content: flex-end; gap: 10px;">
+                <button onclick="processReturn(false)" class="btn btn-danger"><i class="fa-solid fa-check"></i> PROCESS
+                    REFUND</button>
+                <button onclick="processReturn(true)" class="btn" style="background: var(--warning); color: black;"><i class="fa-solid fa-rotate-left"></i> REFUND & RE-BILL</button>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        let currentBillId = null;
+        let selectedItem = null;
+
+        document.getElementById('bill_search').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') searchBill();
+        });
+
+        async function searchBill() {
+            const query = document.getElementById('bill_search').value.trim();
+            if (!query) return;
+
+            // Convert MP-00045 to 45 if needed, or backend can handle
+            let cleanId = query.replace('MP-', '').replace(/^0+/, '');
+
+            try {
+                // Fetch Details
+                // Re-using existing API logic but ideally we need a specific one or enhance existing
+                const response = await fetch('/api/bills/all');
+                // This is inefficient (fetching all), but fine for MVP. 
+                // Better: Create /api/bills/search endpoint.
+
+                const allBills = await response.json();
+                const bill = allBills.find(b => b.real_id == cleanId || b.doc_id === query);
+
+                if (!bill) {
+                    alert("Bill not found!");
+                    return;
+                }
+
+                currentBillId = bill.real_id;
+
+                // Show Header
+                document.getElementById('bill_content').style.display = 'block';
+                document.getElementById('action_card').style.display = 'none';
+                document.getElementById('display_bill_id').innerText = bill.doc_id;
+                document.getElementById('display_total').innerText = '₹ ' + bill.total.toFixed(2);
+                document.getElementById('display_date').innerText = new Date(bill.date).toLocaleString();
+
+                // Fetch Items
+                const itemRes = await fetch(`/api/bills/${bill.real_id}/items`);
+                const items = await itemRes.json();
+
+                const tbody = document.getElementById('items_body');
+                tbody.innerHTML = '';
+
+                items.forEach((item, index) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><input type="radio" name="item_select" onclick='selectItem(${JSON.stringify(item)})'></td>
+                        <td>${item.product_name}</td>
+                        <td>${item.qty}</td>
+                        <td>${item.rate}</td>
+                        <td>${item.amount}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+            } catch (e) {
+                console.error(e);
+                alert("Error searching bill: " + (e.message || e));
+            }
+        }
+
+        function selectItem(item) {
+            selectedItem = item;
+            document.getElementById('action_card').style.display = 'block';
+
+            const qtyInput = document.getElementById('return_qty');
+            qtyInput.value = item.qty;
+            qtyInput.max = item.qty;
+
+            updateRefundCalc();
+        }
+
+        document.getElementById('return_qty').addEventListener('input', updateRefundCalc);
+
+        function updateRefundCalc() {
+            if (!selectedItem) return;
+            const qty = parseFloat(document.getElementById('return_qty').value) || 0;
+            const amt = qty * selectedItem.rate;
+            document.getElementById('refund_amt').value = amt.toFixed(2);
+        }
+
+        async function processReturn(reprocess = false) {
+            if (!confirm(`Are you sure you want to refund this item? ${reprocess ? 'This will also load the remaining items into the billing screen.' : ''} Use caution.`)) return;
+
+            const payload = {
+                bill_id: currentBillId,
+                product: selectedItem.product_name,
+                qty: parseFloat(document.getElementById('return_qty').value),
+                reason: document.getElementById('return_reason').value,
+                restock: document.getElementById('restock_check').checked,
+                refund_amount: parseFloat(document.getElementById('refund_amt').value),
+                reprocess: reprocess
+            };
+
+            try {
+                const res = await fetch('/api/return-item', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await res.json();
+
+                if (result.status === 'success') {
+                    alert("Return Logged! " + (reprocess ? "Redirecting to billing screen..." : ""));
+                    if (result.redirect) {
+                        window.location.href = result.redirect;
+                    } else {
+                        location.reload();
+                    }
+                } else {
+                    alert("Error: " + result.message);
+                }
+            } catch (e) {
+                alert("Failed to process return.");
+            }
+        }
+        async function voidFullBill(reprocess = false) {
+            if (!currentBillId) return;
+            if (!confirm(`CRITICAL: Are you sure you want to VOID the ENTIRE BILL? ${reprocess ? 'This will load items back to the active cart for correction.' : 'This will restock all items and reset balance.'}`)) return;
+
+            try {
+                const res = await fetch('/api/cancel-bill', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bill_id: currentBillId, reprocess: reprocess })
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    alert("Bill Voided Successfully!");
+                    if (result.redirect) {
+                        window.location.href = result.redirect;
+                    } else {
+                        location.reload();
+                    }
+                } else {
+                    alert("Error: " + result.message);
+                }
+            } catch (e) {
+                alert("Failed to void bill.");
+            }
+        }
+    </script>
+</body>
+
+</html>

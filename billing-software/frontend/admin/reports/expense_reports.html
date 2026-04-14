@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Reports - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @media print {
+            .kpi-grid {
+                margin-bottom: 20px !important;
+                display: flex !important;
+            }
+            .kpi-grid .glass-panel {
+                border: 1px solid black !important;
+                padding: 15px !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1 style="font-size: 1.8rem; font-weight: 700;">Expense Reports</h1>
+                <p style="color: var(--text-muted);">Track operational costs.</p>
+            </div>
+
+            <div
+                style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.2); padding: 5px 10px; border-radius: 10px;">
+                <input type="date" id="startDate" class="input-dark">
+                <span style="color: var(--text-muted);">to</span>
+                <input type="date" id="endDate" class="input-dark">
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-filter"></i> Filter
+                </button>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="print-only-header">
+            <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET</h1>
+            <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Expense Report</p>
+            <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
+            <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+        </div>
+
+        <div class="kpi-grid">
+            <div class="glass-panel" style="padding: 20px; flex:1; text-align: center;">
+                <p style="color: var(--text-muted);">TOTAL EXPENSES</p>
+                <h1 id="totalExp" style="color: #f59e0b; font-size: 2.5rem;">₹0</h1>
+            </div>
+        </div>
+
+        <div class="glass-panel" style="padding: 20px;">
+            <div class="table-wrapper">
+                <table id="expTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Category</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Use local date to avoid timezone mismatch
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+
+        async function loadReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+
+            try {
+                const res = await fetch('/api/expenses/all');
+                const expenses = await res.json();
+
+                const filtered = expenses.filter(e => {
+                    const eDate = new Date(e.date);
+                    const d = eDate.getFullYear() + '-' + String(eDate.getMonth() + 1).padStart(2, '0') + '-' + String(eDate.getDate()).padStart(2, '0');
+                    return d >= start && d <= end;
+                });
+
+                let total = 0;
+                const tbody = document.querySelector('#expTable tbody');
+                tbody.innerHTML = '';
+
+                filtered.forEach(e => {
+                    total += e.amount;
+                    const tr = document.createElement('tr');
+                    const eDate = new Date(e.date);
+                    const dateTimeStr = eDate.toLocaleDateString('en-GB') + ' ' + eDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    tr.innerHTML = `
+                        <td style="white-space: nowrap;">${dateTimeStr}</td>
+                        <td>${e.category}</td>
+                        <td>${e.description || '-'}</td>
+                        <td>₹${e.amount.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('totalExp').innerText = '₹' + total.toFixed(2);
+                document.getElementById('printDateRange').innerText = `Period: ${new Date(start).toLocaleDateString()} to ${new Date(end).toLocaleDateString()}`;
+
+            } catch (e) { console.error(e); }
+        }
+
+        loadReport();
+    </script>
+</body>
+
+</html>

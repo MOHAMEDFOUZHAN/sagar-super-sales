@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cash Balance - SmartBill</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .denom-row {
+            display: grid;
+            grid-template-columns: 100px 100px 150px;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        @media print {
+            .denom-row {
+                background: white !important;
+                border-bottom: 1px solid black !important;
+                padding: 4px !important;
+                grid-template-columns: 80px 80px 120px;
+            }
+
+            .denom-input {
+                border: 1px solid black !important;
+                color: black !important;
+            }
+
+            h1, h2, h3 {
+                color: black !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1 style="font-size: 1.8rem; font-weight: 700;">Cash Balance Calculator</h1>
+                <p style="color: var(--text-muted);">Calculate end-of-day cash denominations.</p>
+            </div>
+
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="print-only-header">
+            <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET</h1>
+            <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Cash Balance & Denominations</p>
+            <p id="printRunDate" style="margin: 2px 0; font-weight: bold;"></p>
+            <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+        </div>
+
+        <div style="display: flex; gap: 30px;">
+            <div class="glass-panel" style="padding: 20px; flex: 1; max-width: 500px;">
+                <h2 style="margin-bottom: 20px;">Denominations</h2>
+
+                <div id="denoms">
+                    <!-- JS will fill -->
+                </div>
+            </div>
+
+            <div class="glass-panel"
+                style="padding: 30px; flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                <p style="color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Total Physical
+                    Cash</p>
+                <h1 id="grandTotal"
+                    style="font-size: 4rem; color: #6ee7b7; text-shadow: 0 0 30px rgba(16, 185, 129, 0.4); margin: 20px 0;">
+                    ₹0</h1>
+
+                <div
+                    style="width: 100%; border-top: 1px solid var(--glass-border); margin-top: 30px; padding-top: 20px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span>System Cash Sales (Today)</span>
+                        <span id="sysCash">Loading...</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Difference</span>
+                        <span id="diff" style="font-weight: bold;">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const notes = [500, 200, 100, 50, 20, 10, 5, 2, 1];
+        let sysCash = 0;
+
+        async function init() {
+            const container = document.getElementById('denoms');
+            notes.forEach(n => {
+                const div = document.createElement('div');
+                div.className = 'denom-row';
+                div.innerHTML = `
+                    <span style="font-weight: bold; font-size: 1.2rem;">₹${n}</span>
+                    <input type="number" min="0" class="input-dark denom-input" data-val="${n}" placeholder="Count" oninput="updateTotal()">
+                    <span class="denom-total" id="total-${n}" style="font-family: monospace; text-align: right;">0.00</span>
+                `;
+                container.appendChild(div);
+            });
+
+            // Get System Cash
+            try {
+                const res = await fetch('/api/stats');
+                const stats = await res.json();
+                sysCash = stats.cash_sales;
+                document.getElementById('sysCash').innerText = '₹' + sysCash.toFixed(2);
+                document.getElementById('printRunDate').innerText = `Report Date: ${new Date().toLocaleDateString()}`;
+                updateTotal();
+            } catch (e) { console.error(e); }
+        }
+
+        function updateTotal() {
+            let total = 0;
+            document.querySelectorAll('.denom-input').forEach(inp => {
+                const val = parseInt(inp.dataset.val);
+                const count = parseInt(inp.value) || 0;
+                const sub = val * count;
+                total += sub;
+                document.getElementById('total-' + val).innerText = sub.toFixed(2);
+            });
+
+            document.getElementById('grandTotal').innerText = '₹' + total.toLocaleString();
+
+            const diff = total - sysCash;
+            const diffEl = document.getElementById('diff');
+            diffEl.innerText = (diff > 0 ? '+' : '') + diff.toFixed(2);
+            diffEl.style.color = Math.abs(diff) < 1 ? '#94a3b8' : (diff >= 0 ? '#6ee7b7' : '#ef4444');
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,20 @@
+PROJECT DEPLOYMENT RECAP - APRIL 14, 2026
+
+1. WORK DONE TODAY:
+- Added "Configure Server" and "Enable Remote" buttons.
+- Fixed the EXE crash (MSVCP140.dll error).
+- Synced all 13 database tables for full accounting.
+- Added a "connection_debug.txt" logger for troubleshooting.
+
+2. SETTINGS FOR CLIENT SITE:
+- Server PC IP: 127.0.0.1
+- Client PC IP: 192.168.1.9 (or your Server's IP)
+- Run software as Administrator.
+
+3. DEFAULT LOGINS:
+- Admin: admin / admin123
+- Sales: counter / 123
+
+4. TROUBLESHOOTING:
+- If Error 1812 (Tablespace) appears: Restart Laragon and use Step 2 (Query drop).
+- If Laragon crashes: Run Laragon as Administrator.

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - Maple Pro</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            width: 90%;
+            max-width: 500px;
+            animation: modalSlide 0.4s var(--ease-out);
+        }
+
+        @keyframes modalSlide {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+
+        .role-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .role-admin { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .role-sales { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .role-account { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content animate-fade">
+        <header class="section-header">
+            <div>
+                <h1>User Management</h1>
+                <p style="color: var(--text-muted);">Manage system operators and access levels.</p>
+            </div>
+            <button class="btn btn-primary" onclick="openModal()">
+                <i class="fa-solid fa-user-plus"></i> ADD OPERATOR
+            </button>
+        </header>
+
+        <div class="glass-panel" style="padding: 10px;">
+            <div class="table-wrapper">
+                <table id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>User ID</th>
+                            <th>Username</th>
+                            <th>Permission Level</th>
+                            <th style="text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal -->
+    <div id="userModal" class="modal">
+        <div class="modal-content glass-panel" style="padding: 30px;">
+            <div class="flex-between mb-20">
+                <h2 id="modalTitle" style="font-weight: 800; letter-spacing: -1px;">System User</h2>
+                <button class="btn" style="background: transparent; color: var(--text-muted); font-size: 1.5rem; padding: 0;" onclick="closeModal()">&times;</button>
+            </div>
+
+            <form id="userForm" onsubmit="saveUser(event)">
+                <input type="hidden" id="userId">
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Login Username</label>
+                        <input type="text" id="username" class="input-dark" required placeholder="e.g. counter5">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Set Password</label>
+                        <input type="password" id="password" class="input-dark" placeholder="Leave blank to keep current">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">System Role</label>
+                        <select id="role" class="input-dark">
+                            <option value="sales">Sales Operator</option>
+                            <option value="account">Accountant</option>
+                            <option value="admin">System Admin</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 15px; margin-top: 30px;">
+                    <button type="button" class="btn" style="background: rgba(255,255,255,0.05);" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Database</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        async function loadUsers() {
+            try {
+                const res = await fetch('/api/admin/users');
+                const users = await res.json();
+                const tbody = document.querySelector('#usersTable tbody');
+                tbody.innerHTML = '';
+
+                users.forEach(u => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="color: var(--text-muted);">#${u.id}</td>
+                        <td style="font-weight: 700; color: white;">${u.username}</td>
+                        <td><span class="role-badge role-${u.role}">${u.role}</span></td>
+                        <td style="text-align: right;">
+                            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                                <button class="btn" style="padding: 8px; background: rgba(255,255,255,0.03);" onclick='editUser(${JSON.stringify(u)})'>
+                                    <i class="fa-solid fa-user-gear" style="color: var(--primary);"></i>
+                                </button>
+                                <button class="btn" style="padding: 8px; background: rgba(255,255,255,0.03);" onclick="deleteUser(${u.id})">
+                                    <i class="fa-solid fa-user-slash" style="color: var(--danger);"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        function openModal() {
+            document.getElementById('userForm').reset();
+            document.getElementById('userId').value = '';
+            document.getElementById('password').required = true;
+            document.getElementById('modalTitle').innerText = 'Provision New User';
+            document.getElementById('userModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('userModal').style.display = 'none';
+        }
+
+        function editUser(u) {
+            document.getElementById('userId').value = u.id;
+            document.getElementById('username').value = u.username;
+            document.getElementById('role').value = u.role;
+            document.getElementById('password').required = false;
+            document.getElementById('password').value = '';
+            document.getElementById('modalTitle').innerText = 'Update User Profile';
+            document.getElementById('userModal').style.display = 'flex';
+        }
+
+        async function saveUser(e) {
+            e.preventDefault();
+            const data = {
+                id: document.getElementById('userId').value || null,
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value,
+                role: document.getElementById('role').value
+            };
+
+            const res = await fetch('/api/admin/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if ((await res.json()).status === 'success') {
+                closeModal();
+                loadUsers();
+            }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('Are you sure you want to revoke access for this user?')) return;
+            const res = await fetch('/api/admin/users/' + id, { method: 'DELETE' });
+            if ((await res.json()).status === 'success') loadUsers();
+        }
+
+        loadUsers();
+    </script>
+</body>
+
+</html>
