@@ -1,6 +1,6 @@
 <nav class="sidebar">
     <div class="brand">
-        <i class="fa-solid fa-cube"></i> AdminPanel
+        <i class="fa-solid fa-cube"></i> Sagar Super
     </div>
     <ul class="nav-menu">
         <li>
@@ -100,6 +100,12 @@
             </a>
         </li>
         <li>
+            <a href="{{ url_for('admin_reports_daily_position') }}"
+                class="nav-link {{ 'active' if 'daily_position' in request.endpoint else '' }}">
+                <i class="fa-solid fa-list-check"></i> Daily Position
+            </a>
+        </li>
+        <li>
             <a href="{{ url_for('admin_reports_cancelled_report') }}"
                 class="nav-link {{ 'active' if 'cancelled_report' in request.endpoint else '' }}">
                 <i class="fa-solid fa-ban"></i> Cancelled Report
@@ -121,6 +127,12 @@
             <a href="{{ url_for('admin_reports_final_report') }}"
                 class="nav-link {{ 'active' if 'final_report' in request.endpoint else '' }}">
                 <i class="fa-solid fa-file-contract"></i> Final Report
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_reports_final_sales_report') }}"
+                class="nav-link {{ 'active' if 'final_sales_report' in request.endpoint else '' }}">
+                <i class="fa-solid fa-file-lines"></i> Final Sales Report
             </a>
         </li>
         <li>
@@ -154,9 +166,9 @@
             </a>
         </li>
         <li>
-            <a href="{{ url_for('account_dashboard') }}"
-                class="nav-link {{ 'active' if 'account_dashboard' in request.endpoint else '' }}">
-                <i class="fa-solid fa-file-invoice-dollar"></i> Accounts Section
+            <a href="{{ url_for('admin_maintenance') }}"
+                class="nav-link {{ 'active' if 'admin_maintenance' in request.endpoint else '' }}">
+                <i class="fa-solid fa-gears"></i> System Maintenance
             </a>
         </li>
     </ul>

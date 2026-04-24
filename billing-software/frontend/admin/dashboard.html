@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Dashboard - SmartBill</title>
+    <title>Advanced Dashboard - Sagar Super</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -161,7 +161,7 @@
                     <i class="fa-solid fa-receipt"></i>
                 </div>
                 <div class="kpi-info">
-                    <p>Invoices</p>
+                    <p>NO OF BILLS</p>
                     <h3 id="kpiBillCount">0</h3>
                 </div>
             </div>
@@ -360,6 +360,9 @@
         function renderPaymentChart(payments) {
             const ctx = document.getElementById('paymentModeChart').getContext('2d');
             const total = payments.reduce((acc, p) => acc + p.total, 0);
+            
+            // Generate dynamic colors for the chart slices to match the legends
+            const chartColors = payments.map(p => getColor(p.payment_mode));
 
             new Chart(ctx, {
                 type: 'doughnut',
@@ -367,7 +370,7 @@
                     labels: payments.map(p => p.payment_mode),
                     datasets: [{
                         data: payments.map(p => p.total),
-                        backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ec4899'],
+                        backgroundColor: chartColors,
                         borderWidth: 0,
                         hoverOffset: 10
                     }]
@@ -392,10 +395,11 @@
         }
 
         function getColor(mode) {
-            if (mode === 'Cash') return '#6366f1';
-            if (mode === 'UPI') return '#10b981';
-            if (mode === 'Card') return '#f59e0b';
-            return '#ec4899';
+            const m = mode.toUpperCase();
+            if (m === 'CASH') return '#10b981'; // Green
+            if (m === 'UPI') return '#6366f1';  // Blue
+            if (m === 'CARD') return '#f59e0b'; // Yellow (Amber)
+            return '#ec4899'; // Pink for others
         }
 
         function renderTopProducts(products) {

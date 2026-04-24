@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Maintenance - Sagar Super</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .maintenance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
+        }
+        .reset-card {
+            padding: 30px;
+            border: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .warning-box {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid var(--danger);
+            padding: 15px;
+            border-radius: var(--radius-sm);
+            color: #fca5a5;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+        .security-input {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            width: 100%;
+            outline: none;
+            font-family: monospace;
+            letter-spacing: 2px;
+        }
+        .security-input:focus {
+            border-color: var(--primary);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
+        }
+        #notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            z-index: 1000;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+        #notification.show { transform: translateX(0); }
+    </style>
+</head>
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>System Maintenance</h1>
+                <p style="color: var(--text-muted);">Secure tools for database reset and year-end procedures.</p>
+            </div>
+        </header>
+
+        <div class="maintenance-grid">
+            <!-- Financial Year Reset -->
+            <div class="glass-panel reset-card">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="width: 50px; height: 50px; background: rgba(99, 102, 241, 0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--primary); font-size: 1.5rem;">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                    <div>
+                        <h2 style="font-size: 1.2rem; font-weight: 700;">Financial Year Reset</h2>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">NEW YEAR START</p>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    <strong>WHAT HAPPENS:</strong>
+                    <ul style="margin-left: 20px; margin-top: 5px;">
+                        <li>Clears all Sales History (Bills & Items).</li>
+                        <li>Clears all Expenses and Audit Logs.</li>
+                        <li>Resets bill sequences to 00001.</li>
+                        <li><strong>KEEPS:</strong> All Products, Categories, and Current Stock.</li>
+                    </ul>
+                </div>
+
+                <div style="margin-top: 10px;">
+                    <label style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px;">CONFIRM ADMIN PASSWORD</label>
+                    <input type="password" id="pass_fy" class="security-input" placeholder="••••••••">
+                </div>
+
+                <button class="btn-danger" onclick="triggerReset('financial_year', 'pass_fy')">
+                    <i class="fa-solid fa-triangle-exclamation"></i> EXECUTE YEAR-END RESET
+                </button>
+            </div>
+
+            <!-- Factory Reset -->
+            <div class="glass-panel reset-card">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="width: 50px; height: 50px; background: rgba(239, 68, 68, 0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--danger); font-size: 1.5rem;">
+                        <i class="fa-solid fa-skull-crossbones"></i>
+                    </div>
+                    <div>
+                        <h2 style="font-size: 1.2rem; font-weight: 700;">Factory Data Reset</h2>
+                        <p style="font-size: 0.8rem; color: var(--danger); font-weight: 600;">DUMMY DATA WIPE</p>
+                    </div>
+                </div>
+
+                <div class="warning-box" style="background: rgba(239, 68, 68, 0.2);">
+                    <strong>⚠️ CRITICAL ACTION:</strong>
+                    <ul style="margin-left: 20px; margin-top: 5px;">
+                        <li>Clears EVERYTHING including Products and Categories.</li>
+                        <li>Stock levels will be completely wiped.</li>
+                        <li>Resets Users to default (admin/admin123).</li>
+                        <li>Use this only to clear dummy test data.</li>
+                    </ul>
+                </div>
+
+                <div style="margin-top: 10px;">
+                    <label style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px;">CONFIRM ADMIN PASSWORD</label>
+                    <input type="password" id="pass_factory" class="security-input" placeholder="••••••••">
+                </div>
+
+                <button class="btn-danger" onclick="triggerReset('factory', 'pass_factory')" style="background: #000; border: 1px solid var(--danger);">
+                    <i class="fa-solid fa-radiation"></i> WIPE ENTIRE DATABASE
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <div id="notification"></div>
+
+    <script>
+        async function triggerReset(mode, passId) {
+            const password = document.getElementById(passId).value;
+            if (!password) {
+                showNotif('Please enter your admin password for security.', true);
+                return;
+            }
+
+            const confirmText = mode === 'factory' ? 
+                "⚠️ CRITICAL: YOU ARE ABOUT TO WIPE EVERYTHING. All products and sales will be deleted. Are you SURE?" : 
+                "Are you sure you want to start a new Financial Year? This will clear all sales history.";
+
+            if (!confirm(confirmText)) return;
+
+            try {
+                const res = await fetch('/api/admin/system/reset-db', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode, password })
+                });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    showNotif(data.message);
+                    setTimeout(() => {
+                        window.location.href = mode === 'factory' ? '/login' : '/admin/dashboard';
+                    }, 2000);
+                } else {
+                    showNotif(data.message, true);
+                }
+            } catch (err) {
+                showNotif('Network error occurred.', true);
+            }
+        }
+
+        function showNotif(msg, isError = false) {
+            const n = document.getElementById('notification');
+            n.innerText = msg;
+            n.className = isError ? 'show error' : 'show';
+            n.style.background = isError ? 'var(--danger)' : 'var(--success)';
+            setTimeout(() => n.className = '', 4000);
+        }
+    </script>
+</body>
+</html>

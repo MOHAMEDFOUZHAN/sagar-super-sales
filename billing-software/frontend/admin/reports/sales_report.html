@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Report - AdminPanel</title>
+    <title>Sales Report - Sagar Super</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
@@ -111,7 +111,7 @@
             </div>
 
             <div class="print-only-header">
-                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET
+                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER
                 </h1>
                 <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Sales Report (Item-wise)</p>
                 <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
@@ -120,7 +120,7 @@
 
             <div class="glass-panel" style="padding: 20px;">
                 <div style="text-align: center; margin-bottom: 20px;" class="hide-on-print">
-                    <h2 style="color: var(--primary);">SAGAR SUPER MARKET</h2>
+                    <h2 style="color: var(--primary);">SAGAR SUPER</h2>
                     <p id="dateDisplay" style="color: var(--text-muted);"></p>
                 </div>
 
@@ -168,7 +168,7 @@
                 const filtered = data.filter(r => {
                     const rDate = new Date(r.bill_date);
                     const dStr = rDate.getFullYear() + '-' + String(rDate.getMonth() + 1).padStart(2, '0') + '-' + String(rDate.getDate()).padStart(2, '0');
-                    return dStr >= start && dStr <= end && r.bill_status !== 'Cancelled';
+                    return dStr >= start && dStr <= end;
                 });
 
                 // Group by payment mode
@@ -194,19 +194,27 @@
                         const dateStr = bDate.toLocaleDateString('en-GB'); // dd/mm/yyyy
                         const timeStr = bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
                         const dateTimeStr = dateStr + ' ' + timeStr;
-                        const docID = `MP-#${String(item.bill_id).padStart(5, '0')}`;
-
-                        modeTotal += item.amount;
+                        const docID = item.invoice_no || String(item.bill_id).padStart(5, '0');
+                        
+                        const isCancelled = item.bill_status === 'Cancelled';
+                        if (!isCancelled) {
+                            modeTotal += item.amount;
+                        }
 
                         const tr = document.createElement('tr');
+                        if (isCancelled) tr.className = 'cancelled-row';
+                        
                         tr.innerHTML = `
-                            <td class="doc-id">${docID}</td>
+                            <td class="doc-id">
+                                ${docID}
+                                ${isCancelled ? '<span class="badge badge-danger" style="font-size: 0.5rem; padding: 2px 5px; margin-left: 5px;">VOID</span>' : ''}
+                            </td>
                             <td style="white-space: nowrap;">${dateTimeStr}</td>
                             <td class="amount-cell">₹${item.bizz_amount.toFixed(2)}</td>
                             <td style="color: var(--text-main);">${item.product_name}</td>
                             <td style="text-align: center;">${item.qty}</td>
                             <td class="amount-cell">₹${item.rate.toFixed(2)}</td>
-                            <td class="amount-cell" style="font-weight: 700; color: white;">₹${item.amount.toFixed(2)}</td>
+                            <td class="amount-cell" style="font-weight: 700; color: ${isCancelled ? 'inherit' : 'white'};">₹${item.amount.toFixed(2)}</td>
                         `;
                         tbody.appendChild(tr);
                     });

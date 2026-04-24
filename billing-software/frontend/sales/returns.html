@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Returns & Voids | Maple Pro</title>
+    <title>Returns & Voids | Sagar Super</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -176,11 +176,12 @@
 
 <body>
     <nav class="sidebar">
-        <div class="brand"><i class="fa-solid fa-bolt"></i> Maple Pro</div>
+        <div class="brand"><i class="fa-solid fa-bolt"></i> Sagar Super</div>
         <ul class="nav-menu">
             <li><a href="/sales/dashboard" class="nav-link"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
             <li><a href="/sales/billing" class="nav-link"><i class="fa-solid fa-cart-shopping"></i> Billing</a></li>
             <li><a href="/sales/expenses" class="nav-link"><i class="fa-solid fa-receipt"></i> Expenses</a></li>
+            <li><a href="/sales/preview" class="nav-link"><i class="fa-solid fa-eye"></i> Preview Bills</a></li>
             <li><a href="/sales/report" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Reports</a></li>
             <li><a href="/sales/returns" class="nav-link active"><i class="fa-solid fa-rotate-left"></i> Returns & Voids</a></li>
         </ul>
@@ -214,7 +215,7 @@
             <div style="flex: 1;">
                 <label style="display: block; color: var(--text-muted); margin-bottom: 5px; font-size: 0.8rem;">BILL ID
                     / DOC ID</label>
-                <input id="bill_search" type="text" class="input-dark" placeholder="e.g. MP-00045">
+                <input id="bill_search" type="text" class="input-dark" placeholder="e.g. 00045">
             </div>
             <button onclick="searchBill()" class="btn" style="height: 42px; margin-top: 20px;"><i
                     class="fa-solid fa-search"></i> SEARCH</button>
@@ -224,7 +225,7 @@
             <div
                 style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;">
                 <div>
-                    <h3 id="display_bill_id" style="color: var(--primary);">Bill #MP-00000</h3>
+                    <h3 id="display_bill_id" style="color: var(--primary);">Bill #00000</h3>
                     <span id="display_date" style="font-size: 0.8rem; color: var(--text-muted);">October 24, 2024</span>
                 </div>
                 <div style="text-align: right; display: flex; flex-direction: column; gap: 10px;">
@@ -310,8 +311,8 @@
             const query = document.getElementById('bill_search').value.trim();
             if (!query) return;
 
-            // Convert MP-00045 to 45 if needed, or backend can handle
-            let cleanId = query.replace('MP-', '').replace(/^0+/, '');
+            // Convert to numeric if needed
+            let cleanId = query.replace(/^0+/, '');
 
             try {
                 // Fetch Details
@@ -321,24 +322,25 @@
                 // Better: Create /api/bills/search endpoint.
 
                 const allBills = await response.json();
-                const bill = allBills.find(b => b.real_id == cleanId || b.doc_id === query);
+                // Find by ID directly or by Invoice No
+                const bill = allBills.find(b => b.id == cleanId || b.invoice_no === query);
 
                 if (!bill) {
                     alert("Bill not found!");
                     return;
                 }
 
-                currentBillId = bill.real_id;
+                currentBillId = bill.id;
 
                 // Show Header
                 document.getElementById('bill_content').style.display = 'block';
                 document.getElementById('action_card').style.display = 'none';
-                document.getElementById('display_bill_id').innerText = bill.doc_id;
-                document.getElementById('display_total').innerText = '₹ ' + bill.total.toFixed(2);
-                document.getElementById('display_date').innerText = new Date(bill.date).toLocaleString();
+                document.getElementById('display_bill_id').innerText = bill.invoice_no;
+                document.getElementById('display_total').innerText = '₹ ' + parseFloat(bill.total_amount).toFixed(2);
+                document.getElementById('display_date').innerText = new Date(bill.bill_date).toLocaleString();
 
                 // Fetch Items
-                const itemRes = await fetch(`/api/bills/${bill.real_id}/items`);
+                const itemRes = await fetch(`/api/bills/${bill.id}/items`);
                 const items = await itemRes.json();
 
                 const tbody = document.getElementById('items_body');
@@ -346,13 +348,18 @@
 
                 items.forEach((item, index) => {
                     const tr = document.createElement('tr');
+                    tr.style.cursor = 'pointer';
                     tr.innerHTML = `
-                        <td><input type="radio" name="item_select" onclick='selectItem(${JSON.stringify(item)})'></td>
+                        <td><input type="radio" name="item_select" id="radio_${index}"></td>
                         <td>${item.product_name}</td>
-                        <td>${item.qty}</td>
-                        <td>${item.rate}</td>
-                        <td>${item.amount}</td>
+                        <td>${item.qty} ${item.unit || 'PCS'}</td>
+                        <td>${parseFloat(item.rate).toFixed(2)}</td>
+                        <td>${parseFloat(item.amount).toFixed(2)}</td>
                     `;
+                    tr.onclick = (e) => {
+                        if (e.target.type !== 'radio') document.getElementById(`radio_${index}`).checked = true;
+                        selectItem(item);
+                    };
                     tbody.appendChild(tr);
                 });
 

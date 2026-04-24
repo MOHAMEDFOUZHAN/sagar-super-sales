@@ -117,7 +117,7 @@
         <div id="bill_content" class="glass-panel" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 15px;">
                 <div>
-                    <h3 id="display_bill_id" style="color: var(--primary); font-weight: 800;">Bill #MP-00000</h3>
+                    <h3 id="display_bill_id" style="color: var(--primary); font-weight: 800;">Bill #00000</h3>
                     <span id="display_date" style="font-size: 0.8rem; color: var(--text-muted);">October 24, 2024</span>
                 </div>
                 <div style="text-align: right; display: flex; flex-direction: column; gap: 10px;">
@@ -199,7 +199,7 @@
             const query = document.getElementById('bill_search').value.trim();
             if (!query) return;
 
-            let cleanId = query.replace('MP-', '').replace(/^0+/, '');
+            let cleanId = query.replace(/^0+/, '');
 
             try {
                 const response = await fetch('/api/bills/all');

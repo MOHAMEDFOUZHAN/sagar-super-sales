@@ -18,14 +18,16 @@ def calculate_tsc(total):
 
 
 def reserve_invoice_number(cursor, bill_time):
-    seq_date = bill_time.date()
+    # Use a fixed date to keep a global continuous sequence
+    global_seq_key = datetime.date(2000, 1, 1)
+    
     cursor.execute(
         """
         INSERT INTO bill_sequences (seq_date, last_value)
         VALUES (%s, 1)
         ON DUPLICATE KEY UPDATE last_value = LAST_INSERT_ID(last_value + 1)
         """,
-        (seq_date,)
+        (global_seq_key,)
     )
     cursor.execute("SELECT LAST_INSERT_ID()")
     sequence_row = cursor.fetchone()
@@ -34,8 +36,10 @@ def reserve_invoice_number(cursor, bill_time):
         if isinstance(sequence_row, dict)
         else sequence_row[0]
     )
+    
+    # If LAST_INSERT_ID is 0, fallback to current last_value
     if sequence_value == 0:
-        cursor.execute("SELECT last_value FROM bill_sequences WHERE seq_date = %s", (seq_date,))
+        cursor.execute("SELECT last_value FROM bill_sequences WHERE seq_date = %s", (global_seq_key,))
         fallback_row = cursor.fetchone()
         sequence_value = int(
             fallback_row.get('last_value')
@@ -43,7 +47,7 @@ def reserve_invoice_number(cursor, bill_time):
             else fallback_row[0]
         )
 
-    return f"{bill_time.strftime('%Y%m%d')}-{sequence_value:04d}"
+    return f"{sequence_value:05d}"
 
 
 def create_bill(conn, payload, username, audit_logger):

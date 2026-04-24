@@ -318,6 +318,35 @@ tr:hover td {
 }
 
 /* =========================================
+   STATUS ROWS (CANCELLED/RETURNED)
+   ========================================= */
+.cancelled-row {
+    opacity: 0.45;
+    filter: grayscale(1);
+    pointer-events: none;
+    text-decoration: line-through solid var(--danger);
+    background: rgba(239, 68, 68, 0.05) !important;
+}
+
+.cancelled-row td {
+    color: var(--text-muted) !important;
+}
+
+.returned-row {
+    background: rgba(245, 158, 11, 0.03) !important;
+}
+
+.returned-row td {
+    border-left: 3px solid var(--warning);
+}
+
+.badge-warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* =========================================
    PRINT OPTIMIZATION
    ========================================= */
 @media print {

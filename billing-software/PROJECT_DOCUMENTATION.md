@@ -1,7 +1,7 @@
-# Maple Super Market - Billing Software Documentation
+# SAGAR SUPER - Billing Software Documentation
 
 ## 1. Project Overview
-**Maple Super Market Billing Software** (also known as Maple Pro) is a comprehensive, web-based retail management system designed for efficient point-of-sale operations, inventory tracking, and deep financial analytics. The system follows a dual-role architecture (Admin and Sales) to ensure secure and optimized workflows for both management and counter staff.
+**SAGAR SUPER Billing Software** (also known as Sagar Super) is a comprehensive, web-based retail management system designed for efficient point-of-sale operations, inventory tracking, and deep financial analytics. The system follows a dual-role architecture (Admin and Sales) to ensure secure and optimized workflows for both management and counter staff.
 
 ### Core Philosophy
 The software is built with a focus on speed, visual excellence, and detailed reporting. It handles complex business logic like **Bizz Points** (loyalty/charges) and **TSC** (Technical Service Charges) automatically during the billing process.
@@ -15,10 +15,10 @@ The application leverages modern web technologies for a seamless and responsive 
 *   **Database:** **MySQL** for robust data persistence and structured querying.
 *   **Frontend:**
     *   **Structure:** Semantic HTML5.
-    *   **Styling:** Custom Vanilla CSS with a focus on "Maple Pro" branding, interactive hover effects, and premium aesthetics.
+    *   **Styling:** Custom Vanilla CSS with a focus on "Sagar Super" branding, interactive hover effects, and premium aesthetics.
     *   **Logic:** Vanilla JavaScript (ES6+) using the Fetch API for real-time data updates without page reloads.
 *   **Printing:** Integrated support for thermal printers (specifically **Epson TM-T82X**) via browser print and specialized formatting.
-*   **Animations:** Dynamic CSS and JS animations, including a signature "Falling Maple Leaf" effect on the login screen.
+*   **Animations:** Dynamic CSS and JS animations, including a signature "Falling Sagar Leaf" effect on the login screen.
 
 ---
 
@@ -75,7 +75,7 @@ During the development phase, several critical improvements were implemented:
 
 1.  **Backend Migration:** Successfully migrated the entire backend architecture from FastAPI to **Flask** for better compatibility and flexibility.
 2.  **UI/UX Overhaul:** 
-    *   Implemented a premium login page with falling maple leaf animations.
+    *   Implemented a premium login page with falling Sagar leaf animations.
     *   Standardized report layouts with consistent headers and date displays.
     *   Refined the POS interface to eliminate scrolling and improve scanner focus.
 3.  **Customer Engagement:** Added a **Customer Data** section with **Bulk SMS Broadcast** capabilities for marketing offers.
@@ -92,5 +92,6 @@ During the development phase, several critical improvements were implemented:
 
 ---
 
-**Maple Super Market Billing Software - 2026**
+**SAGAR SUPER Billing Software - 2026**
 *Designed for Excellence, Built for Growth.*
+

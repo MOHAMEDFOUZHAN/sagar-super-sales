@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final Sales Report - Sagar Super</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .report-container {
+            padding: 20px;
+        }
+
+        .filter-panel {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            margin-bottom: 25px;
+            background: var(--glass-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+        }
+
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--glass-bg);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            border: 1px solid var(--glass-border);
+        }
+
+        .report-table th {
+            background: rgba(99, 102, 241, 0.1);
+            padding: 12px 20px;
+            text-align: left;
+            font-size: 0.75rem;
+            color: var(--primary);
+            text-transform: uppercase;
+            font-weight: 800;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .report-table td {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--text-main);
+        }
+
+        .qty-badge {
+            background: var(--primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+
+        .total-row {
+            background: rgba(255, 255, 255, 0.05);
+            font-weight: 800;
+        }
+
+        @media print {
+            .sidebar, .filter-panel, .btn-print, .section-header {
+                display: none !important;
+            }
+            .main-content {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .report-container {
+                padding: 0;
+            }
+            .print-only-header {
+                display: block !important;
+            }
+            .report-table {
+                width: 100% !important;
+                border: 1px solid black !important;
+                background: white !important;
+                color: black !important;
+                border-collapse: collapse !important;
+            }
+            .report-table th, .report-table td {
+                border: 1px solid black !important;
+                color: black !important;
+                padding: 8px !important;
+            }
+            .qty-badge {
+                background: transparent !important;
+                color: black !important;
+                padding: 0 !important;
+                font-weight: bold !important;
+            }
+        }
+
+        .print-only-header {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>Final Sales Report</h1>
+                <p style="color: var(--text-muted);">Consolidated product sales by category and date range.</p>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="report-container">
+            <div class="filter-panel">
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">CATEGORY</label>
+                    <select id="categoryFilter" class="input-dark" style="width: 200px;">
+                        <option value="ALL">All Categories</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">START DATE</label>
+                    <input type="date" id="startDate" class="input-dark">
+                </div>
+                <div class="form-group">
+                    <label style="font-size: 0.7rem; color: var(--text-muted);">END DATE</label>
+                    <input type="date" id="endDate" class="input-dark">
+                </div>
+                <button class="btn btn-primary" onclick="loadReport()">
+                    <i class="fa-solid fa-sync"></i> REFRESH
+                </button>
+            </div>
+
+            <div class="print-only-header">
+                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER</h1>
+                <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Final Sales Report</p>
+                <p id="printInfo" style="margin: 2px 0; font-weight: bold;"></p>
+                <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+            </div>
+
+            <div id="reportContent">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>CODE</th>
+                            <th>PRODUCT NAME</th>
+                            <th style="text-align: right;">QTY</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportRows">
+                        <!-- Data injected here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const now = new Date();
+        const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+
+        async function init() {
+            await loadCategories();
+            loadReport();
+        }
+
+        async function loadCategories() {
+            try {
+                const res = await fetch('/api/reports/categories');
+                const cats = await res.json();
+                const select = document.getElementById('categoryFilter');
+                // Clear existing except first
+                select.innerHTML = '<option value="ALL">All Categories</option>';
+                cats.forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    select.appendChild(opt);
+                });
+            } catch (err) {
+                console.error("Error loading categories:", err);
+            }
+        }
+
+        async function loadReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const category = document.getElementById('categoryFilter').value;
+
+            const startF = new Date(start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const endF = new Date(end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            document.getElementById('printInfo').innerText = `Category: ${category} | Period: ${startF} to ${endF}`;
+
+            try {
+                const res = await fetch('/api/reports/sales-detailed');
+                const data = await res.json();
+
+                const filtered = data.filter(r => {
+                    const rDate = new Date(r.bill_date);
+                    const dStr = rDate.getFullYear() + '-' + String(rDate.getMonth() + 1).padStart(2, '0') + '-' + String(rDate.getDate()).padStart(2, '0');
+                    const dateMatch = dStr >= start && dStr <= end;
+                    const catMatch = category === 'ALL' || r.category === category;
+                    return dateMatch && catMatch && r.bill_status !== 'Cancelled';
+                });
+
+                // Group by product barcode/code to sum qty
+                const grouped = {};
+                filtered.forEach(item => {
+                    const code = item.barcode || 'N/A';
+                    if (!grouped[code]) {
+                        grouped[code] = {
+                            code: code,
+                            name: item.product_name,
+                            qty: 0
+                        };
+                    }
+                    grouped[code].qty += item.qty;
+                });
+
+                const tbody = document.getElementById('reportRows');
+                tbody.innerHTML = '';
+
+                let totalQty = 0;
+                Object.values(grouped).sort((a,b) => a.name.localeCompare(b.name)).forEach(p => {
+                    totalQty += p.qty;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${p.code}</td>
+                        <td>${p.name}</td>
+                        <td style="text-align: right;"><span class="qty-badge">${p.qty}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                if (Object.keys(grouped).length > 0) {
+                    const totalTr = document.createElement('tr');
+                    totalTr.className = 'total-row';
+                    totalTr.innerHTML = `
+                        <td></td>
+                        <td style="text-align: right; font-weight: bold;">GRAND TOTAL</td>
+                        <td style="text-align: right; font-weight: bold;">${totalQty}</td>
+                    `;
+                    tbody.appendChild(totalTr);
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 40px; color: var(--text-muted);">No sales data for selection.</td></tr>';
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("Failed to load report data.");
+            }
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

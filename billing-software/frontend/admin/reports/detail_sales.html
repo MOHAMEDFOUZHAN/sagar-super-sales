@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detail Sales Report - AdminPanel</title>
+    <title>Detail Sales Report - Sagar Super</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
@@ -25,7 +25,7 @@
 
         .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             margin-bottom: 25px;
         }
@@ -123,7 +123,7 @@
             </div>
 
             <div class="print-only-header">
-                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET
+                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER
                 </h1>
                 <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Detailed Sales Report (BIZ/TSC)</p>
                 <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
@@ -143,10 +143,6 @@
                     <h4>TOTAL TSC</h4>
                     <div id="valTotalTsc">₹0.00</div>
                 </div>
-                <div class="kpi-card">
-                    <h4>BIZ 80%</h4>
-                    <div id="valBiz80" style="color: var(--accent);">₹0.00</div>
-                </div>
             </div>
 
             <div class="glass-panel" style="padding: 30px;">
@@ -162,14 +158,14 @@
                         <td id="rowTotalBiz">₹0.00</td>
                     </tr>
                     <tr>
-                        <td>BIZ 80% Adjustment</td>
+                        <td>BIZ 80% Component</td>
                         <td id="rowBiz80">₹0.00</td>
                     </tr>
                     <tr>
-                        <td>BIZ 20% Adjustment</td>
+                        <td>BIZ 20% Component</td>
                         <td id="rowBiz20">₹0.00</td>
                     </tr>
-                    <tr style="border-top: 2px solid var(--glass-border);">
+                    <tr style="border-top: 1px solid var(--glass-border);">
                         <td>Total TSC Amount</td>
                         <td id="rowTotalTsc">₹0.00</td>
                     </tr>
@@ -180,6 +176,10 @@
                     <tr>
                         <td>TSC 20% Component</td>
                         <td id="rowTsc20">₹0.00</td>
+                    </tr>
+                    <tr style="border-top: 2px solid var(--primary); background: rgba(99, 102, 241, 0.05);">
+                        <td style="font-weight: 800; color: var(--primary);">TOTAL PERCENTAGE (%)</td>
+                        <td id="rowTotalPercentage" style="font-size: 1.4rem; font-weight: 900; color: var(--primary);">0.00 %</td>
                     </tr>
                 </table>
             </div>
@@ -204,20 +204,34 @@
                 const res = await fetch(`/api/reports/closure-range?start_date=${start}&end_date=${end}`);
                 const data = await res.json();
 
-                // KPIs
-                document.getElementById('valNet').innerText = '₹' + data.sales.total_sales.toFixed(2);
-                document.getElementById('valTotalBiz').innerText = '₹' + data.total_bizz.toFixed(2);
-                document.getElementById('valTotalTsc').innerText = '₹' + data.total_tsc.toFixed(2);
-                document.getElementById('valBiz80').innerText = '₹' + (data.total_bizz * 0.8).toFixed(2);
+                const netSales = data.sales.total_sales;
+                const totalBiz = data.total_bizz;
+                const totalTsc = data.total_tsc;
 
+                // KPIs
+                document.getElementById('valNet').innerText = '₹' + netSales.toFixed(2);
+                document.getElementById('valTotalBiz').innerText = '₹' + totalBiz.toFixed(2);
+                document.getElementById('valTotalTsc').innerText = '₹' + totalTsc.toFixed(2);
+                
                 // Table
-                document.getElementById('rowNet').innerText = '₹' + data.sales.total_sales.toFixed(2);
-                document.getElementById('rowTotalBiz').innerText = '₹' + data.total_bizz.toFixed(2);
-                document.getElementById('rowBiz80').innerText = '₹' + (data.total_bizz * 0.8).toFixed(2);
-                document.getElementById('rowBiz20').innerText = '₹' + (data.total_bizz * 0.2).toFixed(2);
-                document.getElementById('rowTotalTsc').innerText = '₹' + data.total_tsc.toFixed(2);
-                document.getElementById('rowTsc80').innerText = '₹' + (data.total_tsc * 0.8).toFixed(2);
-                document.getElementById('rowTsc20').innerText = '₹' + (data.total_tsc * 0.2).toFixed(2);
+                document.getElementById('rowNet').innerText = '₹' + netSales.toFixed(2);
+                document.getElementById('rowTotalBiz').innerText = '₹' + totalBiz.toFixed(2);
+                document.getElementById('rowBiz80').innerText = '₹' + (totalBiz * 0.8).toFixed(2);
+                document.getElementById('rowBiz20').innerText = '₹' + (totalBiz * 0.2).toFixed(2);
+                
+                document.getElementById('rowTotalTsc').innerText = '₹' + totalTsc.toFixed(2);
+                document.getElementById('rowTsc80').innerText = '₹' + (totalTsc * 0.8).toFixed(2);
+                document.getElementById('rowTsc20').innerText = '₹' + (totalTsc * 0.2).toFixed(2);
+
+                // CUSTOM PERCENTAGE CALCULATION (From Photo Logic)
+                // Formula: (BIZ + TSC) / (Net Sales dropped last two digits)
+                let netBase = Math.floor(netSales / 100);
+                let totalPercentage = 0;
+                if (netBase > 0) {
+                    totalPercentage = (totalBiz + totalTsc) / netBase;
+                }
+                
+                document.getElementById('rowTotalPercentage').innerText = totalPercentage.toFixed(2) + ' %';
 
             } catch (err) {
                 console.error(err);

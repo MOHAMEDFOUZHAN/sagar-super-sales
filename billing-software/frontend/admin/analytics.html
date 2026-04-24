@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Business Intelligence - SmartBill</title>
+    <title>Business Intelligence - Sagar Super</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -154,13 +154,94 @@
             </div>
         </header>
 
+        <style>
+            .ai-briefing-card {
+                background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.05));
+                border: 1px solid rgba(99, 102, 241, 0.3);
+                border-radius: var(--radius-lg);
+                padding: 30px;
+                margin-bottom: 30px;
+                position: relative;
+                overflow: hidden;
+            }
+            .ai-briefing-card::before {
+                content: '';
+                position: absolute;
+                top: 0; left: 0; width: 100%; height: 2px;
+                background: linear-gradient(90deg, transparent, var(--primary), transparent);
+                animation: flow 3s linear infinite;
+            }
+            @keyframes flow {
+                0% { transform: translateX(-100%); }
+                100% { transform: translateX(100%); }
+            }
+            .ai-header {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                margin-bottom: 20px;
+            }
+            .ai-icon {
+                width: 45px; height: 45px;
+                background: var(--primary);
+                border-radius: 50%;
+                display: flex; align-items: center; justify-content: center;
+                font-size: 1.2rem; color: white;
+                box-shadow: 0 0 20px var(--primary-glow);
+            }
+            .ai-content {
+                font-family: 'Inter', sans-serif;
+                font-size: 1rem;
+                line-height: 1.6;
+                color: #e2e8f0;
+            }
+            .typewriter {
+                overflow: hidden;
+                border-right: .15em solid var(--secondary);
+                white-space: pre-wrap;
+                margin: 0 auto;
+                letter-spacing: .05em;
+                animation: blink-caret .75s step-end infinite;
+            }
+            @keyframes blink-caret { from, to { border-color: transparent } 50% { border-color: var(--secondary); } }
+            
+            .insight-item {
+                margin-bottom: 15px;
+                display: flex;
+                gap: 12px;
+                align-items: flex-start;
+            }
+            .insight-bullet {
+                color: var(--accent);
+                margin-top: 5px;
+            }
+        </style>
+
+        <div class="ai-briefing-card card-anim">
+            <div class="ai-header">
+                <div class="ai-icon"><i class="fa-solid fa-microchip"></i></div>
+                <div>
+                    <h2 style="font-size: 1.1rem; font-weight: 800; letter-spacing: -0.5px;">AI STRATEGIC BRIEFING</h2>
+                    <p style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Real-time Business Consultant</p>
+                </div>
+                <button onclick="refreshAI()" class="btn" style="margin-left: auto; height: 35px; margin-top: 0; font-size: 0.7rem;">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> RE-ANALYZE
+                </button>
+            </div>
+            
+            <div id="ai-loading" style="display: none; padding: 20px; text-align: center;">
+                <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
+                <p style="margin-top: 10px; font-size: 0.8rem; color: var(--text-muted);">Consulting Artificial Intelligence...</p>
+            </div>
+
+            <div id="ai-terminal" class="ai-content">
+                <div id="ai-text" class="typewriter">Initializing diagnostic sequence... Analysis ready.</div>
+            </div>
+        </div>
+
         <div class="analytics-grid">
             <!-- 1. Revenue Velocity -->
             <div class="chart-box full-row card-anim">
-                <div class="chart-title"><i class="fa-solid fa-chart-line"></i> Revenue Velocity (7-Day Projection)
-                </div>
-                <canvas id="velocityChart" height="100"></canvas>
-            </div>
 
             <!-- 2. Momentum Score -->
             <div class="chart-box card-anim">
@@ -240,8 +321,61 @@
                 renderCategories(deep.categories);
                 renderHourly(deep.hourly);
                 calculateMomentum(adv.trend);
+                
+                // Fetch AI Insights
+                refreshAI();
 
             } catch (e) { console.error("Analysis Failure:", e); }
+        }
+
+        async function refreshAI() {
+            const terminal = document.getElementById('ai-terminal');
+            const loading = document.getElementById('ai-loading');
+            const textEl = document.getElementById('ai-text');
+            
+            terminal.style.display = 'none';
+            loading.style.display = 'block';
+            
+            try {
+                const res = await fetch('/api/analytics/ai-insight');
+                const data = await res.json();
+                
+                loading.style.display = 'none';
+                terminal.style.display = 'block';
+                textEl.innerHTML = ''; // Reset
+                
+                let fullText = "AI ANALYSIS SUMMARY:\n";
+                data.analysis.forEach(line => {
+                    fullText += "• " + line + "\n";
+                });
+                fullText += "\nSTRATEGIC RECOMMENDATIONS:\n";
+                data.advice.forEach(line => {
+                    fullText += "➜ " + line + "\n";
+                });
+
+                typeWriter(fullText, 'ai-text');
+                
+            } catch (e) {
+                loading.style.display = 'none';
+                terminal.style.display = 'block';
+                textEl.innerText = "Consultant Offline (Check API Connectivity)";
+            }
+        }
+
+        function typeWriter(text, elementId) {
+            const el = document.getElementById(elementId);
+            let i = 0;
+            const speed = 15;
+            el.innerHTML = '';
+            
+            function type() {
+                if (i < text.length) {
+                    el.innerHTML += text.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                }
+            }
+            type();
         }
 
         function renderVelocity(trend) {

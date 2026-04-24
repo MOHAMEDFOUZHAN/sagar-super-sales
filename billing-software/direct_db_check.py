@@ -6,7 +6,7 @@ try:
         host='127.0.0.1',
         user='root',
         password='',
-        database='maple_pro_db'
+        database='sagar_super_db'
     )
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT username, role, password_hash FROM users")
@@ -19,3 +19,5 @@ try:
 except Exception as e:
     with open("db_status_report.txt", "w") as f:
         f.write(f"CONNECTION FAILED: {str(e)}\n")
+
+

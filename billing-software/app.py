@@ -1,3 +1,14 @@
+import platform
+import sys
+import collections
+if sys.platform == "win32":
+    Uname = collections.namedtuple("uname_result", ["system", "node", "release", "version", "machine", "processor"])
+    platform.uname = lambda: Uname("Windows", "PC", "10", "10.0.19041", "AMD64", "AMD64")
+    platform.system = lambda: "Windows"
+    platform.release = lambda: "10"
+    platform.machine = lambda: "AMD64"
+    platform.version = lambda: "10.0.19041"
+    
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, Response
 import mysql.connector
 from mysql.connector import pooling
@@ -40,7 +51,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 # --- Automatic Documents Folder setup ---
-DOCUMENTS_FOLDER = os.path.join(os.path.expanduser("~"), "Documents", "MapleSoftware")
+DOCUMENTS_FOLDER = os.path.join(os.path.expanduser("~"), "Documents", "SagarSoftware")
 if not os.path.exists(DOCUMENTS_FOLDER):
     os.makedirs(DOCUMENTS_FOLDER)
 
@@ -146,30 +157,120 @@ def manage_server_ip():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@app.route('/api/config/fix-db-permissions', methods=['POST'])
-def fix_db_permissions_route():
-    """Trigger the remote access fix logic on the Server PC"""
-    try:
-        import mysql.connector
-        conn = mysql.connector.connect(
-            host='127.0.0.1',
-            user=Config.MYSQL_USER,
-            password=Config.MYSQL_PASSWORD,
-            port=Config.MYSQL_PORT
-        )
-        cursor = conn.cursor()
-        hosts = ['%', '127.0.0.1', 'localhost']
-        for host in hosts:
-            try:
-                cursor.execute(f"CREATE USER IF NOT EXISTS 'root'@'{host}' IDENTIFIED BY ''")
-                cursor.execute(f"GRANT ALL PRIVILEGES ON *.* TO 'root'@'{host}' WITH GRANT OPTION")
-            except: pass
-        cursor.execute("FLUSH PRIVILEGES")
-        conn.commit()
+@app.route('/api/admin/system/reset-db', methods=['POST'])
+def reset_database_route():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    
+    data = request.json
+    mode = data.get('mode') # 'financial_year' or 'factory'
+    password = data.get('password')
+    
+    # Verify Admin Password
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT password_hash FROM users WHERE username = %s", (session.get('username'),))
+    user = cursor.fetchone()
+    
+    if not user or user['password_hash'] != password:
         conn.close()
-        return jsonify({'status': 'success', 'message': 'Remote access enabled on this Server PC.'})
+        return jsonify({'status': 'error', 'message': 'Incorrect security password.'}), 401
+
+    try:
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
+        
+        if mode == 'financial_year':
+            # Clear all transactional data but keep products and users
+            tables = [
+                'bills', 'bill_items', 'bill_sequences', 'returns_log', 
+                'stock_movements', 'expenses', 'audit_logs', 'account_entries', 
+                'cash_balance', 'denominations'
+            ]
+            for table in tables:
+                cursor.execute(f"TRUNCATE TABLE {table}")
+            
+            # Note: Stock levels are kept as 'Opening Stock' for the new year
+            log_audit(cursor, 'SYSTEM_RESET', 'database', 0, 'ALL_DATA', 'Financial Year Reset Executed')
+            msg = "Financial Year Reset complete. Sales and expenses cleared."
+
+        elif mode == 'factory':
+            # Wipe everything except users
+            tables = [
+                'bills', 'bill_items', 'bill_sequences', 'returns_log', 
+                'stock_movements', 'expenses', 'products', 'categories',
+                'audit_logs', 'account_entries', 'cash_balance', 'denominations',
+                'daily_position_list'
+            ]
+            for table in tables:
+                cursor.execute(f"TRUNCATE TABLE {table}")
+            
+            # Restore default users just in case
+            cursor.execute("TRUNCATE TABLE users")
+            default_users = [
+                ('admin', 'admin123', 'admin'),
+                ('counter', '123', 'sales'),
+                ('accountant', 'account123', 'account')
+            ]
+            cursor.executemany("INSERT IGNORE INTO users (username, password_hash, role) VALUES (%s, %s, %s)", default_users)
+            
+            msg = "System wiped successfully. All products and sales cleared."
+
+        cursor.execute("SET FOREIGN_KEY_CHECKS = 1")
+        conn.commit()
+        return jsonify({'status': 'success', 'message': msg})
+    except Exception as e:
+        if conn: conn.rollback()
+        return jsonify({'status': 'error', 'message': f"Reset failed: {str(e)}"}), 500
+    finally:
+        if conn: conn.close()
+
+@app.route('/api/analytics/ai-insight')
+def get_ai_insight():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+        
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        # 1. Gather Context for the AI
+        cursor.execute("SELECT SUM(total_amount) as total FROM bills WHERE bill_date >= DATE_SUB(NOW(), INTERVAL 7 DAY)")
+        weekly_sales = cursor.fetchone()['total'] or 0
+        
+        cursor.execute("SELECT category, SUM(amount) as revenue FROM bill_items LEFT JOIN products ON bill_items.product_name = products.name GROUP BY category ORDER BY revenue DESC LIMIT 1")
+        top_cat = cursor.fetchone()
+        
+        cursor.execute("SELECT name, current_stock FROM products WHERE current_stock <= 10 LIMIT 5")
+        low_stock = cursor.fetchall()
+        
+        # 2. Logic to generate "AI-style" response (Mocking LLM behavior for now)
+        # In a real scenario, you'd send this to Gemini/OpenAI API here.
+        insights = [
+            f"Weekly Performance: You have generated ₹{weekly_sales:,.2f} in sales this week.",
+            f"Dominance: The '{top_cat['category'] if top_cat else 'N/A'}' category is your primary revenue anchor.",
+            "Momentum: Sales velocity is currently stable. No immediate market shifts detected."
+        ]
+        
+        if low_stock:
+            insights.append(f"Inventory Risk: {len(low_stock)} high-demand items are reaching critical stock levels (<10 units).")
+            
+        advice = []
+        if weekly_sales > 10000:
+            advice.append("Strategy: Consider a loyalty program for your top 5% customers to stabilize this high revenue.")
+        else:
+            advice.append("Strategy: Implement an afternoon 'Flash Sale' between 2PM-4PM to boost traffic during quiet hours.")
+
+        return jsonify({
+            'status': 'success',
+            'analysis': insights,
+            'advice': advice,
+            'timestamp': datetime.datetime.now().isoformat()
+        })
+        
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        conn.close()
 
 def log_audit(cursor, action, table_name, record_id, old_val=None, new_val=None):
     try:
@@ -327,7 +428,8 @@ def check_and_init_db():
                 created_by INT,
                 INDEX (entry_date),
                 INDEX (major_type)
-            )"""
+            )""",
+            "daily_position_list": "CREATE TABLE IF NOT EXISTS daily_position_list (barcode VARCHAR(50) PRIMARY KEY)"
         }
 
         # 4. Create each table if it doesn't exist
@@ -350,6 +452,23 @@ def check_and_init_db():
         cursor.executemany("INSERT IGNORE INTO users (username, password_hash, role) VALUES (%s, %s, %s)", default_users)
         
         conn.commit()
+        
+        # 6. Seed Daily Position List if empty
+        cursor.execute("SELECT COUNT(*) FROM daily_position_list")
+        if cursor.fetchone()[0] == 0:
+            print("Seeding Daily Position list...")
+            initial_codes = [
+                '1100', '1101', '1102', '1103', '1104', '1105', '1106', '1107', '1108', '1109', '1110',
+                '1150', '1151', '1152', '1153', '1154', '1235', '1236', '1239', '1240', '1241', '1333',
+                '1350', '1351', '1352', '1354', '1358', '1446', '1600', '1606', '1610', '1612', '1654',
+                '1655', '1656', '1660', '1661', '1662', '1722', '1723', '1726', '1820', '1821', '1822',
+                '1823', '1824', '1825', '1826', '1827', '1828', '1830', '1831', '1832', '1833', '1834',
+                '1909', '1910', '1950', '1951'
+            ]
+            for code in initial_codes:
+                cursor.execute("INSERT IGNORE INTO daily_position_list (barcode) VALUES (%s)", (code,))
+            conn.commit()
+
         conn.close()
         print("Database initialization check complete.")
     except Exception as e:
@@ -565,6 +684,10 @@ def admin_reports_total_sales():
 def admin_reports_daily_stock():
     return render_template('admin/reports/daily_stock.html')
 
+@app.route('/admin/reports/daily-position')
+def admin_reports_daily_position():
+    return render_template('admin/reports/daily_position.html')
+
 @app.route('/admin/reports/cancelled-report')
 def admin_reports_cancelled_report():
     return render_template('admin/reports/cancelled_report.html')
@@ -576,6 +699,10 @@ def admin_reports_transfer_report():
 @app.route('/admin/reports/final-report')
 def admin_reports_final_report():
     return render_template('admin/reports/final_report.html')
+
+@app.route('/admin/reports/final-sales-report')
+def admin_reports_final_sales_report():
+    return render_template('admin/reports/final_sales_report.html')
 
 @app.route('/admin/reports/change-sales')
 def admin_reports_change_sales():
@@ -591,7 +718,7 @@ def admin_reports_correction():
 
 @app.route('/admin/reports/cash')
 def admin_reports_cash():
-    return render_template('admin/reports/cash_calc.html')
+    return render_template('admin/reports/cash_balance.html')
 
 @app.route('/admin/reports/counter-wise')
 def admin_reports_counter_wise():
@@ -600,6 +727,10 @@ def admin_reports_counter_wise():
 @app.route('/admin/returns')
 def admin_returns():
     return render_template('admin/returns.html')
+
+@app.route('/admin/maintenance')
+def admin_maintenance():
+    return render_template('admin/maintenance.html')
 
 @app.route('/api/reports/sales-changes')
 def get_sales_changes_report():
@@ -643,9 +774,9 @@ def get_sales_changes_report():
                 'date': log['return_date'].strftime('%Y-%m-%dT%H:%M:%S') if log['return_date'] else None,
                 'type': type_label,
                 'bill_id': log['bill_id'],
-                'doc_id': f"MP-{log['bill_id']:05d}",
-                'original_doc': f"MP-{log['bill_id']:05d}",
-                'new_doc': f"MP-{new_id:05d}" if new_id else None,
+                'doc_id': f"{log['bill_id']:05d}",
+                'original_doc': f"{log['bill_id']:05d}",
+                'new_doc': f"{new_id:05d}" if new_id else None,
                 'product': log['product_name'],
                 'qty': float(log['qty'] or 0),
                 'amount': float(log['amount'] or 0),
@@ -660,6 +791,61 @@ def get_sales_changes_report():
     finally:
         conn.close()
 
+@app.route('/api/reports/corrections')
+def get_corrections_report():
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    
+    conn = get_db_connection()
+    if not conn: return jsonify([])
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        # We look for bills that are Cancelled or RETURNED
+        # and try to find any bills that were created as a replacement (source_bill_id)
+        query = """
+            SELECT 
+                b1.id, b1.invoice_no, b1.bill_date, b1.total_amount as current_amt, 
+                b1.prev_total as original_amt, b1.status, b1.payment_mode, b1.created_by,
+                (SELECT GROUP_CONCAT(reason) FROM returns_log WHERE bill_id = b1.id) as reasons,
+                b2.id as new_bill_id, b2.invoice_no as new_invoice, b2.total_amount as new_amt
+            FROM bills b1
+            LEFT JOIN bills b2 ON b1.id = b2.source_bill_id
+            WHERE (b1.status IN ('Cancelled', 'RETURNED') OR b1.prev_total > 0)
+              AND DATE(b1.bill_date) >= %s AND DATE(b1.bill_date) <= %s
+            ORDER BY b1.bill_date DESC
+        """
+        cursor.execute(query, (start_date, end_date))
+        data = cursor.fetchall()
+        
+        results = []
+        seen_ids = set()
+        for row in data:
+            if row['id'] in seen_ids: continue
+            seen_ids.add(row['id'])
+            
+            orig = float(row['original_amt'] or row['current_amt'] or 0)
+            curr = float(row['new_amt'] if row['new_amt'] is not None else row['current_amt'])
+            diff = curr - orig
+            
+            results.append({
+                'date': row['bill_date'].isoformat() if row['bill_date'] else None,
+                'bill_no': row['invoice_no'] or f"{row['id']:05d}",
+                'original_amt': orig,
+                'corrected_amt': curr,
+                'difference': diff,
+                'reason': row['reasons'] or 'Correction',
+                'status': row['status'],
+                'new_bill_no': row['new_invoice'] or (f"{row['new_bill_id']:05d}" if row['new_bill_id'] else None)
+            })
+            
+        return jsonify(results)
+    except Exception as e:
+        print(f"Correction Report Error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        conn.close()
+
 @app.route('/api/reports/sales-detailed')
 def get_detailed_sales_report():
     conn = get_db_connection()
@@ -667,7 +853,7 @@ def get_detailed_sales_report():
         cursor = conn.cursor(dictionary=True)
         query = """
             SELECT 
-                b.bill_date, b.id as bill_id, b.status as bill_status, b.payment_mode,
+                b.bill_date, b.id as bill_id, b.invoice_no, b.status as bill_status, b.payment_mode,
                 b.total_amount as bill_total, b.tsc_percent, b.tsc_amount,
                 bi.product_name, bi.qty, bi.amount, bi.rate, bi.bizz_percent, bi.bizz_amount,
                 p.category, p.barcode
@@ -704,7 +890,7 @@ def get_master_report():
     cursor.execute("""
         SELECT 
             b.bill_date as date, 
-            CONCAT('INV-', LPAD(b.id, 5, '0')) as id,
+            LPAD(b.id, 5, '0') as id,
             'SALE' as type,
             bi.product_name as detail,
             bi.qty,
@@ -919,9 +1105,20 @@ def get_closure_report():
             cursor.execute("SELECT * FROM denominations WHERE balance_id = %s", (balance['id'],))
             denoms = cursor.fetchall()
 
+        u = session.get('username', 'SYSTEM')
+        counter_type = "All-in-One Sales"
+        if u.lower() in ['counter3', 'counter4']:
+            counter_type = "Chocolate Section"
+        elif u.lower() in ['counter', 'counter1', 'counter2']:
+            counter_type = "General Items"
+
         conn.close()
         return jsonify({
-            'meta': {'admin': session.get('username', 'SYSTEM'), 'time': datetime.datetime.now().strftime('%H:%M:%S')},
+            'meta': {
+                'username': u, 
+                'counter_type': counter_type,
+                'time': datetime.datetime.now().strftime('%H:%M:%S')
+            },
             'sales': sales,
             'biz_charges': total_biz, 'biz_80': biz_80, 'biz_20': biz_20,
             'tsc_total': total_tsc, 'tsc_80': tsc_80, 'tsc_20': tsc_20,
@@ -1183,6 +1380,66 @@ def get_daily_stock_report():
         row['stock'] = float(row['stock'] or 0)
     return jsonify(data)
 
+@app.route('/api/reports/daily-position')
+def get_daily_position_report():
+    conn = get_db_connection()
+    if not conn: return jsonify([])
+    cursor = conn.cursor(dictionary=True)
+    
+    # We join products with the daily_position_list table to get only chosen products
+    query = """
+        SELECT 
+            p.barcode as code, 
+            p.name as product_name, 
+            p.current_stock as closing,
+            COALESCE(SUM(CASE WHEN DATE(b.bill_date) = CURDATE() AND b.status != 'Cancelled' THEN bi.qty ELSE 0 END), 0) as outgoing,
+            p.category
+        FROM daily_position_list dp
+        JOIN products p ON dp.barcode = p.barcode
+        LEFT JOIN bill_items bi ON p.name = bi.product_name
+        LEFT JOIN bills b ON bi.bill_id = b.id
+        GROUP BY p.barcode, p.name, p.current_stock, p.category
+        ORDER BY p.barcode
+    """
+    cursor.execute(query)
+    data = cursor.fetchall()
+    conn.close()
+    
+    for row in data:
+        row['closing'] = float(row['closing'] or 0)
+        row['outgoing'] = float(row['outgoing'] or 0)
+        if row['outgoing'] == 0: row['outgoing'] = ""
+        
+    return jsonify(data)
+
+@app.route('/api/reports/daily-position/add', methods=['POST'])
+def add_to_daily_position():
+    data = request.json
+    barcode = data.get('barcode')
+    if not barcode: return jsonify({'status': 'error', 'message': 'No barcode'}), 400
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT IGNORE INTO daily_position_list (barcode) VALUES (%s)", (barcode,))
+        conn.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/reports/daily-position/remove', methods=['POST'])
+def remove_from_daily_position():
+    data = request.json
+    barcode = data.get('barcode')
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM daily_position_list WHERE barcode = %s", (barcode,))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'success'})
+
 @app.route('/api/stock/transfers')
 def get_stock_transfers():
     conn = get_db_connection()
@@ -1227,6 +1484,10 @@ def sales_billing():
 @app.route('/sales/expenses')
 def sales_expenses():
     return render_template('sales/expense.html')
+
+@app.route('/sales/preview')
+def sales_preview():
+    return render_template('sales/preview_bills.html')
 
 @app.route('/sales/report')
 def sales_report():
@@ -1337,15 +1598,7 @@ def search_products():
     if not conn: return jsonify([])
     cursor = conn.cursor(dictionary=True)
     
-    # Counter logic: Counter 3&4 for Chocolate, 1&2 for Balance (Point 2)
-    role_filter = ""
-    u = session.get('username', '').lower()
-    if u in ['counter3', 'counter4']:
-        role_filter = " AND (category = 'CHOCOLATE' OR name LIKE '%CHOCO%' OR name LIKE '%MRD%')"
-    elif u in ['counter1', 'counter2']:
-        role_filter = " AND (category != 'CHOCOLATE' AND name NOT LIKE '%CHOCO%' AND name NOT LIKE '%MRD%')"
-
-    cursor.execute(f"SELECT * FROM products WHERE (name LIKE %s OR barcode = %s){role_filter} LIMIT 20", (f'%{q}%', q))
+    cursor.execute("SELECT * FROM products WHERE (name LIKE %s OR barcode = %s) LIMIT 20", (f'%{q}%', q))
     products = cursor.fetchall()
     conn.close()
     for p in products:
@@ -1389,7 +1642,7 @@ def save_bill():
             next_val = current_bills + 1
             cursor.execute("INSERT INTO bill_sequences (seq_date, `last_value`) VALUES (%s, %s)", (global_key, next_val))
             
-        invoice_no = f"MP-{next_val:04d}"
+        invoice_no = f"{next_val:05d}"
 
         cursor.execute("""
             INSERT INTO bills (invoice_no, bill_date, total_amount, payment_mode, tsc_percent, tsc_amount, status, source_bill_id, discount, created_by) 
@@ -1650,7 +1903,7 @@ def get_next_invoice():
         next_val = cursor.fetchone()[0] + 1
         
     conn.close()
-    return jsonify({'next_id': f"MP-{next_val:04d}"})
+    return jsonify({'next_id': f"{next_val:05d}"})
 
 @app.route('/api/bills/recent')
 def get_recent_bills():
@@ -1658,13 +1911,39 @@ def get_recent_bills():
     if not conn: return jsonify([])
     cursor = conn.cursor(dictionary=True)
     
-    user_filter = ""
+    bill_no = request.args.get('bill_no')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    conditions = []
     params = []
+    
     if session.get('role') == 'sales':
-        user_filter = " WHERE created_by = %s"
+        conditions.append("created_by = %s")
         params.append(session.get('username'))
         
-    cursor.execute(f"SELECT id, invoice_no, total_amount, bill_date, status FROM bills{user_filter} ORDER BY id DESC LIMIT 50", tuple(params))
+    if bill_no:
+        # Search by Invoice No or ID
+        if bill_no.isdigit():
+            conditions.append("(invoice_no = %s OR id = %s)")
+            params.append(f"{int(bill_no):05d}")
+            params.append(bill_no)
+        else:
+            conditions.append("(invoice_no LIKE %s OR id = %s)")
+            params.append(f"%{bill_no}%")
+            params.append(bill_no)
+            
+    if start_date:
+        conditions.append("DATE(bill_date) >= %s")
+        params.append(start_date)
+    if end_date:
+        conditions.append("DATE(bill_date) <= %s")
+        params.append(end_date)
+        
+    where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+    
+    query = f"SELECT id, invoice_no, total_amount, bill_date, status, payment_mode FROM bills{where_clause} ORDER BY id DESC LIMIT 50"
+    cursor.execute(query, tuple(params))
     bills = cursor.fetchall()
     conn.close()
     for b in bills:
@@ -1672,6 +1951,43 @@ def get_recent_bills():
         if isinstance(b['bill_date'], (datetime.datetime, datetime.date)):
             b['bill_date'] = b['bill_date'].isoformat()
     return jsonify(bills)
+
+@app.route('/api/bills/update-payment-mode', methods=['POST'])
+def update_payment_mode():
+    data = request.json
+    bill_id = data.get('bill_id')
+    new_mode = data.get('payment_mode')
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get old value for audit
+        cursor.execute("SELECT payment_mode, invoice_no FROM bills WHERE id = %s", (bill_id,))
+        bill = cursor.fetchone()
+        if not bill:
+            if conn: conn.close()
+            return jsonify({'status': 'error', 'message': 'Bill not found'}), 404
+        
+        old_mode = bill[0]
+        invoice_no = bill[1]
+        
+        # Update
+        cursor.execute("UPDATE bills SET payment_mode = %s WHERE id = %s", (new_mode, bill_id))
+        
+        # Audit log
+        log_audit(cursor, 'UPDATE_PAYMENT_MODE', 'bills', bill_id, old_mode, new_mode)
+        
+        conn.commit()
+        conn.close()
+        
+        # Real-time trigger
+        announcer.announce("update")
+        
+        return jsonify({'status': 'success', 'message': f'Payment mode for {invoice_no} updated to {new_mode}'})
+    except Exception as e:
+        if 'conn' in locals() and conn: conn.rollback(); conn.close()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/bills/all')
 def get_all_bills_api():
@@ -1795,6 +2111,8 @@ def get_stock_alerts():
 def cancel_bill():
     data = request.json
     bill_id = data.get('bill_id')
+    reprocess = data.get('reprocess', False)
+    
     conn = get_db_connection()
     if not conn: return jsonify({'status': 'error', 'message': 'DB fail'}), 500
     try:
@@ -1802,23 +2120,63 @@ def cancel_bill():
         cursor.execute("SELECT status, total_amount FROM bills WHERE id = %s", (bill_id,))
         bill = cursor.fetchone()
         if not bill: raise Exception("Bill not found")
-        if bill['status'] == 'Cancelled': return jsonify({'status': 'info', 'message': 'Already cancelled'})
+        if bill['status'] == 'Cancelled': 
+            if not reprocess:
+                return jsonify({'status': 'info', 'message': 'Already cancelled'})
+            # If reprocess is true but already cancelled, we still want to load items
 
-        # 1. Restock items
-        cursor.execute("SELECT product_name, qty FROM bill_items WHERE bill_id = %s", (bill_id,))
+        # 1. Fetch items for potential re-billing OR restocking
+        cursor.execute("SELECT * FROM bill_items WHERE bill_id = %s", (bill_id,))
         items = cursor.fetchall()
-        for item in items:
-            cursor.execute("UPDATE products SET current_stock = current_stock + %s WHERE name = %s", (item['qty'], item['product_name']))
 
-        # 2. Mark bill as cancelled
-        cursor.execute("UPDATE bills SET status = 'Cancelled', total_amount = 0 WHERE id = %s", (bill_id,))
-        
-        log_audit(cursor, 'CANCEL_BILL', 'bills', bill_id, f"Total: {bill['total_amount']}", "Cancelled")
+        # 2. Restock items (only if NOT already cancelled)
+        if bill['status'] != 'Cancelled':
+            for item in items:
+                cursor.execute("UPDATE products SET current_stock = current_stock + %s WHERE name = %s", (item['qty'], item['product_name']))
+
+            # 3. Mark bill as cancelled
+            cursor.execute("UPDATE bills SET status = 'Cancelled', prev_total = %s, total_amount = 0 WHERE id = %s", (bill['total_amount'], bill_id))
+            log_audit(cursor, 'CANCEL_BILL_PROCESS', 'bills', bill_id, f"Total: {bill['total_amount']}", "Cancelled for Correction" if reprocess else "Cancelled")
+
+        # 4. Handle Reprocess (Loading items back to cart)
+        if reprocess:
+            rebill_cart = []
+            for item in items:
+                rebill_cart.append({
+                    'name': item['product_name'],
+                    'qty': float(item['qty']),
+                    'rate': float(item['rate']),
+                    'amount': float(item['amount']),
+                    'bizz': float(item.get('bizz_percent', 0)),
+                    'category': 'General'
+                })
+            
+            session['reprocess_cart'] = rebill_cart
+            session['source_bill_id'] = bill_id
+            session.modified = True
+            
         conn.commit(); conn.close()
-        return jsonify({'status': 'success'})
+        
+        # Real-time trigger
+        announcer.announce("update")
+        
+        return jsonify({
+            'status': 'success', 
+            'redirect': '/sales/billing' if reprocess else None
+        })
     except Exception as e:
         if conn: conn.rollback(); conn.close()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/reports/categories')
+def get_report_categories():
+    conn = get_db_connection()
+    if not conn: return jsonify([])
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category != '' ORDER BY category")
+    cats = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return jsonify(cats)
 
 @app.route('/api/inventory/categories', methods=['GET', 'POST', 'DELETE'])
 @app.route('/api/inventory/categories/<int:cat_id>', methods=['DELETE'])
@@ -1962,7 +2320,7 @@ if __name__ == '__main__':
         url = f"http://{host}:{Config.SERVER_PORT}/"
         if webview:
             print("Launching Desktop Window...")
-            webview.create_window("Maple Pro- Billing System", url, width=1280, height=800, min_size=(1024, 768))
+            webview.create_window("Sagar Super- Billing System", url, width=1280, height=800, min_size=(1024, 768))
             webview.start()
         else:
             webbrowser.open(url)
@@ -1971,3 +2329,4 @@ if __name__ == '__main__':
         print(f"Webview setup failed: {e}")
         webbrowser.open(url)
         while True: time.sleep(100)
+

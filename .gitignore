@@ -16,4 +16,13 @@ billing-software/scratch/
 *.pdf
 *.zip
 *.db
-!sales_pro.db  # Including the main database if it's essential
+
+.venv_linux/
+billing-software/Configuration/connection_debug.txt
+billing-software/check_bills_debug.py
+billing-software/check_users_temp.py
+billing-software/frontend/admin/cmd.txt
+billing-software/query
+dump_hang.py
+dump_webview.py
+test_webview.py

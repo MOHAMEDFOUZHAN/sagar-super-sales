@@ -4,9 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Transfer - Maple Pro</title>
+    <title>Stock Transfer - Sagar Super</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        #searchResults div:hover {
+            background: rgba(99, 102, 241, 0.2) !important;
+            color: white !important;
+        }
+    </style>
 </head>
 
 <body>
@@ -35,11 +41,24 @@
                     </select>
                 </div>
 
-                <div class="form-group mb-20">
-                    <label>Product</label>
-                    <select id="tProduct" class="input-dark">
-                        <option>Loading...</option>
-                    </select>
+                <div class="form-group mb-20" style="position: relative;">
+                    <label>Product Search</label>
+                    <div style="position: relative;">
+                        <input type="text" id="pSearch" class="input-dark" placeholder="Search by name or barcode..." autocomplete="off">
+                        <i class="fa-solid fa-search" style="position: absolute; right: 15px; top: 12px; color: var(--text-muted);"></i>
+                    </div>
+                    <!-- Results Dropdown -->
+                    <div id="searchResults" class="glass-panel" style="display: none; position: absolute; width: 100%; max-height: 250px; overflow-y: auto; z-index: 100; margin-top: 5px; padding: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+                        <!-- Results populated by JS -->
+                    </div>
+                    <input type="hidden" id="tProduct">
+                    <div id="selectedProductDisplay" style="margin-top: 10px; display: none;">
+                        <span class="glass-panel" style="padding: 8px 15px; display: inline-flex; align-items: center; gap: 10px; border-color: var(--primary);">
+                            <i class="fa-solid fa-box" style="color: var(--primary);"></i>
+                            <span id="selectedProductName" style="font-weight: 600;"></span>
+                            <i class="fa-solid fa-circle-xmark" style="cursor: pointer; color: var(--danger);" onclick="clearSelectedProduct()"></i>
+                        </span>
+                    </div>
                 </div>
 
                 <div class="form-group mb-20">
@@ -95,24 +114,79 @@
     </main>
 
     <script>
+        let productsData = [];
         let productsMap = {};
         let transferItems = [];
 
         async function init() {
             try {
                 const res = await fetch('/api/inventory/products');
-                const products = await res.json();
-                const sel = document.getElementById('tProduct');
-                sel.innerHTML = '';
-
-                products.forEach(p => {
+                productsData = await res.json();
+                productsData.forEach(p => {
                     productsMap[p.id] = p;
-                    const opt = document.createElement('option');
-                    opt.value = p.id;
-                    opt.innerText = `${p.name} (Cur: ${p.current_stock})`;
-                    sel.appendChild(opt);
                 });
             } catch (err) { console.error('Failed to load products'); }
+        }
+
+        const pSearch = document.getElementById('pSearch');
+        const searchResults = document.getElementById('searchResults');
+
+        pSearch.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            if(!query) {
+                searchResults.style.display = 'none';
+                return;
+            }
+
+            const matches = productsData.filter(p => 
+                p.name.toLowerCase().includes(query) || 
+                (p.barcode && p.barcode.includes(query))
+            ).slice(0, 50);
+
+            if(matches.length > 0) {
+                searchResults.innerHTML = '';
+                matches.forEach(p => {
+                    const div = document.createElement('div');
+                    div.style.padding = '10px';
+                    div.style.cursor = 'pointer';
+                    div.style.borderBottom = '1px solid var(--glass-border)';
+                    div.innerHTML = `
+                        <div style="font-weight: 600;">${p.name}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+                            <span>${p.barcode || 'No Barcode'}</span>
+                            <span style="color: var(--accent);">Stock: ${p.current_stock}</span>
+                        </div>
+                    `;
+                    div.onclick = () => selectProduct(p);
+                    searchResults.appendChild(div);
+                });
+                searchResults.style.display = 'block';
+            } else {
+                searchResults.innerHTML = '<div style="padding: 10px; color: var(--text-muted);">No products found</div>';
+                searchResults.style.display = 'block';
+            }
+        });
+
+        // Close search results when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!pSearch.contains(e.target) && !searchResults.contains(e.target)) {
+                searchResults.style.display = 'none';
+            }
+        });
+
+        function selectProduct(p) {
+            document.getElementById('tProduct').value = p.id;
+            document.getElementById('selectedProductName').innerText = `${p.name} (Qty: ${p.current_stock})`;
+            document.getElementById('selectedProductDisplay').style.display = 'block';
+            document.getElementById('searchResults').style.display = 'none';
+            document.getElementById('pSearch').value = '';
+            document.getElementById('tQty').focus();
+        }
+
+        function clearSelectedProduct() {
+            document.getElementById('tProduct').value = '';
+            document.getElementById('selectedProductDisplay').style.display = 'none';
+            document.getElementById('pSearch').focus();
         }
 
         function addItemToList() {
@@ -135,6 +209,7 @@
                 });
             }
 
+            clearSelectedProduct();
             renderList();
             document.getElementById('tQty').value = 1;
         }

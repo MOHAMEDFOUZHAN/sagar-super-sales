@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bill wise Sales Report - AdminPanel</title>
+    <title>Bill wise Sales Report - Sagar Super</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
@@ -107,7 +107,7 @@
             </div>
 
             <div class="print-only-header">
-                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET
+                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER
                 </h1>
                 <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Bill wise Sales Report</p>
                 <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
@@ -116,7 +116,7 @@
 
             <div class="glass-panel" style="padding: 20px;">
                 <div style="text-align: center; margin-bottom: 20px;" class="hide-on-print">
-                    <h2 style="color: var(--primary);">SAGAR SUPER MARKET</h2>
+                    <h2 style="color: var(--primary);">SAGAR SUPER</h2>
                     <p id="dateDisplay" style="color: var(--text-muted);"></p>
                 </div>
 
@@ -184,7 +184,7 @@
 
                     const status = b.status;
                     const isCancelled = (status === 'Cancelled');
-                    const isReturned = (status === 'RETURNED' || b.source_bill_id);
+                    const isReturned = (status === 'RETURNED');
                     
                     const gross = (b.prev_total || b.total_amount) + (b.discount || 0);
                     const discount = (b.discount || 0);
@@ -196,9 +196,10 @@
                         gNet += net;
                     }
 
-                    const rowClass = isCancelled ? 'cancelled-row' : (isReturned ? 'returned-row' : '');
                     const tr = document.createElement('tr');
-                    tr.className = rowClass;
+                    if (isCancelled) tr.className = 'cancelled-row';
+                    else if (isReturned) tr.className = 'returned-row';
+                    
                     tr.innerHTML = `
                         <td class="doc-id">
                             MP-${String(b.id).padStart(5, '0')}

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Position - Sagar Super</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        :root {
+            --print-font: 'Calibri', 'Arial', sans-serif;
+        }
+
+        .report-page {
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 30px;
+            background: var(--glass-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+        }
+
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--text-main);
+            padding-bottom: 10px;
+        }
+
+        .report-title-container {
+            text-align: center;
+            flex-grow: 1;
+        }
+
+        .report-title {
+            font-size: 1.5rem;
+            font-weight: 900;
+            background: #fdfd96; /* Light yellow background like the photo */
+            color: #000;
+            padding: 5px 20px;
+            display: inline-block;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .header-info {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--text-main);
+        }
+
+        .position-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .position-table th {
+            border: 1px solid #666;
+            padding: 10px;
+            text-align: left;
+            background: rgba(255, 255, 255, 0.05);
+            font-weight: 900;
+            color: var(--primary);
+            font-size: 0.85rem;
+        }
+
+        .position-table td {
+            border: 1px solid #666;
+            padding: 8px 10px;
+            font-size: 0.9rem;
+            color: var(--text-main);
+        }
+
+        .col-code { width: 10%; font-family: monospace; text-align: center; }
+        .col-name { width: 60%; font-weight: 600; }
+        .col-closing { width: 15%; text-align: center; font-weight: 900; color: var(--success); }
+        .col-outgoing { width: 15%; text-align: center; font-weight: 900; color: var(--danger); }
+
+        .print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+                background: white !important;
+                color: black !important;
+            }
+            .report-page, .report-page * {
+                visibility: visible;
+                border-color: #000 !important;
+            }
+            .report-page {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                border: none;
+                box-shadow: none;
+            }
+            .sidebar, .print-btn, .section-header {
+                display: none !important;
+            }
+            .report-title {
+                background: #eee !important;
+                -webkit-print-color-adjust: exact;
+            }
+            .position-table th, .position-table td {
+                border: 1px solid black !important;
+            }
+            .col-closing, .col-outgoing {
+                color: black !important;
+            }
+        }
+
+        .search-panel {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>Daily Position</h1>
+                <p style="color: var(--text-muted);">Detailed daily item status and movement.</p>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div class="search-box-container" style="position: relative;">
+                    <button class="btn btn-primary" onclick="toggleSearch()">
+                        <i class="fa-solid fa-plus"></i> ADD PRODUCT
+                    </button>
+                    <div id="productSearchDropdown" class="glass-panel" style="display: none; position: absolute; top: 100%; right: 0; width: 300px; z-index: 1001; padding: 10px; margin-top: 5px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+                        <input type="text" id="addProdInput" class="input-dark" placeholder="Type product name/code..." onkeyup="searchProducts(this.value)" autocomplete="off">
+                        <div id="searchResults" style="max-height: 200px; overflow-y: auto; margin-top: 10px;"></div>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" onclick="loadData()">
+                    <i class="fa-solid fa-sync"></i> Refresh
+                </button>
+                <button class="btn btn-primary" onclick="window.print()">
+                    <i class="fa-solid fa-print"></i> Print Report
+                </button>
+            </div>
+        </header>
+
+        <div class="report-page" id="printableArea">
+            <div class="report-header">
+                <div class="header-info">
+                    DATE - <span id="headerDate"></span>
+                </div>
+                <div class="report-title-container">
+                    <div class="report-title">SUPER - DAILY POSITION</div>
+                </div>
+                <div class="header-info">
+                    DAY - <span id="headerDay"></span>
+                </div>
+            </div>
+
+            <div class="search-panel">
+                <input type="text" id="tableSearch" class="input-dark" placeholder="Filter current list..." onkeyup="filterTable()" style="max-width: 300px;">
+            </div>
+
+            <table class="position-table" id="posTable">
+                <thead>
+                    <tr>
+                        <th class="col-code">CODE</th>
+                        <th class="col-name">PRODUCT NAME</th>
+                        <th class="col-closing">CLOSING</th>
+                        <th class="col-outgoing">OUTGOING</th>
+                        <th class="no-print" style="width: 40px; border-left: none;"></th>
+                    </tr>
+                </thead>
+                <tbody id="posBody">
+                    <!-- Data will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        let allData = [];
+
+        async function loadData() {
+            const now = new Date();
+            document.getElementById('headerDate').innerText = now.toLocaleDateString('en-GB');
+            const dayStr = now.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase();
+            document.getElementById('headerDay').innerText = dayStr + ' ' + now.toLocaleDateString('en-GB');
+
+            try {
+                const res = await fetch('/api/reports/daily-position');
+                allData = await res.json();
+                renderTable(allData);
+            } catch (err) {
+                console.error("Failed to load report data:", err);
+            }
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('posBody');
+            tbody.innerHTML = '';
+
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="col-code">${item.code || '-'}</td>
+                    <td class="col-name">${item.product_name}</td>
+                    <td class="col-closing">${item.closing}</td>
+                    <td class="col-outgoing">${item.outgoing}</td>
+                    <td class="no-print" style="text-align: center; border-left: none;">
+                        <button onclick="removeItem('${item.code}')" style="background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.8rem;">
+                            <i class="fa-solid fa-times"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function toggleSearch() {
+            const dropdown = document.getElementById('productSearchDropdown');
+            dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+            if (dropdown.style.display === 'block') document.getElementById('addProdInput').focus();
+        }
+
+        let searchTimeout;
+        function searchProducts(query) {
+            clearTimeout(searchTimeout);
+            if (!query) {
+                document.getElementById('searchResults').innerHTML = '';
+                return;
+            }
+            searchTimeout = setTimeout(async () => {
+                const res = await fetch(`/api/products?q=${query}`);
+                const products = await res.json();
+                const resultsDiv = document.getElementById('searchResults');
+                resultsDiv.innerHTML = '';
+                
+                products.forEach(p => {
+                    const div = document.createElement('div');
+                    div.style = 'padding: 8px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.85rem;';
+                    div.innerHTML = `<strong>${p.barcode}</strong> - ${p.name}`;
+                    div.onclick = () => addProductToList(p.barcode);
+                    div.onmouseover = () => div.style.background = 'rgba(255,255,255,0.05)';
+                    div.onmouseout = () => div.style.background = 'transparent';
+                    resultsDiv.appendChild(div);
+                });
+            }, 300);
+        }
+
+        async function addProductToList(barcode) {
+            await fetch('/api/reports/daily-position/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ barcode })
+            });
+            toggleSearch();
+            document.getElementById('addProdInput').value = '';
+            document.getElementById('searchResults').innerHTML = '';
+            loadData();
+        }
+
+        async function removeItem(barcode) {
+            if (!confirm('Remove this product from the Daily Position list?')) return;
+            await fetch('/api/reports/daily-position/remove', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ barcode })
+            });
+            loadData();
+        }
+
+        function filterTable() {
+            const query = document.getElementById('tableSearch').value.toLowerCase();
+            const filtered = allData.filter(item => 
+                item.product_name.toLowerCase().includes(query) || 
+                (item.code && item.code.toLowerCase().includes(query))
+            );
+            renderTable(filtered);
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const container = document.querySelector('.search-box-container');
+            if (!container.contains(e.target)) {
+                document.getElementById('productSearchDropdown').style.display = 'none';
+            }
+        });
+
+        // Initialize
+        loadData();
+    </script>
+</body>
+
+</html>

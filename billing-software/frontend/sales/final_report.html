@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Final Admin Audit | Maple Pro</title>
+    <title>Final Admin Audit | Sagar Super</title>
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
         rel="stylesheet">
@@ -424,12 +424,13 @@
     <!-- Sidebar -->
     <nav class="sidebar">
         <div class="brand" style="font-size: 1.5rem; font-weight: 900; margin-bottom: 40px; color: white;">
-            <i class="fa-solid fa-bolt" style="color: var(--primary);"></i> MAPLE PRO
+            <i class="fa-solid fa-bolt" style="color: var(--primary);"></i> Sagar Super
         </div>
         <ul style="list-style: none; padding: 0;">
             <li><a href="/sales/dashboard" class="nav-link"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
             <li><a href="/sales/billing" class="nav-link"><i class="fa-solid fa-cart-shopping"></i> Billing</a></li>
             <li><a href="/sales/expenses" class="nav-link"><i class="fa-solid fa-receipt"></i> Expenses</a></li>
+            <li><a href="/sales/preview" class="nav-link"><i class="fa-solid fa-eye"></i> Preview Bills</a></li>
             <li><a href="/sales/report" class="nav-link active"><i class="fa-solid fa-file-invoice-dollar"></i> Final Audit</a></li>
             <li><a href="/sales/returns" class="nav-link"><i class="fa-solid fa-rotate-left"></i> Returns & Voids</a></li>
         </ul>
@@ -712,6 +713,10 @@
 
     <script>
         const notes = [500, 200, 100, 50, 20, 10, 5, 2, 1];
+        const sessionUsername = "{{ session.username|default('', true)|e }}";
+        const counterLabel = sessionUsername.toLowerCase().startsWith('counter')
+            ? `Counter ${sessionUsername.replace(/^counter[-_\s]?/i, '').trim()}`.trim()
+            : '';
 
         window.onload = () => {
             // Fix: Use local date instead of UTC to avoid timezone mismatch
@@ -957,7 +962,8 @@
                     <div style="background: white; color: black; font-family: 'Courier New', Courier, monospace; max-width: 600px; margin: 0 auto; padding: 20px;">
                         <div style="text-align: center; margin-bottom: 20px;">
                             <h3 style="margin: 0; text-transform: uppercase;">Final Report</h3>
-                            <h2 style="margin: 5px 0; text-transform: uppercase;">Sagar - Super - Oils</h2>
+                            ${counterLabel ? `<div style="margin-top: 6px; font-size: 0.95rem; font-weight: 700; text-transform: uppercase;">Counter: ${counterLabel}</div>` : ''}
+                            <h2 style="margin: 5px 0; text-transform: uppercase;">Sagar Super</h2>
                             <p style="margin: 5px 0; font-size: 0.9rem;">Date: ${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')} &nbsp; Time: ${syncTime}<br>
                             Report Date: ${date.split('-').reverse().join('-')}</p>
                         </div>

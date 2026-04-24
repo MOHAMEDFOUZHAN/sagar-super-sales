@@ -4,7 +4,7 @@ import sys
 
 class Config:
     # Default MySQL Configuration
-    MYSQL_HOST = '127.0.0.1'
+    MYSQL_HOST = '192.168.1.12'
     MYSQL_USER = 'root'
     MYSQL_PASSWORD = ''  # Default for Laragon root is usually empty.
     MYSQL_DB = 'maple_pro_db'
@@ -41,8 +41,8 @@ class Config:
             search_paths = [
                 local_config_file,                                     # App/Configuration/config.json
                 os.path.join(base_dir, "config.json"),                 # Root of App folder
-                os.path.join(os.path.expanduser("~"), "Documents", "MapleSoftware", "config.json"), # Documents
-                os.path.join(os.environ.get('APPDATA', ''), "MapleSoftware", "config.json")          # AppData
+                os.path.join(os.path.expanduser("~"), "Documents", "SagarSoftware", "config.json"), # Documents
+                os.path.join(os.environ.get('APPDATA', ''), "SagarSoftware", "config.json")          # AppData
             ]
 
             found_file = None
@@ -94,3 +94,4 @@ class Config:
 
 # Load external settings when logic is imported
 Config.load_external_config()
+

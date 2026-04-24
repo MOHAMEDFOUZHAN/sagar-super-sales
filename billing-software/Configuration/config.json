@@ -1,5 +1,5 @@
 {
-    "MYSQL_HOST": "127.0.0.1",
+    "MYSQL_HOST": "192.168.1.12",
     "MYSQL_USER": "root",
     "MYSQL_PASSWORD": "",
     "MYSQL_DB": "maple_pro_db",
@@ -9,3 +9,4 @@
     "SERVER_HOST": "0.0.0.0",
     "SERVER_PORT": 5004
 }
+

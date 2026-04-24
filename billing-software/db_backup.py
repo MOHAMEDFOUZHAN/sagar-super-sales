@@ -5,7 +5,7 @@ from config import Config
 
 def run_backup():
     # 1. Create backup directory if not exists
-    backup_dir = os.path.join(os.path.expanduser("~"), "Documents", "MapleSoftware", "backups")
+    backup_dir = os.path.join(os.path.expanduser("~"), "Documents", "SagarSoftware", "backups")
     if not os.path.exists(backup_dir):
         os.makedirs(backup_dir)
 
@@ -45,3 +45,4 @@ def run_backup():
 
 if __name__ == "__main__":
     run_backup()
+

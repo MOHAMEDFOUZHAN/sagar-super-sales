@@ -1,8 +1,8 @@
--- Maple Pro Database Schema
+-- Sagar Super Database Schema
 -- Last updated: 2026-02-03
 
-CREATE DATABASE IF NOT EXISTS maple_pro_db;
-USE maple_pro_db;
+CREATE DATABASE IF NOT EXISTS sagar_super_db;
+USE sagar_super_db;
 
 -- Users Table
 CREATE TABLE IF NOT EXISTS users (
@@ -165,4 +165,5 @@ INSERT IGNORE INTO users (username, password_hash, role) VALUES ('counter2', '12
 INSERT IGNORE INTO users (username, password_hash, role) VALUES ('counter3', '123', 'sales');
 INSERT IGNORE INTO users (username, password_hash, role) VALUES ('counter4', '123', 'sales');
 INSERT IGNORE INTO users (username, password_hash, role) VALUES ('accountant', 'account123', 'account');
+
 

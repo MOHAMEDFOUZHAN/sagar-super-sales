@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Correction Bill - SmartBill</title>
+    <title>Correction Bill - Sagar Super</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
@@ -45,21 +45,14 @@
         </header>
 
         <div class="print-only-header">
-            <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET</h1>
+            <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER</h1>
             <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Correction Bill Report</p>
             <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
             <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
         </div>
 
         <div class="glass-panel" style="padding: 20px;">
-            <div style="text-align: center; padding: 60px; color: var(--text-muted);">
-                <i class="fa-solid fa-hammer" style="font-size: 3rem; margin-bottom: 20px; opacity: 0.5;"></i>
-                <h2>Correction Module Pending</h2>
-                <p>The logic for bill correction and returns is being prepared.</p>
-            </div>
-
-            <!-- Table structure ready for future implementation -->
-            <div class="table-wrapper" style="display: none;" id="correctionTableWrapper">
+            <div class="table-wrapper" id="correctionTableWrapper">
                 <table id="correctionTable">
                     <thead>
                         <tr>
@@ -67,13 +60,18 @@
                             <th>Bill No</th>
                             <th>Original Amt</th>
                             <th>Corrected Amt</th>
-                            <th>Difference</th>
+                            <th style="text-align: right;">Difference</th>
+                            <th>New Bill</th>
                             <th>Reason</th>
                             <th>Status</th>
                         </tr>
                     </thead>
-                    <tbody></tbody>
+                    <tbody id="reportContent"></tbody>
                 </table>
+            </div>
+            <div id="noData" style="display: none; text-align: center; padding: 40px; color: var(--text-muted);">
+                <i class="fa-solid fa-check-circle" style="font-size: 3rem; margin-bottom: 10px; opacity: 0.3;"></i>
+                <p>No corrected or returned bills found for this period.</p>
             </div>
         </div>
     </main>
@@ -85,13 +83,59 @@
         document.getElementById('startDate').value = today;
         document.getElementById('endDate').value = today;
 
-        function loadReport() {
+        async function loadReport() {
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
-            document.getElementById('printDateRange').innerText = `Period: ${new Date(start).toLocaleDateString()} to ${new Date(end).toLocaleDateString()}`;
-            // Logic to be implemented as per user requirements
-            console.log("Loading correction report...");
+            const startF = new Date(start).toLocaleDateString('en-GB');
+            const endF = new Date(end).toLocaleDateString('en-GB');
+            document.getElementById('printDateRange').innerText = `Period: ${startF} to ${endF}`;
+
+            try {
+                const res = await fetch(`/api/reports/corrections?start=${start}&end=${end}`);
+                const data = await res.json();
+
+                const tbody = document.getElementById('reportContent');
+                tbody.innerHTML = '';
+                
+                if (!data || data.length === 0) {
+                    document.getElementById('correctionTableWrapper').style.display = 'none';
+                    document.getElementById('noData').style.display = 'block';
+                    return;
+                }
+
+                document.getElementById('correctionTableWrapper').style.display = 'block';
+                document.getElementById('noData').style.display = 'none';
+
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    const diffColor = row.difference < 0 ? 'var(--danger)' : (row.difference > 0 ? 'var(--success)' : 'inherit');
+                    
+                    tr.innerHTML = `
+                        <td>${new Date(row.date).toLocaleDateString('en-GB')}</td>
+                        <td style="font-weight: bold; color: var(--primary);">${row.bill_no}</td>
+                        <td>₹${row.original_amt.toFixed(2)}</td>
+                        <td>₹${row.corrected_amt.toFixed(2)}</td>
+                        <td style="text-align: right; font-weight: bold; color: ${diffColor};">
+                            ${row.difference > 0 ? '+' : ''}${row.difference.toFixed(2)}
+                        </td>
+                        <td>${row.new_bill_no || '-'}</td>
+                        <td style="font-size: 0.85rem; color: var(--text-muted);">${row.reason}</td>
+                        <td>
+                            <span class="badge ${row.status === 'Cancelled' ? 'badge-danger' : 'badge-warning'}">
+                                ${row.status.toUpperCase()}
+                            </span>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+            } catch (err) {
+                console.error(err);
+                alert("Failed to load correction report.");
+            }
         }
+
+        loadReport();
     </script>
 </body>
 

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Total Sales Report - AdminPanel</title>
+    <title>Total Sales Report - Sagar Super</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
@@ -72,16 +72,38 @@
 
         @media print {
             .category-block {
-                border: 1px solid black !important;
-                margin-bottom: 20px !important;
+                border: none !important;
+                margin-bottom: 30px !important;
                 break-inside: avoid;
             }
 
             .category-header {
                 background: #f0f0f0 !important;
                 color: black !important;
-                border-bottom: 1px solid black !important;
-                padding: 5px 10px !important;
+                border: 1px solid black !important;
+                border-bottom: none !important;
+                padding: 8px 12px !important;
+                font-size: 1.1rem !important;
+            }
+
+            .report-table {
+                border: 1px solid black !important;
+                border-collapse: collapse !important;
+            }
+
+            .report-table th, .report-table td {
+                border: 1px solid black !important;
+                color: black !important;
+                padding: 6px 12px !important;
+            }
+
+            .report-table th {
+                background: #eee !important;
+            }
+
+            .total-row td {
+                font-weight: bold !important;
+                background: #f9f9f9 !important;
             }
 
             .qty-badge {
@@ -128,7 +150,7 @@
             </div>
 
             <div class="print-only-header">
-                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER MARKET
+                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER
                 </h1>
                 <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Total Sales Report (Product-wise Qty)</p>
                 <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
@@ -184,6 +206,7 @@
                 Object.keys(grouped).sort().forEach(cat => {
                     const products = grouped[cat];
                     let catQty = 0;
+                    let catRevenue = 0;
 
                     const block = document.createElement('div');
                     block.className = 'category-block';
@@ -192,6 +215,7 @@
                     Object.keys(products).sort().forEach(pName => {
                         const p = products[pName];
                         catQty += p.qty;
+                        catRevenue += p.revenue;
                         rows += `
                             <tr>
                                 <td>${pName}</td>
@@ -214,7 +238,14 @@
                                     <th style="text-align: right;">TOTAL REVENUE</th>
                                 </tr>
                             </thead>
-                            <tbody>${rows}</tbody>
+                            <tbody id="rows_${cat.replace(/[^a-zA-Z0-9]/g, '')}">
+                                ${rows}
+                                <tr class="total-row">
+                                    <td>TOTAL FOR ${cat}</td>
+                                    <td style="text-align: right;">${catQty}</td>
+                                    <td style="text-align: right;">₹${catRevenue.toFixed(2)}</td>
+                                </tr>
+                            </tbody>
                         </table>
                     `;
                     container.appendChild(block);
