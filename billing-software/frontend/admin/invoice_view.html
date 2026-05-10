@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice SS#{{ bill_id }}</title>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; width: 80mm; margin: 0 auto; padding: 10px; color: #000; }
+        .header { text-align: center; margin-bottom: 10px; }
+        .header h1 { margin: 0; font-size: 18px; }
+        .header p { margin: 2px 0; font-size: 12px; }
+        .divider { border-bottom: 1px dashed #000; margin: 10px 0; }
+        .info-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+        .items-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .items-table th { text-align: left; border-bottom: 1px solid #000; padding: 5px 0; }
+        .items-table td { padding: 5px 0; vertical-align: top; }
+        .total-section { margin-top: 10px; font-weight: bold; font-size: 14px; text-align: right; }
+        .footer { text-align: center; margin-top: 20px; font-size: 10px; }
+        @media print {
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="margin-bottom: 20px; text-align: center;">
+        <button onclick="window.print()" style="padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            <i class="fa-solid fa-print"></i> Print Invoice
+        </button>
+        <button onclick="window.close()" style="padding: 10px 20px; background: #ef4444; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
+            Close
+        </button>
+    </div>
+
+    <div id="invoiceContent">
+        <div class="header">
+            <h1>SAGAR SUPER</h1>
+            <p>Quality Products & Best Service</p>
+            <p>Contact: +91 98765 43210</p>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <div class="info-row">
+            <span>Invoice: <b id="invNo">Loading...</b></span>
+            <span id="invDate">...</span>
+        </div>
+        <div class="info-row">
+            <span>Mode: <b id="invMode">...</b></span>
+            <span id="invTime">...</span>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 50%;">Item</th>
+                    <th style="text-align: center;">Qty</th>
+                    <th style="text-align: right;">Amt</th>
+                </tr>
+            </thead>
+            <tbody id="itemsBody">
+                <!-- Items will be loaded here -->
+            </tbody>
+        </table>
+        
+        <div class="divider"></div>
+        
+        <div class="total-section">
+            TOTAL: ₹<span id="totalAmt">0.00</span>
+        </div>
+        
+        <div class="footer">
+            <p>Thank you for shopping with us!</p>
+            <p>Visit again!</p>
+        </div>
+    </div>
+
+    <script>
+        async function loadInvoice() {
+            const billId = "{{ bill_id }}";
+            try {
+                // Fetch bill details (we can use recent or add a specific one)
+                // For now, let's assume we can get it from api/reports/sales-detailed and filter
+                const res = await fetch('/api/reports/sales-detailed');
+                const allData = await res.json();
+                
+                const billItems = allData.filter(item => item.bill_id == billId);
+                if (billItems.length === 0) {
+                    document.body.innerHTML = "<h1>Invoice not found</h1>";
+                    return;
+                }
+                
+                const first = billItems[0];
+                document.getElementById('invNo').innerText = first.invoice_no || billId;
+                
+                const bDate = new Date(first.bill_date);
+                document.getElementById('invDate').innerText = bDate.toLocaleDateString();
+                document.getElementById('invTime').innerText = bDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                document.getElementById('invMode').innerText = (first.payment_mode || 'CASH').toUpperCase();
+                document.getElementById('totalAmt').innerText = first.bill_total.toFixed(2);
+                
+                const tbody = document.getElementById('itemsBody');
+                billItems.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${item.product_name}</td>
+                        <td style="text-align: center;">${item.qty}</td>
+                        <td style="text-align: right;">₹${item.amount.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                
+                // Automatically open print dialog
+                // setTimeout(() => window.print(), 500);
+                
+            } catch (err) {
+                console.error(err);
+                document.body.innerHTML = "<h1>Error loading invoice</h1>";
+            }
+        }
+        loadInvoice();
+    </script>
+</body>
+</html>

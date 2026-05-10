@@ -15,10 +15,26 @@ from mysql.connector import pooling
 import datetime
 import sys
 import os
+import json
 import queue
 import time
 from config import Config
 from backend.sales import create_bill
+from thermal_printer import print_thermal_bill, print_closure_report
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+# --- CLOUD DATABASE CONFIGURATION ---
+# Loaded from d:\Sales\online sales\.env
+CLOUD_DB_URL = "postgresql://neondb_owner:npg_6xQaYTgvCJ7G@ep-spring-recipe-a17qufnw-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+
+def get_cloud_db_connection():
+    try:
+        conn = psycopg2.connect(CLOUD_DB_URL, connect_timeout=5)
+        return conn
+    except Exception as e:
+        print(f"Cloud DB Connection Error: {e}")
+        return None
 
 # Global queue for real-time notifications
 # In a multi-worker environment like Waitress, we use a simple list of queues
@@ -31,6 +47,13 @@ class MessageAnnouncer:
         q = queue.Queue(maxsize=5)
         self.listeners.append(q)
         return q
+
+    def disconnect(self, q):
+        if q in self.listeners:
+            try:
+                self.listeners.remove(q)
+            except ValueError:
+                pass
 
     def announce(self, msg):
         for i in reversed(range(len(self.listeners))):
@@ -70,10 +93,19 @@ def format_sse(data: str, event=None) -> str:
 @app.route('/api/realtime/stream')
 def realtime_stream():
     def stream():
-        messages = announcer.listen()
-        while True:
-            msg = messages.get() # blocks until a new message arrives
-            yield format_sse(data=msg, event='billing_update')
+        q = announcer.listen()
+        try:
+            while True:
+                try:
+                    msg = q.get(timeout=15) # Wait up to 15s for an update
+                    yield format_sse(data=msg, event='billing_update')
+                except queue.Empty:
+                    # Keep-alive ping to detect client disconnects
+                    yield ': keep-alive\n\n'
+        except (GeneratorExit, Exception):
+            pass
+        finally:
+            announcer.disconnect(q)
     return Response(stream(), mimetype='text/event-stream')
 
 db_pool = None
@@ -724,6 +756,66 @@ def admin_reports_cash():
 def admin_reports_counter_wise():
     return render_template('admin/reports/counter_sales.html')
 
+@app.route('/admin/reports/online-sales')
+def admin_reports_online_sales():
+    return render_template('admin/reports/online_sales.html')
+
+@app.route('/admin/reports/online-sales/reports')
+def admin_reports_online_sales_reports():
+    return render_template('admin/reports/online_sales_reports.html')
+
+@app.route('/admin/reports/online-sales/invoices')
+def admin_reports_online_sales_invoices():
+    return render_template('admin/reports/online_sales_invoices.html')
+
+@app.route('/api/reports/online-sales-cloud')
+def get_online_sales_cloud_api():
+    """
+    Fetches online orders from the Neon PostgreSQL Cloud Database.
+    """
+    conn = get_cloud_db_connection()
+    if not conn:
+        return jsonify({'status': 'error', 'message': 'Cloud Database Connection Failed. Please check internet or credentials.'}), 500
+    
+    try:
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        # We attempt to fetch from common table names for Next.js/Prisma apps.
+        # The user can adjust these table/column names if their schema differs.
+        query = """
+            SELECT 
+                id, "totalAmount", status, "createdAt", 'ONLINE' as payment_mode
+            FROM "Order"
+            ORDER BY "createdAt" DESC
+            LIMIT 200
+        """
+        cur.execute(query)
+        orders = cur.fetchall()
+        
+        results = []
+        for o in orders:
+            # Map Cloud DB fields to the frontend's expected format
+            dt = o['createdAt']
+            results.append({
+                'bill_id': o['id'],
+                'invoice_no': f"WEB-{str(o['id'])[:8]}", # Using prefix for cloud orders
+                'bill_date': dt.isoformat() if hasattr(dt, 'isoformat') else str(dt),
+                'amount': float(o['totalAmount'] or 0),
+                'bizz_amount': 0, # Cloud orders might have different fee structures
+                'product_name': 'Online Order Content', # Placeholder for detail
+                'qty': 1,
+                'rate': float(o['totalAmount'] or 0),
+                'bill_total': float(o['totalAmount'] or 0),
+                'payment_mode': 'ONLINE',
+                'bill_status': o['status']
+            })
+        
+        conn.close()
+        return jsonify(results)
+    except Exception as e:
+        if conn: conn.close()
+        # Fallback error message with detail for debugging
+        return jsonify({'status': 'error', 'message': f'Cloud Query Error: {str(e)}'}), 500
+
 @app.route('/admin/returns')
 def admin_returns():
     return render_template('admin/returns.html')
@@ -731,6 +823,10 @@ def admin_returns():
 @app.route('/admin/maintenance')
 def admin_maintenance():
     return render_template('admin/maintenance.html')
+
+@app.route('/admin/invoice/<int:bill_id>')
+def admin_view_invoice(bill_id):
+    return render_template('admin/invoice_view.html', bill_id=bill_id)
 
 @app.route('/api/reports/sales-changes')
 def get_sales_changes_report():
@@ -1112,6 +1208,17 @@ def get_closure_report():
         elif u.lower() in ['counter', 'counter1', 'counter2']:
             counter_type = "General Items"
 
+        # 7. Counter Breakdown
+        cursor.execute(f"""
+            SELECT created_by as counter, SUM(total_amount) as amount
+            FROM bills
+            WHERE DATE(bill_date) = %s AND status != 'Cancelled'{user_filter}
+            GROUP BY created_by
+        """, tuple(query_params))
+        counter_breakdown = cursor.fetchall()
+        for c in counter_breakdown:
+            c['amount'] = float(c['amount'] or 0)
+
         conn.close()
         return jsonify({
             'meta': {
@@ -1123,6 +1230,7 @@ def get_closure_report():
             'biz_charges': total_biz, 'biz_80': biz_80, 'biz_20': biz_20,
             'tsc_total': total_tsc, 'tsc_80': tsc_80, 'tsc_20': tsc_20,
             'categories': categories,
+            'counter_breakdown': counter_breakdown,
             'office_expenses': office_exps, 'shop_expenses': shop_exps,
             'total_shop': sum(e['amount'] for e in shop_exps),
             'total_expenses': total_exc,
@@ -1373,7 +1481,7 @@ def get_daily_stock_report():
     conn = get_db_connection()
     if not conn: return jsonify([])
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT barcode, name, category, current_stock as stock, unit FROM products ORDER BY category, name")
+    cursor.execute("SELECT barcode, name, category, current_stock as stock, unit FROM products ORDER BY (barcode + 0), barcode")
     data = cursor.fetchall()
     conn.close()
     for row in data:
@@ -1399,7 +1507,7 @@ def get_daily_position_report():
         LEFT JOIN bill_items bi ON p.name = bi.product_name
         LEFT JOIN bills b ON bi.bill_id = b.id
         GROUP BY p.barcode, p.name, p.current_stock, p.category
-        ORDER BY p.barcode
+        ORDER BY (p.barcode + 0), p.barcode
     """
     cursor.execute(query)
     data = cursor.fetchall()
@@ -1644,10 +1752,12 @@ def save_bill():
             
         invoice_no = f"{next_val:05d}"
 
+        bill_dt = datetime.datetime.now()
+
         cursor.execute("""
             INSERT INTO bills (invoice_no, bill_date, total_amount, payment_mode, tsc_percent, tsc_amount, status, source_bill_id, discount, created_by) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (invoice_no, datetime.datetime.now(), total, data['payment_mode'], tsc_percent, tsc_amount, status, data.get('source_bill_id'), discount, session.get('username', 'SYSTEM')))
+        """, (invoice_no, bill_dt, total, data['payment_mode'], tsc_percent, tsc_amount, status, data.get('source_bill_id'), discount, session.get('username', 'SYSTEM')))
         bill_id = cursor.lastrowid
         
         for item in data['items']:
@@ -1674,9 +1784,47 @@ def save_bill():
         # Trigger Real-time update
         announcer.announce("update")
         
-        return jsonify({'status': 'success', 'bill_id': bill_id})
+        return jsonify({
+            'status': 'success',
+            'bill_id': bill_id,
+            'invoice_no': invoice_no,
+            'invoice_display': f"SS#{invoice_no.zfill(6)}",
+            'bill_date': bill_dt.strftime('%d-%m-%Y'),
+            'bill_time': bill_dt.strftime('%I:%M %p'),
+        })
     except Exception as e:
         if 'conn' in locals() and conn: conn.rollback(); conn.close()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/print-thermal', methods=['POST'])
+def api_print_thermal():
+    data = request.json
+    try:
+        # Expected keys: items, bill_no, bill_date, bill_time, bill_type
+        success = print_thermal_bill(
+            items=data['items'],
+            bill_no=data['bill_no'],
+            bill_date=data['bill_date'],
+            bill_time=data['bill_time'],
+            bill_type=data['bill_type']
+        )
+        if success:
+            return jsonify({'status': 'success', 'message': 'Thermal bill printed.'})
+        else:
+            return jsonify({'status': 'error', 'message': 'Printing failed.'}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/print-closure', methods=['POST'])
+def api_print_closure():
+    data = request.json
+    try:
+        success = print_closure_report(data)
+        if success:
+            return jsonify({'status': 'success', 'message': 'Closure report printed.'})
+        else:
+            return jsonify({'status': 'error', 'message': 'Printing failed.'}), 500
+    except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/stats')
@@ -1685,7 +1833,7 @@ def get_stats():
     if not conn: return jsonify({'error': 'DB Connection failed'}), 500
     
     cursor = conn.cursor()
-    today = datetime.date.today().isoformat()
+    today = datetime.date.today()
     
     # User-specific filtering for stats
     user_filter = ""
@@ -1890,7 +2038,7 @@ def get_next_invoice():
     today_prefix = datetime.datetime.now().strftime("%Y%m%d")
     global_key = datetime.date(2000, 1, 1)
     conn = get_db_connection()
-    if not conn: return jsonify({'next_id': f"MP-00000"})
+    if not conn: return jsonify({'next_id': f"MP-00000", 'display_id': 'SS#000000'})
     cursor = conn.cursor()
     cursor.execute("SELECT `last_value` FROM bill_sequences WHERE seq_date = %s", (global_key,))
     res = cursor.fetchone()
@@ -1903,7 +2051,10 @@ def get_next_invoice():
         next_val = cursor.fetchone()[0] + 1
         
     conn.close()
-    return jsonify({'next_id': f"{next_val:05d}"})
+    return jsonify({
+        'next_id': f"{next_val:05d}",
+        'display_id': f"SS#{next_val:06d}",
+    })
 
 @app.route('/api/bills/recent')
 def get_recent_bills():
@@ -2033,7 +2184,7 @@ def void_bill_api():
         # Get bill info
         cursor.execute("SELECT invoice_no, total_amount, status FROM bills WHERE id = %s", (bill_id,))
         bill = cursor.fetchone()
-        if not bill: throw_error("Bill not found")
+        if not bill: raise Exception("Bill not found")
         if bill[2] == 'Cancelled': return jsonify({'status': 'error', 'message': 'Already Voided'})
         
         # 1. Update bill status
@@ -2234,17 +2385,17 @@ def inventory_products(prod_id=None):
         try:
             if pid:
                 cursor.execute("""
-                    UPDATE products SET barcode=%s, name=%s, category=%s, price=%s, bizz=%s, unit=%s, expiry_date=%s, min_threshold=%s
+                    UPDATE products SET barcode=%s, name=%s, category=%s, price=%s, bizz=%s, unit=%s, expiry_date=%s, min_threshold=%s, current_stock=%s
                     WHERE id = %s
                 """, (data['barcode'], data['name'], data['category'], data['price'], data['bizz'], 
-                      data.get('unit', 'PCS'), data.get('expiry_date'), data.get('min_threshold', 25), pid))
+                      data.get('unit', 'PCS'), data.get('expiry_date'), data.get('min_threshold', 25), data.get('current_stock', 0), pid))
                 log_audit(cursor, 'EDIT_PRODUCT', 'products', pid, None, data['name'])
             else:
                 cursor.execute("""
-                    INSERT INTO products (barcode, name, category, price, bizz, unit, expiry_date, min_threshold)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO products (barcode, name, category, price, bizz, unit, expiry_date, min_threshold, current_stock)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (data['barcode'], data['name'], data['category'], data['price'], data['bizz'], 
-                      data.get('unit', 'PCS'), data.get('expiry_date'), data.get('min_threshold', 25)))
+                      data.get('unit', 'PCS'), data.get('expiry_date'), data.get('min_threshold', 25), data.get('current_stock', 0)))
                 log_audit(cursor, 'ADD_PRODUCT', 'products', cursor.lastrowid, None, data['name'])
             
             conn.commit(); conn.close()
@@ -2262,6 +2413,56 @@ def inventory_products(prod_id=None):
         except Exception as e:
             if conn: conn.rollback(); conn.close()
             return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/inventory/stock-adjust', methods=['POST'])
+def api_inventory_stock_adjust():
+    data = request.json
+    pid = data.get('id')
+    mode = data.get('mode') 
+    qty = float(data.get('qty', 0))
+    reason = data.get('reason', 'Manual Adjustment')
+
+    if not pid or qty <= 0:
+        return jsonify({'status': 'error', 'message': 'Invalid input data'}), 400
+
+    conn = get_db_connection()
+    if not conn: 
+        return jsonify({'status': 'error', 'message': 'DB Connection failed'}), 500
+
+    try:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT current_stock, name FROM products WHERE id = %s FOR UPDATE", (pid,))
+        product = cursor.fetchone()
+        if not product:
+            conn.rollback()
+            conn.close()
+            return jsonify({'status': 'error', 'message': 'Product not found'}), 404
+
+        stock_before = float(product['current_stock'] or 0)
+        diff = qty if mode == 'add' else -qty
+        stock_after = stock_before + diff
+
+        if stock_after < 0:
+            conn.rollback()
+            conn.close()
+            return jsonify({'status': 'error', 'message': 'Stock cannot fall below zero'}), 400
+
+        # 1. Update products table
+        cursor.execute("UPDATE products SET current_stock = %s WHERE id = %s", (stock_after, pid))
+
+        # 2. Log movement in stock_movements table
+        cursor.execute("""
+            INSERT INTO stock_movements 
+            (product_id, movement_type, qty_change, stock_before, stock_after, created_by) 
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (pid, 'ADJUSTMENT', diff, stock_before, stock_after, session.get('username', 'SYSTEM')))
+
+        conn.commit()
+        conn.close()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        if conn: conn.rollback(); conn.close()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/stock/transfer', methods=['POST'])
 def api_stock_transfer():
@@ -2309,7 +2510,9 @@ except ImportError:
     webview = None
 
 def run_flask():
-    app.run(host=Config.SERVER_HOST, port=Config.SERVER_PORT, debug=False, use_reloader=False)
+    from waitress import serve
+    print(f"Starting Waitress server on {Config.SERVER_HOST}:{Config.SERVER_PORT} with {Config.WAITRESS_THREADS} threads...")
+    serve(app, host=Config.SERVER_HOST, port=Config.SERVER_PORT, threads=Config.WAITRESS_THREADS)
 
 if __name__ == '__main__':
     flask_thread = threading.Thread(target=run_flask, daemon=True)
@@ -2329,4 +2532,3 @@ if __name__ == '__main__':
         print(f"Webview setup failed: {e}")
         webbrowser.open(url)
         while True: time.sleep(100)
-

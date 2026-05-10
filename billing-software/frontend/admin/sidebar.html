@@ -124,6 +124,12 @@
             </a>
         </li>
         <li>
+            <a href="{{ url_for('admin_reports_online_sales') }}"
+                class="nav-link {{ 'active' if 'online_sales' in request.endpoint else '' }}">
+                <i class="fa-solid fa-globe"></i> Online Sales
+            </a>
+        </li>
+        <li>
             <a href="{{ url_for('admin_reports_final_report') }}"
                 class="nav-link {{ 'active' if 'final_report' in request.endpoint else '' }}">
                 <i class="fa-solid fa-file-contract"></i> Final Report

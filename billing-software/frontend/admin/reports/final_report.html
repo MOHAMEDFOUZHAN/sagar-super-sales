@@ -224,7 +224,7 @@
                 document.getElementById('valOtherSales').innerText = '₹' + (data.sales.total_sales - data.sales.cash_sales).toFixed(2);
                 document.getElementById('valExpenses').innerText = '- ₹' + data.total_expenses.toFixed(2);
 
-                const expected = data.balance.opening_balance + data.sales.cash_sales - data.total_expenses;
+                const expected = data.balance.opening_balance + data.sales.cash_sales - data.total_expenses - data.biz_charges;
                 document.getElementById('valExpected').innerText = '₹' + expected.toFixed(2);
 
                 document.getElementById('valActual').innerText = '₹' + data.balance.actual_closing.toFixed(2);
@@ -252,8 +252,8 @@
                     });
                 }
 
-                document.getElementById('valBizTotal').innerText = '₹' + data.total_bizz.toFixed(2);
-                document.getElementById('valBiz80').innerText = '₹' + (data.total_bizz * 0.8).toFixed(2);
+                document.getElementById('valBizTotal').innerText = '₹' + data.biz_charges.toFixed(2);
+                document.getElementById('valBiz80').innerText = '₹' + (data.biz_charges * 0.8).toFixed(2);
 
             } catch (err) {
                 console.error(err);

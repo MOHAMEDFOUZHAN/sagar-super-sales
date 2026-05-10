@@ -9,15 +9,18 @@ if sys.platform == "win32":
     platform.machine = lambda: "AMD64"
     platform.version = lambda: "10.0.19041"
 
+print("Starting PyInstaller build process...")
 import PyInstaller.__main__
 
 PyInstaller.__main__.run([
     '--noconfirm',
     '--onefile',
     '--windowed',
+    '--icon', 'frontend/images/app_icon.ico',
     '--add-data', 'frontend;frontend',
     '--add-data', 'database;database',
     '--name', 'SagarBilling',
     '--noupx',
     'app.py'
 ])
+print("Build process finished.")

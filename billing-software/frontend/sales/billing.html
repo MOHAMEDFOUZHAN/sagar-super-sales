@@ -43,6 +43,107 @@
             --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
         }
 
+        :root.light-mode {
+            --bg-dark: #f8fafc;
+            --bg-darker: #e2e8f0;
+            --primary: #4f46e5;
+            --primary-glow: rgba(79, 70, 229, 0.3);
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(0, 0, 0, 0.1);
+            --glass-highlight: rgba(0, 0, 0, 0.05);
+            --text-main: #0f172a;
+            --text-muted: #475569;
+        }
+
+        body.light-mode {
+            background: radial-gradient(circle at top left, #e0e7ff, var(--bg-dark), var(--bg-darker));
+        }
+
+        body.light-mode .brand {
+            color: #0f172a;
+            text-shadow: none;
+        }
+
+        body.light-mode .input-dark {
+            background: rgba(255, 255, 255, 0.7);
+            color: #0f172a;
+        }
+
+        body.light-mode .input-dark:focus {
+            background: #ffffff;
+        }
+
+        body.light-mode .sidebar {
+            background: rgba(248, 250, 252, 0.8);
+        }
+
+        body.light-mode th {
+            background: rgba(79, 70, 229, 0.1);
+            color: #475569;
+        }
+
+        body.light-mode tr:hover td {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        body.light-mode .modal-content {
+            background: #ffffff;
+            color: #0f172a;
+        }
+
+        body.light-mode .modal-header {
+            background: rgba(0,0,0,0.02);
+        }
+
+        body.light-mode .bill-list {
+            background: rgba(0,0,0,0.03);
+        }
+
+        body.light-mode .shortcut-badge b {
+            color: var(--primary);
+        }
+
+        body.light-mode #grand_total_input {
+            color: #059669 !important;
+        }
+
+        body.light-mode .nav-link {
+            color: #475569;
+        }
+
+        body.light-mode .nav-link:hover {
+            background: rgba(0,0,0,0.04);
+            color: #0f172a;
+        }
+
+        body.light-mode .nav-link.active {
+            color: #4f46e5;
+            background: rgba(79,70,229,0.1);
+            border-color: rgba(79,70,229,0.3);
+        }
+
+        body.light-mode .cat-item {
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        body.light-mode .table-wrapper {
+            background: rgba(255,255,255,0.5) !important;
+        }
+        
+        body.light-mode .glass-panel {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+        }
+
+        body.light-mode .sidebar div[style*="font-weight: 600; color: white;"] {
+            color: var(--text-main) !important;
+        }
+
+        body.light-mode .bill-item-preview div[style*="color:white;"] {
+            color: var(--text-main) !important;
+        }
+
         /* Global Reset */
         * {
             box-sizing: border-box;
@@ -317,6 +418,17 @@
         .animate-fade {
             animation: fadeIn 0.5s var(--ease-out) forwards;
         }
+
+        .shortcut-badge {
+            transition: all 0.2s;
+            cursor: default;
+        }
+
+        .shortcut-badge:hover {
+            background: rgba(99, 102, 241, 0.2) !important;
+            border-color: var(--primary) !important;
+            transform: translateY(-1px);
+        }
     </style>
     <style>
         /* Specific Overrides for Billing Grid */
@@ -431,6 +543,47 @@
             padding: 20px;
             overflow-y: auto;
         }
+
+        /* SETTLEMENT CONFIRMATION MODAL */
+        #settleModal .modal-content {
+            max-width: 450px;
+            height: auto;
+            border: 1px solid var(--primary);
+            box-shadow: 0 0 40px var(--primary-glow);
+        }
+
+        .confirm-card {
+            padding: 30px;
+            text-align: center;
+        }
+
+        .confirm-total {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: var(--success);
+            margin: 10px 0;
+            text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .confirm-meta {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .confirm-badge {
+            background: rgba(255,255,255,0.05);
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .confirm-badge b {
+            color: white;
+        }
     </style>
 </head>
 
@@ -472,7 +625,19 @@
                 <span style="color: var(--warning); font-weight: 800; letter-spacing: 1px; font-size: 1.1rem;">SAGAR
                     SUPER</span>
             </div>
+
+            <!-- KEYBOARD SHORTCUTS LEGEND -->
+            <div style="display: flex; gap: 15px; align-items: center; background: rgba(0,0,0,0.2); padding: 6px 15px; border-radius: 20px; border: 1px solid var(--glass-border); font-size: 0.75rem; letter-spacing: 0.5px;">
+                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F2</b> CODE</span>
+                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F3</b> NAME</span>
+                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F4</b> QTY</span>
+                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F8</b> METHOD</span>
+                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F9</b> SETTLE</span>
+            </div>
             <div style="display: flex; gap: 20px; font-size: 0.9rem;">
+                <button id="theme_toggle" class="btn" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.8rem; padding: 0 12px;" onclick="toggleTheme()" title="Toggle Light/Dark Mode">
+                    <i class="fa-solid fa-sun" id="theme_icon"></i>
+                </button>
                 <div class="flex-between gap-10">
                     <span style="color: var(--text-muted);">DOC ID</span>
                     <span id="doc_id_display" class="glass-panel"
@@ -578,54 +743,71 @@
 
     <!-- HIDDEN THERMAL RECEIPT TEMPLATE -->
     <div id="receipt-template" style="display: none;">
-        <div style="width: 280px; padding: 10px; font-family: 'Courier New', monospace; color: black; background: white;">
-            <div style="text-align: center; margin-bottom: 5px;">
-                <div id="copy_label" style="text-transform: uppercase; font-weight: bold; font-size: 0.9rem; border: 1px solid black; display: inline-block; padding: 2px 8px; margin-bottom: 5px;"></div>
-                <h2 style="margin: 0; font-size: 1.1rem; line-height: 1.1;">SAGAR SUPER</h2>
-                <div style="font-size: 0.7rem; margin-top: 4px;">36 Commercial Road, Next to A2B, Ooty - 643001</div>
-                <div style="font-size: 0.7rem;">Ph: 9363596124 | GST: 33ACMPC6407B1Z7</div>
+        <div class="receipt-copy">
+            <div class="copy-label"></div>
+            <div class="shop-title">
+                <div>SAGAR</div>
+                <div>NILGIRI PRODUCTS</div>
+                <div>SUPER</div>
             </div>
-            
-            <div style="border-bottom: 1px dashed black; margin: 5px 0;"></div>
-            
-            <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
-                <span class="print_bill_id">Bill: #</span>
-                <span class="print_type">Type: Cash</span>
+            <div class="full-copy-only shop-address">
+                <div>36 COMMERCIAL ROAD, NEXT TO A2B RESTAURANT,</div>
+                <div>OOTY - 643001</div>
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
-                <span class="print_date">Date: </span>
-                <span class="print_time">Time: </span>
+            <div class="full-copy-only meta-row">
+                <span class="print_phone">Ph: 9363596124</span>
+                <span class="print_type">Type: UPI</span>
             </div>
-
-            <div style="border-bottom: 1px dashed black; margin: 5px 0;"></div>
-            
-            <table style="width: 100%; font-size: 0.75rem; text-align: left; border-collapse: collapse;">
-                <thead>
-                    <tr style="border-bottom: 1px solid black;">
-                        <th style="padding: 2px 0;">Product</th>
-                        <th style="padding: 2px 0; text-align: center;">Qty</th>
-                        <th style="padding: 2px 0; text-align: center;">Rate</th>
-                        <th style="padding: 2px 0; text-align: right;">Amt</th>
-                    </tr>
-                </thead>
-                <tbody class="print_items_body">
-                    <!-- Items go here -->
-                </tbody>
+            <div class="short-copy-only meta-row">
+                <span>office purpose only</span>
+                <span class="print_type">Type: UPI</span>
+            </div>
+            <div class="full-copy-only meta-row">
+                <span class="print_gstin">GSTIN: 33ACMPC6407B1Z7</span>
+                <span class="print_date">Date: 09-04-2026</span>
+            </div>
+            <div class="short-copy-only meta-row">
+                <span class="print_date">Date: 09-04-2026</span>
+            </div>
+            <div class="meta-row">
+                <span class="print_bill_id">Bill No: SS#014682</span>
+                <span class="print_time">Time: 02:39 PM</span>
+            </div>
+            <div class="dashed"></div>
+            <div class="items-head">
+                <span class="product-head">Product</span>
+                <span>Qty</span>
+                <span>Rate</span>
+                <span>Amount</span>
+            </div>
+            <table class="items-table">
+                <tbody class="print_items_body"></tbody>
             </table>
-            
-            <div style="border-bottom: 1px dashed black; margin: 5px 0;"></div>
-            
-            <div style="text-align: right; font-weight: bold; font-size: 1rem;">
-                Total: <span class="print_total_val">0.00</span>
+            <div class="dashed"></div>
+            <div class="total-line">
+                <span>Total:</span>
+                <span class="print_total_val">0.00</span>
             </div>
-            <div style="text-align: center; font-size: 0.65rem; margin-top: 4px;">(PRICES INCLUSIVE OF GST)</div>
-            
-            <div style="border-bottom: 1px dashed black; margin: 10px 0;"></div>
-            
-            <div style="text-align: center; font-size: 0.75rem;">
-                FIXED PRICE. COMMITTED TO QUALITY.<br>
-                <strong>CELEBRATING 60 YEARS OF TRUST</strong><br>
-                * Thank you! Visit Again *
+            <div class="center-note">(PRICES INCLUSIVE OF GST)</div>
+            <div class="dashed"></div>
+            <div class="mode-line">
+                <span class="print_mode_label">UPI:</span>
+                <span class="print_mode_val">0.00</span>
+            </div>
+            <div class="center-note">(Rounded off to Nearest Rupees)</div>
+            <div class="dashed"></div>
+            <div class="full-copy-only footer-block">
+                <div>FIXED PRICE</div>
+                <div>Sagar - Since 1964</div>
+                <div>COMMITTED TO QUALITY</div>
+                <div class="shop-online">SHOP ONLINE @</div>
+                <div class="website">www.sagarnilgiriproducts.com</div>
+                <div class="thanks">*Thanks for shopping***Kindly Visit Again*</div>
+                <div style="font-weight: bold; margin: 5px 0;">No return no replacement</div>
+                <div class="trust">CELEBRATING 60 YEARS OF TRUST</div>
+            </div>
+            <div class="short-copy-only footer-block short-footer">
+                <div class="bill-copy">BILL COPY</div>
             </div>
         </div>
     </div>
@@ -652,6 +834,35 @@
             </div>
         </div>
     </div>
+
+    <!-- SETTLEMENT CONFIRMATION MODAL -->
+    <div id="settleModal" class="modal-overlay">
+        <div class="modal-content animate-fade">
+            <div class="modal-header" style="border-bottom: none;">
+                <h3 style="color: var(--primary);"><i class="fa-solid fa-file-invoice-dollar"></i> CONFIRM SALE</h3>
+                <button onclick="closeSettleModal()" class="btn" style="background: transparent; color: var(--text-muted); font-size: 1.5rem;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="confirm-card">
+                <div style="color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem;">Grand Total</div>
+                <div id="confirm_total_display" class="confirm-total">₹0.00</div>
+                
+                <div class="confirm-meta">
+                    <div class="confirm-badge">PAYMENT: <b id="confirm_mode_display">CASH</b></div>
+                    <div id="confirm_tsc_badge" class="confirm-badge" style="display:none;">TSC: <b id="confirm_tsc_val">₹0.00</b></div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
+                    <button onclick="closeSettleModal()" class="btn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white; padding: 15px;">
+                        CANCEL (ESC)
+                    </button>
+                    <button id="final_confirm_btn" class="btn btn-success" style="padding: 15px; font-size: 1rem; box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);">
+                        CONFIRM & PRINT (ENTER)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const qrInput = document.getElementById('qr_search');
         const productNameInput = document.getElementById('prod_name');
@@ -671,6 +882,34 @@
         let correctionData = { isCorrection: false, sourceBillId: null };
         let isSavingBill = false;
 
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function formatReceiptBillNo(value) {
+            const raw = String(value ?? '').trim();
+            if (!raw) return 'SS#000000';
+            if (/^SS#/i.test(raw)) return raw;
+            const digits = raw.replace(/\D/g, '');
+            if (!digits) return `SS#${raw}`;
+            return `SS#${digits.padStart(6, '0')}`;
+        }
+
+        function formatMoney(value) {
+            return Number(value || 0).toFixed(2);
+        }
+
+        function setTextAll(root, selector, value) {
+            root.querySelectorAll(selector).forEach(node => {
+                node.innerText = value;
+            });
+        }
+
         function createBillRequestId() {
             if (window.crypto && window.crypto.randomUUID) {
                 return window.crypto.randomUUID();
@@ -678,35 +917,178 @@
             return `bill-${Date.now()}-${Math.random().toString(16).slice(2)}`;
         }
 
-        // 1. QR CODE SCAN (Enter)
+        // 1. QR CODE SCAN & AUTO-ADD (with 3s Delay)
         let isFetchingProduct = false;
+        let scanTimeout = null;
+        let autoAddTimeout = null;
+
+        function processPendingAutoAdd() {
+            if (autoAddTimeout) {
+                clearTimeout(autoAddTimeout);
+                autoAddTimeout = null;
+                // Only add if there's actually a product selected in the inputs
+                if (currentProduct) {
+                    addItem();
+                }
+            }
+        }
+
+        function parseWeighingBarcode(barcode) {
+            if (barcode.length > 4 && /^\d+$/.test(barcode)) {
+                return {
+                    code: barcode.substring(0, 4),
+                    weight: parseFloat(barcode.substring(4)) || 0
+                };
+            }
+            return null;
+        }
+
+        qrInput.addEventListener('input', () => {
+            const rawBarcode = qrInput.value.trim();
+            if (!rawBarcode) return;
+
+            // Small debounce for the actual scan/type action
+            clearTimeout(scanTimeout);
+            scanTimeout = setTimeout(async () => {
+                if (isFetchingProduct || !qrInput.value.trim()) return;
+                
+                isFetchingProduct = true;
+                try {
+                    // 1. Try to fetch exact full barcode match first
+                    const response = await fetch(`/api/products?q=${encodeURIComponent(rawBarcode)}`);
+                    const products = await response.json();
+
+                    let exactMatch = products.find(p => String(p.barcode) === rawBarcode);
+                    let parsed = null;
+
+                    if (!exactMatch && rawBarcode.length > 4 && /^\d+$/.test(rawBarcode)) {
+                        // 2. Fallback: Check if it's a weighing scale barcode (first 4 digits = code)
+                        const scannedCode = rawBarcode.substring(0, 4);
+                        const scannedWeight = parseFloat(rawBarcode.substring(4)) || 0;
+                        
+                        const retryRes = await fetch(`/api/products?q=${encodeURIComponent(scannedCode)}`);
+                        const retryProducts = await retryRes.json();
+                        
+                        exactMatch = retryProducts.find(p => String(p.barcode) === scannedCode);
+                        if (exactMatch) {
+                            parsed = { code: scannedCode, weight: scannedWeight };
+                        }
+                    }
+
+                    if (exactMatch) {
+                        // 1. If there's a pending item from a previous scan, add it now
+                        processPendingAutoAdd();
+
+                        // 2. Immediately fill the "area" (inputs)
+                        selectProduct(exactMatch);
+
+                        if (parsed) {
+                            qtyInput.value = parsed.weight;
+                            updateRowAmount();
+                        }
+                        
+                        qrInput.value = ''; // Clear QR input so they can scan next one
+                        
+                        // 3. Wait 1 second before moving it "down" to the cart
+                        autoAddTimeout = setTimeout(() => {
+                            addItem();
+                            autoAddTimeout = null;
+                        }, 1000);
+                    }
+                } catch (err) {
+                    console.error("Auto-scan error:", err);
+                } finally {
+                    isFetchingProduct = false;
+                }
+            }, 150); 
+        });
+
+        // Backup for Enter key (immediate action)
         qrInput.addEventListener('keydown', async (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
+                e.stopPropagation(); // Prevent bubbling to window listener
+                clearTimeout(scanTimeout);
+                processPendingAutoAdd(); // Add any existing pending item
+                
                 if (isFetchingProduct) return;
 
-                const barcode = qrInput.value.trim();
-                qrInput.value = ''; // Clear immediately to prevent double-scan appending
-                
-                if (!barcode) return;
+                const rawBarcode = qrInput.value.trim();
+                if (!rawBarcode) {
+                    // IF EMPTY: Trigger Settle (Complete Sale)
+                    if (items.length > 0) {
+                        e.preventDefault();
+                        saveBtn.click();
+                    }
+                    return;
+                }
 
                 isFetchingProduct = true;
                 try {
-                    const response = await fetch(`/api/products?q=${barcode}`);
+                    const response = await fetch(`/api/products?q=${encodeURIComponent(rawBarcode)}`);
                     const products = await response.json();
 
-                    if (products.length > 0) {
-                        selectProduct(products[0]);
-                        addItem(); // Automatically add to cart for faster scanning
+                    let match = products.find(p => String(p.barcode) === rawBarcode);
+                    let parsed = null;
+
+                    if (!match && rawBarcode.length > 4 && /^\d+$/.test(rawBarcode)) {
+                        const scannedCode = rawBarcode.substring(0, 4);
+                        const scannedWeight = parseFloat(rawBarcode.substring(4)) || 0;
+                        
+                        const retryRes = await fetch(`/api/products?q=${encodeURIComponent(scannedCode)}`);
+                        const retryProducts = await retryRes.json();
+                        
+                        match = retryProducts.find(p => String(p.barcode) === scannedCode) || retryProducts[0];
+                        if (match) {
+                            parsed = { code: scannedCode, weight: scannedWeight };
+                        }
+                    } else if (!match && products.length > 0) {
+                        match = products[0];
+                    }
+
+                    if (match) {
+                        selectProduct(match);
+                        if (parsed) {
+                            qtyInput.value = parsed.weight;
+                            updateRowAmount();
+                        }
+                        addItem();
                     } else {
                         alert("Product not found!");
                         qrInput.focus();
+                        qrInput.select();
                     }
                 } catch (err) {
                     console.error("Fetch error:", err);
                     qrInput.focus();
                 } finally {
                     isFetchingProduct = false;
+                }
+            }
+        });
+
+        // Product Name Search (Enter)
+        productNameInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation(); // Prevent bubbling
+                const query = productNameInput.value.trim();
+                if (!query) return;
+                
+                try {
+                    const response = await fetch(`/api/products?q=${encodeURIComponent(query)}`);
+                    const products = await response.json();
+                    if (products.length > 0) {
+                        selectProduct(products[0]);
+                        qtyInput.focus();
+                        qtyInput.select();
+                    } else {
+                        // If not found, allow manual entry or move to next field
+                        rateInput.focus();
+                        rateInput.select();
+                    }
+                } catch (err) {
+                    console.error("Search error:", err);
                 }
             }
         });
@@ -735,6 +1117,7 @@
         qtyInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
+                e.stopPropagation(); // Prevent bubbling
                 addItem();
             }
         });
@@ -869,15 +1252,44 @@
             renderTable();
         };
 
-        // 3. SAVE BILL
-        saveBtn.addEventListener('click', async () => {
+        // 3. SETTLE MODAL FLOW
+        function openSettleModal() {
             if (items.length === 0) {
                 alert("No items in bill!");
                 return;
             }
+            const total = parseFloat(grandTotalInput.value);
+            const payMode = payModeSelect.value;
+            
+            document.getElementById('confirm_total_display').innerText = `₹${total.toFixed(2)}`;
+            document.getElementById('confirm_mode_display').innerText = payMode;
+            
+            // Show TSC in modal if applicable
+            const tscText = document.getElementById('tsc_display').innerText;
+            if (tscText.includes('₹') && !tscText.includes('₹0.00')) {
+                document.getElementById('confirm_tsc_badge').style.display = 'block';
+                document.getElementById('confirm_tsc_val').innerText = tscText.split(' ')[0];
+            } else {
+                document.getElementById('confirm_tsc_badge').style.display = 'none';
+            }
+
+            document.getElementById('settleModal').style.display = 'flex';
+            document.getElementById('final_confirm_btn').focus();
+        }
+
+        function closeSettleModal() {
+            document.getElementById('settleModal').style.display = 'none';
+            qrInput.focus();
+        }
+
+        saveBtn.addEventListener('click', openSettleModal);
+
+        document.getElementById('final_confirm_btn').addEventListener('click', async () => {
             if (isSavingBill) return;
             isSavingBill = true;
-            saveBtn.disabled = true;
+            const btn = document.getElementById('final_confirm_btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> SAVING...';
 
             const total = parseFloat(grandTotalInput.value);
             const payMode = payModeSelect.value;
@@ -898,15 +1310,22 @@
                 const result = await response.json();
                 if (result.status === 'success') {
                     if (!document.getElementById('test_mode_toggle').checked) {
-                        printBill(result.bill_id, total, payMode);
+                        printBill(
+                            result.invoice_display || result.invoice_no,
+                            total,
+                            payMode,
+                            result.bill_date,
+                            result.bill_time
+                        );
                     } else {
                         // Visual confirmation for testing so they know it saved
-                        alert(`TEST MODE: Bill #${result.bill_id} saved successfully to database without printing.`);
+                        alert(`TEST MODE: Bill #${formatReceiptBillNo(result.invoice_display || result.invoice_no)} saved successfully to database without printing.`);
                     }
                     items = [];
                     renderTable();
                     fetchNextDocId();
                     correctionData = { isCorrection: false, sourceBillId: null };
+                    closeSettleModal();
                 } else {
                     alert(result.message);
                 }
@@ -914,7 +1333,8 @@
                 alert("Error saving bill: " + err);
             } finally {
                 isSavingBill = false;
-                saveBtn.disabled = false;
+                btn.disabled = false;
+                btn.innerHTML = 'CONFIRM & PRINT (ENTER)';
             }
         });
 
@@ -922,7 +1342,7 @@
             try {
                 const response = await fetch('/api/next-invoice');
                 const data = await response.json();
-                document.getElementById('doc_id_display').innerText = data.next_id;
+                document.getElementById('doc_id_display').innerText = data.display_id || formatReceiptBillNo(data.next_id);
             } catch (e) { console.error("Doc ID fail", e); }
         }
 
@@ -966,7 +1386,7 @@
                     const div = document.createElement('div');
                     div.className = 'bill-item-preview';
                     div.innerHTML = `
-                        <div style="font-weight:bold; color:white;">Bill #${bill.invoice_no}</div>
+                        <div style="font-weight:bold; color:white;">Bill #${formatReceiptBillNo(bill.invoice_no)}</div>
                         <div style="font-size:0.8rem; color:var(--text-muted); display:flex; justify-content:space-between;">
                             <span>${new Date(bill.bill_date).toLocaleTimeString()}</span>
                             <span style="color:var(--success); font-weight:bold;">₹${parseFloat(bill.total_amount).toFixed(2)}</span>
@@ -1059,83 +1479,111 @@
             } catch (e) { alert("Action failed"); }
         }
 
-        function printBill(billId, total, payMode) {
-            const templateHtml = document.getElementById('receipt-template').innerHTML;
-            
-            // Create a hidden iframe for printing (more reliable than window.open in webviews)
-            let printIframe = document.getElementById('print-iframe');
-            if (!printIframe) {
-                printIframe = document.createElement('iframe');
-                printIframe.id = 'print-iframe';
-                printIframe.style.position = 'absolute';
-                printIframe.style.top = '-1000px';
-                printIframe.style.left = '-1000px';
-                printIframe.style.width = '0';
-                printIframe.style.height = '0';
-                printIframe.style.border = 'none';
-                document.body.appendChild(printIframe);
+        async function printBill(invoiceNo, total, payMode, billDate, billTime) {
+            try {
+                const response = await fetch('/api/print-thermal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: items,
+                        bill_no: invoiceNo,
+                        bill_date: billDate,
+                        bill_time: billTime,
+                        bill_type: payMode
+                    })
+                });
+                const result = await response.json();
+                if (result.status !== 'success') {
+                    console.error("Thermal print failed:", result.message);
+                }
+            } catch (err) {
+                console.error("Thermal print error:", err);
             }
-
-            const doc = printIframe.contentDocument || printIframe.contentWindow.document;
-            const today = new Date();
-            const dateStr = today.toLocaleDateString('en-GB');
-            const timeStr = today.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-            let itemsHtml = '';
-            items.forEach(item => {
-                itemsHtml += `
-                    <tr>
-                        <td style="padding: 2px 0;">${item.name.substring(0, 20)}</td>
-                        <td style="text-align: center;">${item.qty}</td>
-                        <td style="text-align: center;">${item.rate}</td>
-                        <td style="text-align: right;">${item.amount.toFixed(2)}</td>
-                    </tr>
-                `;
-            });
-
-            doc.open();
-            doc.write('<html><head><title>Print Receipt</title>');
-            doc.write('<style>');
-            doc.write('body { margin: 0; padding: 0; width: 280px; font-family: monospace; }');
-            doc.write('@media print { body { width: 280px; } .cut-line { display: block !important; border-top: 1px dashed black; margin: 10px 0; } }');
-            doc.write('</style>');
-            doc.write('</head><body>');
-            
-            // 1. OFFICE COPY
-            doc.write('<div id="office-copy" class="ticket">' + templateHtml + '</div>');
-            // 2. DASHED CUT LINE
-            doc.write('<div class="cut-line" style="border-top: 1px dashed black; margin: 10px 0; width: 280px;"></div>');
-            // 3. CUSTOMER COPY
-            doc.write('<div id="customer-copy" class="ticket">' + templateHtml + '</div>');
-            
-            doc.write('</body></html>');
-            doc.close();
-
-            // Populate labels afterécriture
-            setTimeout(() => {
-                const office = doc.getElementById('office-copy');
-                office.querySelector('#copy_label').innerText = 'OFFICE COPY';
-                office.querySelector('.print_bill_id').innerText = 'Bill: #' + billId;
-                office.querySelector('.print_type').innerText = 'Type: ' + payMode;
-                office.querySelector('.print_date').innerText = 'Date: ' + dateStr;
-                office.querySelector('.print_time').innerText = 'Time: ' + timeStr;
-                office.querySelector('.print_items_body').innerHTML = itemsHtml;
-                office.querySelector('.print_total_val').innerText = '₹' + total.toFixed(2);
-
-                const customer = doc.getElementById('customer-copy');
-                customer.querySelector('#copy_label').innerText = 'CUSTOMER COPY';
-                customer.querySelector('.print_bill_id').innerText = 'Bill: #' + billId;
-                customer.querySelector('.print_type').innerText = 'Type: ' + payMode;
-                customer.querySelector('.print_date').innerText = 'Date: ' + dateStr;
-                customer.querySelector('.print_time').innerText = 'Time: ' + timeStr;
-                customer.querySelector('.print_items_body').innerHTML = itemsHtml;
-                customer.querySelector('.print_total_val').innerText = '₹' + total.toFixed(2);
-
-                // Trigger Print
-                printIframe.contentWindow.focus();
-                printIframe.contentWindow.print();
-            }, 100);
         }
+
+        // 4. KEYBOARD SHORTCUTS
+        window.addEventListener('keydown', (e) => {
+            // Prevent default function key behavior for the app
+            switch(e.key) {
+                case 'F2':
+                    e.preventDefault();
+                    qrInput.focus();
+                    break;
+                case 'F3':
+                    e.preventDefault();
+                    productNameInput.focus();
+                    break;
+                case 'F4':
+                    e.preventDefault();
+                    qtyInput.focus();
+                    qtyInput.select();
+                    break;
+                case 'F8':
+                    e.preventDefault();
+                    payModeSelect.focus();
+                    break;
+                case 'F9':
+                    e.preventDefault();
+                    openSettleModal();
+                    break;
+                case 'Enter':
+                    // If settlement modal is open, Enter confirms it
+                    if (document.getElementById('settleModal').style.display === 'flex') {
+                        e.preventDefault();
+                        document.getElementById('final_confirm_btn').click();
+                        return;
+                    }
+                    // Global Enter only settles if we are NOT in an input field 
+                    // (prevents double triggers since inputs have their own handlers)
+                    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT' && items.length > 0) {
+                        e.preventDefault();
+                        openSettleModal();
+                    }
+                    break;
+                case 'Escape':
+                    if (document.getElementById('settleModal').style.display === 'flex') {
+                        closeSettleModal();
+                    }
+                    if (document.getElementById('historyModal').style.display === 'flex') {
+                        closeHistory();
+                    }
+                    break;
+            }
+        });
+
+        // Add Enter support for Pay Mode selection
+        payModeSelect.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation(); // Prevent bubbling
+                openSettleModal();
+            }
+        });
+
+        // Theme Toggle Logic
+        function toggleTheme() {
+            const isLight = document.documentElement.classList.toggle('light-mode');
+            document.body.classList.toggle('light-mode');
+            const icon = document.getElementById('theme_icon');
+            if (isLight) {
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+                localStorage.setItem('billing_theme', 'light');
+            } else {
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+                localStorage.setItem('billing_theme', 'dark');
+            }
+        }
+
+        // Load saved theme
+        if (localStorage.getItem('billing_theme') === 'light') {
+            document.documentElement.classList.add('light-mode');
+            document.body.classList.add('light-mode');
+            document.getElementById('theme_icon').classList.remove('fa-sun');
+            document.getElementById('theme_icon').classList.add('fa-moon');
+        }
+
     </script>
 </body>
 

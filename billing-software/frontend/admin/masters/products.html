@@ -153,10 +153,16 @@
                         <select id="unit" class="input-dark">
                             <option value="PCS">PCS (Pieces)</option>
                             <option value="KG">KG (Kilograms)</option>
+                            <option value="GM">GM (Grams)</option>
                             <option value="PKT">PKT (Packet)</option>
                             <option value="BOX">BOX (Carton)</option>
                             <option value="LTR">LTR (Liters)</option>
                         </select>
+                    </div>
+
+                    <div class="form-group" id="price_per_kg_group" style="display: none;">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Price Per Kg (₹)</label>
+                        <input type="number" step="0.01" id="price_per_kg" class="input-dark" placeholder="0.00">
                     </div>
 
                     <div class="form-group">
@@ -169,6 +175,11 @@
                         <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Min stock
                             Threshold</label>
                         <input type="number" id="min_threshold" class="input-dark" value="25">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Initial Stock (Qty)</label>
+                        <input type="number" id="current_stock" class="input-dark" value="0" placeholder="0">
                     </div>
 
 
@@ -256,6 +267,7 @@
             document.getElementById('productId').value = '';
             document.getElementById('modalTitle').innerText = 'Register New Product';
             document.getElementById('productModal').style.display = 'flex';
+            document.getElementById('price_per_kg_group').style.display = 'none';
         }
 
         function closeModal() {
@@ -272,8 +284,19 @@
             document.getElementById('unit').value = p.unit || 'PCS';
             document.getElementById('expiry_date').value = p.expiry_date || '';
             document.getElementById('min_threshold').value = p.min_threshold || 25;
+            document.getElementById('current_stock').value = p.current_stock || 0;
             document.getElementById('modalTitle').innerText = 'Refine Product Specs';
             document.getElementById('productModal').style.display = 'flex';
+            
+            const priceKgGroup = document.getElementById('price_per_kg_group');
+            const priceKgInput = document.getElementById('price_per_kg');
+            if (p.unit === 'GM') {
+                priceKgGroup.style.display = 'block';
+                priceKgInput.value = (p.price * 1000).toFixed(2);
+            } else {
+                priceKgGroup.style.display = 'none';
+                priceKgInput.value = '';
+            }
         }
 
         async function saveProduct(e) {
@@ -288,7 +311,8 @@
                 bizz: parseFloat(document.getElementById('bizz').value),
                 unit: document.getElementById('unit').value,
                 expiry_date: document.getElementById('expiry_date').value || null,
-                min_threshold: parseInt(document.getElementById('min_threshold').value) || 25
+                min_threshold: parseInt(document.getElementById('min_threshold').value) || 25,
+                current_stock: parseFloat(document.getElementById('current_stock').value) || 0
             };
 
             const res = await fetch('/api/inventory/products', {
@@ -308,6 +332,28 @@
             const res = await fetch('/api/inventory/products/' + id, { method: 'DELETE' });
             if ((await res.json()).status === 'success') loadProducts();
         }
+
+        // Add listeners for Per-Kg Conversion
+        const unitSelect = document.getElementById('unit');
+        const priceKgGroup = document.getElementById('price_per_kg_group');
+        const priceKgInput = document.getElementById('price_per_kg');
+        const priceInput = document.getElementById('price');
+
+        unitSelect.addEventListener('change', () => {
+            if (unitSelect.value === 'GM') {
+                priceKgGroup.style.display = 'block';
+                if (priceInput.value) {
+                    priceKgInput.value = (parseFloat(priceInput.value) * 1000).toFixed(2);
+                }
+            } else {
+                priceKgGroup.style.display = 'none';
+            }
+        });
+
+        priceKgInput.addEventListener('input', () => {
+            const perKg = parseFloat(priceKgInput.value) || 0;
+            priceInput.value = (perKg / 1000).toFixed(4);
+        });
 
         init();
     </script>

@@ -26,3 +26,9 @@ billing-software/query
 dump_hang.py
 dump_webview.py
 test_webview.py
+.env
+*.env
+node_modules/
+billing-software/scratch/
+billing-software/out.txt
+

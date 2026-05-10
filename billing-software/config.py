@@ -4,18 +4,19 @@ import sys
 
 class Config:
     # Default MySQL Configuration
-    MYSQL_HOST = '192.168.1.12'
+    MYSQL_HOST = '127.0.0.1'
     MYSQL_USER = 'root'
     MYSQL_PASSWORD = ''  # Default for Laragon root is usually empty.
     MYSQL_DB = 'maple_pro_db'
     MYSQL_PORT = 3306
     MYSQL_POOL_NAME = 'maple_pool'
-    MYSQL_POOL_SIZE = 10
+    MYSQL_POOL_SIZE = 32
     MYSQL_AUTOCOMMIT = False
     
     # Server Connection Configuration
-    SERVER_HOST = '0.0.0.0' # Set to 0.0.0.0 to listen on all interfaces
+    SERVER_HOST = '0.0.0.0' # Listen on all interfaces so client PCs can connect
     SERVER_PORT = 5004
+    WAITRESS_THREADS = 50
     
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev_key_123')
 
@@ -66,7 +67,8 @@ class Config:
                     "MYSQL_POOL_NAME": cls.MYSQL_POOL_NAME,
                     "MYSQL_POOL_SIZE": cls.MYSQL_POOL_SIZE,
                     "SERVER_HOST": cls.SERVER_HOST,
-                    "SERVER_PORT": cls.SERVER_PORT
+                    "SERVER_PORT": cls.SERVER_PORT,
+                    "WAITRESS_THREADS": cls.WAITRESS_THREADS
                 }
                 with open(found_file, 'w') as f:
                     json.dump(sample_data, f, indent=4)
@@ -85,6 +87,7 @@ class Config:
                     cls.MYSQL_POOL_SIZE = int(data.get('MYSQL_POOL_SIZE', cls.MYSQL_POOL_SIZE))
                     cls.SERVER_HOST = data.get('SERVER_HOST', cls.SERVER_HOST)
                     cls.SERVER_PORT = int(data.get('SERVER_PORT', cls.SERVER_PORT))
+                    cls.WAITRESS_THREADS = int(data.get('WAITRESS_THREADS', cls.WAITRESS_THREADS))
                 
                 # Store the actual path used for other utilities to reference
                 cls.ACTIVE_CONFIG_PATH = found_file
@@ -94,4 +97,3 @@ class Config:
 
 # Load external settings when logic is imported
 Config.load_external_config()
-

@@ -443,27 +443,21 @@
                 // Update Payment Chart
                 if (paymentChart) {
                     const payMap = real.payments || {};
-                    // Standardize keys to upper case for lookup
                     const normalizedMap = {};
                     Object.keys(payMap).forEach(k => normalizedMap[k.toUpperCase()] = payMap[k]);
 
                     const cash = normalizedMap['CASH'] || 0;
                     const upi = normalizedMap['UPI'] || 0;
                     const card = normalizedMap['CARD'] || 0;
-                    const credit = normalizedMap['CREDIT'] || 0;
 
                     paymentChart.data.datasets[0].data = [cash, upi, card];
                     paymentChart.update();
 
-                    // Update Legend Text
-                    const legendContainer = document.querySelector('.glass-panel .flex-center'); // Adjust selector based on actual DOM? 
-                    // No existing container with class flex-center found easily, updating existing span elements
-                    // Just finding by text content or structure is tricky, let's use the parent div structure
-                    const payLegends = document.querySelectorAll('#paymentChart').parentNode.nextElementSibling.children;
-                    if (payLegends.length >= 2) {
-                        payLegends[0].innerHTML = `<i class="fa-solid fa-circle"></i> Cash (₹ ${cash.toLocaleString('en-IN')})`;
-                        payLegends[1].innerHTML = `<i class="fa-solid fa-circle"></i> UPI (₹ ${upi.toLocaleString('en-IN')})`;
-                        // Add card if needed dynamically, but for now stick to 2 main ones or just update text
+                    // Fix: Reliable selector for legends
+                    const legendDiv = document.querySelector('#paymentChart').closest('.glass-panel').querySelector('div[style*="justify-content: center"]');
+                    if (legendDiv && legendDiv.children.length >= 2) {
+                        legendDiv.children[0].innerHTML = `<i class="fa-solid fa-circle"></i> Cash (Rs. ${cash.toLocaleString('en-IN')})`;
+                        legendDiv.children[1].innerHTML = `<i class="fa-solid fa-circle"></i> UPI (Rs. ${upi.toLocaleString('en-IN')})`;
                     }
                 }
 
@@ -476,7 +470,7 @@
 
                 // Update Top Products List
                 const listContainer = document.getElementById('top-products-list');
-                if (real.top_products.length > 0) {
+                if (real.top_products && real.top_products.length > 0) {
                     let html = '';
                     real.top_products.forEach((p, i) => {
                         html += `
@@ -487,7 +481,7 @@
                                 <div class="item-info">
                                     <div class="item-name">
                                         <span>${p.product_name}</span>
-                                        <span style="color: var(--success);">₹${p.revenue.toLocaleString('en-IN')}</span>
+                                        <span style="color: var(--success);">Rs.${p.revenue.toLocaleString('en-IN')}</span>
                                     </div>
                                     <div class="progress-bg">
                                         <div class="progress-bar" style="width: 100%;"></div>

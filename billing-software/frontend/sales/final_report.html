@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -418,6 +418,7 @@
             background: var(--glass-bg);
         }
     </style>
+    <link rel='stylesheet' href='/theme.css'>
 </head>
 
 <body>
@@ -454,13 +455,16 @@
                 <button class="btn-premium" style="width: 100%; justify-content: center;" onclick="loadClosureReport()">SYNC DATE</button>
             </div>
             
-            <a href="/" class="nav-link" style="color: var(--danger);"><i class="fa-solid fa-power-off"></i> Logout</a>
+            <a href="/logout" class="nav-link" style="color: var(--danger);"><i class="fa-solid fa-power-off"></i> Logout</a>
         </div>
     </nav>
 
     <!-- Main -->
     <main class="main-content">
         <header class="section-header">
+                <button id="theme_toggle" class="btn" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.8rem; padding: 10px; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;" onclick="toggleTheme()" title="Toggle Light/Dark Mode">
+                    <i class="fa-solid fa-sun" id="theme_icon"></i>
+                </button>
             <div>
                 <h1 style="font-size: 2.2rem; font-weight: 900; letter-spacing: -2px;">
                     {% if session.username.startswith('counter') %}Daily Closure - Counter {{ session.username[7:] }}
@@ -495,7 +499,7 @@
         <div class="report-grid">
             <div class="kpi-card" style="--acc: var(--primary);">
                 <label>Total Net Sales</label>
-                <span id="totalSales">₹0.00</span>
+                <span id="totalSales">â‚¹0.00</span>
             </div>
             <div class="kpi-card" style="--acc: var(--accent);">
                 <label>No. of Bills</label>
@@ -503,7 +507,7 @@
             </div>
             <div class="kpi-card" style="--acc: var(--secondary);">
                 <label>Avg Bill Value</label>
-                <span id="avgBill">₹0.00</span>
+                <span id="avgBill">â‚¹0.00</span>
             </div>
         </div>
 
@@ -528,18 +532,18 @@
                 <div style="display: flex; flex-direction: column;">
                     <span
                         style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">TOTALBIZ:
-                        ₹</span>
+                        â‚¹</span>
                     <span id="totalBizCharges"
                         style="font-size: 3.2rem; font-weight: 900; color: var(--warning); line-height: 1; letter-spacing: -2px;">0.00</span>
                 </div>
                 <div class="bizz-summary-grid" style="width: 450px;">
                     <div class="bizz-detail-item">
                         <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800;">BIZ@80%:</span>
-                        <span id="biz80Val" style="font-size: 1.1rem; font-weight: 900;">₹0.00</span>
+                        <span id="biz80Val" style="font-size: 1.1rem; font-weight: 900;">â‚¹0.00</span>
                     </div>
                     <div class="bizz-detail-item">
                         <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800;">BIZ@20%:</span>
-                        <span id="biz20Val" style="font-size: 1.1rem; font-weight: 900;">₹0.00</span>
+                        <span id="biz20Val" style="font-size: 1.1rem; font-weight: 900;">â‚¹0.00</span>
                     </div>
                 </div>
             </div>
@@ -553,18 +557,18 @@
                     <span
                         style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">TOTAL
                         TSC:
-                        ₹</span>
+                        â‚¹</span>
                     <span id="totalTscVal"
                         style="font-size: 3.2rem; font-weight: 900; color: var(--accent); line-height: 1; letter-spacing: -2px;">0.00</span>
                 </div>
                 <div class="bizz-summary-grid" style="width: 450px;">
                     <div class="bizz-detail-item">
                         <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800;">TSC@80%:</span>
-                        <span id="tsc80Val" style="font-size: 1.1rem; font-weight: 900;">₹0.00</span>
+                        <span id="tsc80Val" style="font-size: 1.1rem; font-weight: 900;">â‚¹0.00</span>
                     </div>
                     <div class="bizz-detail-item">
                         <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800;">TSC@20%:</span>
-                        <span id="tsc20Val" style="font-size: 1.1rem; font-weight: 900;">₹0.00</span>
+                        <span id="tsc20Val" style="font-size: 1.1rem; font-weight: 900;">â‚¹0.00</span>
                     </div>
                 </div>
             </div>
@@ -600,7 +604,7 @@
                     <tfoot>
                         <tr style="background: rgba(0,0,0,0.1);">
                             <td style="font-weight: 800;">TOTAL SHOP</td>
-                            <td style="text-align: right; font-weight: 800;" id="totalShop">₹0.00</td>
+                            <td style="text-align: right; font-weight: 800;" id="totalShop">â‚¹0.00</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -620,7 +624,7 @@
                     style="margin-top: 15px; padding: 15px; background: rgba(99, 102, 241, 0.1); border: 1px solid var(--primary); border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-weight: 800;">PHYSICAL TOTAL</span>
                     <span id="actualCashDisplay"
-                        style="font-size: 1.6rem; font-weight: 900; color: var(--success);">₹0</span>
+                        style="font-size: 1.6rem; font-weight: 900; color: var(--success);">â‚¹0</span>
                 </div>
             </div>
 
@@ -629,38 +633,38 @@
                     <table style="font-size: 0.95rem; border-spacing: 0 5px; border-collapse: separate; width: 100%;">
                         <tr style="color: var(--text-muted);">
                             <td style="padding: 8px;">(+) OPENING BALANCE</td>
-                            <td style="text-align: right; padding: 8px;" id="obVal">₹0.00</td>
+                            <td style="text-align: right; padding: 8px;" id="obVal">â‚¹0.00</td>
                         </tr>
                         <tr style="color: var(--text-muted);">
                             <td style="padding: 8px;">(+) CASH SALES</td>
-                            <td style="text-align: right; padding: 8px;" id="cashSalesVal">₹0.00</td>
+                            <td style="text-align: right; padding: 8px;" id="cashSalesVal">â‚¹0.00</td>
                         </tr>
                         <tr style="color: var(--text-muted);">
                             <td style="padding: 8px;">(-) EXPENSES</td>
-                            <td style="text-align: right; padding: 8px;" id="cashExpVal">₹0.00</td>
+                            <td style="text-align: right; padding: 8px;" id="cashExpVal">â‚¹0.00</td>
                         </tr>
                         <tr style="color: var(--text-muted);">
                             <td style="padding: 8px;">(-) BIZ REWARDS</td>
-                            <td style="text-align: right; padding: 8px;" id="bizChargesVal">₹0.00</td>
+                            <td style="text-align: right; padding: 8px;" id="bizChargesVal">â‚¹0.00</td>
                         </tr>
                         <tr style="font-weight: 800; color: var(--accent); border-top: 1px solid var(--glass-border);">
                             <td style="padding: 10px;">EXPECTED CLOSING</td>
-                            <td style="text-align: right; padding: 10px;" id="expectedVal">₹0.00</td>
+                            <td style="text-align: right; padding: 10px;" id="expectedVal">â‚¹0.00</td>
                         </tr>
                         <tr style="font-weight: 900;">
                             <td
                                 style="padding: 15px; background: rgba(255,255,255,0.03); border-top-left-radius: 12px; border-bottom-left-radius: 12px;">
                                 ACTUAL COUNTED</td>
                             <td style="text-align: right; color: var(--success); padding: 15px; background: rgba(255,255,255,0.03); border-top-right-radius: 12px; border-bottom-right-radius: 12px;"
-                                id="actualVal">₹0.00</td>
+                                id="actualVal">â‚¹0.00</td>
                         </tr>
                         <tr style="color: var(--text-muted);">
                             <td style="padding: 15px;">(-) NEXT DAY FLOAT</td>
-                            <td style="text-align: right; padding: 15px;">-₹2,500.00</td>
+                            <td style="text-align: right; padding: 15px;">-â‚¹2,500.00</td>
                         </tr>
                         <tr style="font-weight: 900; color: var(--warning); border-top: 2px solid var(--glass-border);">
                             <td style="padding: 20px; font-size: 1.3rem;">NET CASH TO OFFICE</td>
-                            <td style="text-align: right; padding: 20px; font-size: 1.5rem;" id="netToOfficeVal">₹0.00
+                            <td style="text-align: right; padding: 20px; font-size: 1.5rem;" id="netToOfficeVal">â‚¹0.00
                             </td>
                         </tr>
                     </table>
@@ -673,11 +677,11 @@
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 50px;">
             <div class="glass-panel" style="border-top: 5px solid var(--primary);">
                 <label style="font-size: 0.65rem; color: var(--text-muted); font-weight: 800;">CASH TO OFFICE</label>
-                <h2 id="cfVal" style="font-size: 2rem; font-weight: 900; margin: 10px 0;">₹0.00</h2>
+                <h2 id="cfVal" style="font-size: 2rem; font-weight: 900; margin: 10px 0;">â‚¹0.00</h2>
             </div>
             <div class="glass-panel" style="border-top: 5px solid var(--accent);">
                 <label style="font-size: 0.65rem; color: var(--text-muted); font-weight: 800;">NEXT DAY OPENING</label>
-                <h2 id="nextObVal" style="font-size: 2rem; font-weight: 900; margin: 10px 0;">₹0.00</h2>
+                <h2 id="nextObVal" style="font-size: 2rem; font-weight: 900; margin: 10px 0;">â‚¹0.00</h2>
             </div>
         </div>
 
@@ -729,7 +733,7 @@
             notes.forEach(note => {
                 container.innerHTML += `
                     <div class="denom-row">
-                        <span style="font-weight: 800; width: 50px; color: var(--accent);">₹${note}</span>
+                        <span style="font-weight: 800; width: 50px; color: var(--accent);">â‚¹${note}</span>
                         <input type="number" class="denom-input" data-note="${note}" min="0" value="0" oninput="calcPhysical()">
                         <span style="color: var(--text-muted); font-size: 0.7rem; margin-left: auto;" id="total-${note}">0</span>
                     </div>
@@ -750,18 +754,18 @@
                 document.getElementById('genBy').innerText = `ADMIN: ${data.meta.admin} | SYNC TIME: ${data.meta.time}`;
 
                 // Sales
-                document.getElementById('totalSales').innerText = '₹' + data.sales.total_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('totalSales').innerText = 'â‚¹' + data.sales.total_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 });
                 document.getElementById('billCount').innerText = data.sales.bill_count;
-                document.getElementById('avgBill').innerText = '₹' + data.sales.avg_bill.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('avgBill').innerText = 'â‚¹' + data.sales.avg_bill.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
                 // Bizz Breakdown (Top Panel)
-                document.getElementById('biz80Val').innerText = '₹' + data.biz_80.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-                document.getElementById('biz20Val').innerText = '₹' + data.biz_20.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('biz80Val').innerText = 'â‚¹' + data.biz_80.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('biz20Val').innerText = 'â‚¹' + data.biz_20.toLocaleString('en-IN', { minimumFractionDigits: 2 });
                 document.getElementById('totalBizCharges').innerText = data.biz_charges.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
                 // TSC Breakdown
-                document.getElementById('tsc80Val').innerText = '₹' + data.tsc_80.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-                document.getElementById('tsc20Val').innerText = '₹' + data.tsc_20.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('tsc80Val').innerText = 'â‚¹' + data.tsc_80.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('tsc20Val').innerText = 'â‚¹' + data.tsc_20.toLocaleString('en-IN', { minimumFractionDigits: 2 });
                 document.getElementById('totalTscVal').innerText = data.tsc_total.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
                 const sBody = document.getElementById('salesTableBody');
@@ -769,32 +773,32 @@
                 ['CASH', 'CARD', 'UPI', 'CREDIT'].forEach(mode => {
                     const amount = data.sales[mode.toLowerCase() + '_sales'] || 0;
                     const perc = data.sales.total_sales > 0 ? (amount / data.sales.total_sales * 100).toFixed(1) : 0;
-                    sBody.innerHTML += `<tr><td>${mode} Sales</td><td style="text-align: right; font-weight: 800;">₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td><td style="text-align: right; color: var(--accent); font-weight: 700;">${perc}%</td></tr>`;
+                    sBody.innerHTML += `<tr><td>${mode} Sales</td><td style="text-align: right; font-weight: 800;">â‚¹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td><td style="text-align: right; color: var(--accent); font-weight: 700;">${perc}%</td></tr>`;
                 });
 
                 // Categories
                 const cBody = document.getElementById('catTableBody');
                 cBody.innerHTML = '';
                 data.categories.forEach(cat => {
-                    cBody.innerHTML += `<tr><td style="font-weight: 700;">${cat.category}</td><td style="text-align: right; font-weight: 900;">₹${cat.category_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td><td style="text-align: right;"><span style="color: var(--primary); font-weight: 800;">${cat.percent.toFixed(1)}%</span></td></tr>`;
+                    cBody.innerHTML += `<tr><td style="font-weight: 700;">${cat.category}</td><td style="text-align: right; font-weight: 900;">â‚¹${cat.category_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td><td style="text-align: right;"><span style="color: var(--primary); font-weight: 800;">${cat.percent.toFixed(1)}%</span></td></tr>`;
                 });
 
                 // Expenses
                 const oBody = document.getElementById('officeExpBody'); oBody.innerHTML = '';
-                data.office_expenses.forEach(e => { oBody.innerHTML += `<tr><td>${e.category}</td><td style="text-align: right;">₹${e.amount.toFixed(2)}</td></tr>`; });
+                data.office_expenses.forEach(e => { oBody.innerHTML += `<tr><td>${e.category}</td><td style="text-align: right;">â‚¹${e.amount.toFixed(2)}</td></tr>`; });
 
                 const shBody = document.getElementById('shopExpBody'); shBody.innerHTML = '';
-                data.shop_expenses.forEach(e => { shBody.innerHTML += `<tr><td>${e.category}</td><td style="text-align: right;">₹${e.amount.toFixed(2)}</td></tr>`; });
-                document.getElementById('totalShop').innerText = '₹' + data.total_shop.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                data.shop_expenses.forEach(e => { shBody.innerHTML += `<tr><td>${e.category}</td><td style="text-align: right;">â‚¹${e.amount.toFixed(2)}</td></tr>`; });
+                document.getElementById('totalShop').innerText = 'â‚¹' + data.total_shop.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
                 // Balance Calc
-                document.getElementById('obVal').innerText = '₹' + data.balance.opening_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-                document.getElementById('cashSalesVal').innerText = '₹' + data.sales.cash_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-                document.getElementById('cashExpVal').innerText = '₹' + data.total_expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-                document.getElementById('bizChargesVal').innerText = '₹' + data.biz_charges.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('obVal').innerText = 'â‚¹' + data.balance.opening_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('cashSalesVal').innerText = 'â‚¹' + data.sales.cash_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('cashExpVal').innerText = 'â‚¹' + data.total_expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('bizChargesVal').innerText = 'â‚¹' + data.biz_charges.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
                 const expected = data.balance.opening_balance + data.sales.cash_sales - data.total_expenses - data.biz_charges;
-                document.getElementById('expectedVal').innerText = '₹' + expected.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('expectedVal').innerText = 'â‚¹' + expected.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
                 // Denoms
                 if (data.denominations.length > 0) {
@@ -819,19 +823,19 @@
                 document.getElementById(`total-${note}`).innerText = (note * count).toLocaleString('en-IN');
             });
 
-            document.getElementById('actualCashDisplay').innerText = '₹' + total.toLocaleString('en-IN');
-            document.getElementById('actualVal').innerText = '₹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+            document.getElementById('actualCashDisplay').innerText = 'â‚¹' + total.toLocaleString('en-IN');
+            document.getElementById('actualVal').innerText = 'â‚¹' + total.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
             const toOffice = Math.max(0, total - 2500);
-            document.getElementById('netToOfficeVal').innerText = '₹' + toOffice.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-            document.getElementById('cfVal').innerText = '₹' + toOffice.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-            document.getElementById('nextObVal').innerText = '₹2,500.00';
+            document.getElementById('netToOfficeVal').innerText = 'â‚¹' + toOffice.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+            document.getElementById('cfVal').innerText = 'â‚¹' + toOffice.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+            document.getElementById('nextObVal').innerText = 'â‚¹2,500.00';
         }
 
         async function saveAudit() {
             const date = document.getElementById('reportDate').value;
-            const ob = parseFloat(document.getElementById('obVal').innerText.replace(/[₹,]/g, ''));
-            const actual = parseFloat(document.getElementById('actualVal').innerText.replace(/[₹,]/g, ''));
+            const ob = parseFloat(document.getElementById('obVal').innerText.replace(/[â‚¹,]/g, ''));
+            const actual = parseFloat(document.getElementById('actualVal').innerText.replace(/[â‚¹,]/g, ''));
             const denoms = Array.from(document.querySelectorAll('.denom-input')).map(i => ({ note_value: parseInt(i.dataset.note), count: parseInt(i.value) || 0 }));
 
             if (!confirm("Finalize today's audit? This will lock the cash ledger for " + date)) return;
@@ -852,7 +856,7 @@
 
         function showPreview() {
             try {
-                const getText = (id) => document.getElementById(id)?.innerText || '₹ 0.00';
+                const getText = (id) => document.getElementById(id)?.innerText || 'â‚¹ 0.00';
                 const getVal = (id) => document.getElementById(id)?.value || '';
 
                 // Data Extraction
@@ -864,9 +868,9 @@
                 const totalSales = getText('totalSales');
                 const cashSales = document.getElementById('cashSalesVal').innerText;
                 const cardCol = Array.from(document.querySelectorAll('#salesTableBody tr')).find(tr => tr.innerText.includes('CARD'));
-                const cardSales = cardCol ? cardCol.querySelector('td:nth-child(2)').innerText : '₹ 0.00';
+                const cardSales = cardCol ? cardCol.querySelector('td:nth-child(2)').innerText : 'â‚¹ 0.00';
                 const upiCol = Array.from(document.querySelectorAll('#salesTableBody tr')).find(tr => tr.innerText.includes('UPI'));
-                const upiSales = upiCol ? upiCol.querySelector('td:nth-child(2)').innerText : '₹ 0.00';
+                const upiSales = upiCol ? upiCol.querySelector('td:nth-child(2)').innerText : 'â‚¹ 0.00';
 
                 const catRows = Array.from(document.querySelectorAll('#catTableBody tr')).map(tr => ({
                     label: tr.querySelector('td:nth-child(1)').innerText.toUpperCase(),
@@ -940,9 +944,9 @@
                 tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
 
                 tableRows += SectionHeader('TSC Super');
-                tableRows += Row('TSC:', '₹' + tscTotal);
-                tableRows += Row('80% :', '₹' + tsc80);
-                tableRows += Row('20% :', '₹' + tsc20);
+                tableRows += Row('TSC:', 'â‚¹' + tscTotal);
+                tableRows += Row('80% :', 'â‚¹' + tsc80);
+                tableRows += Row('20% :', 'â‚¹' + tsc20);
                 tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
 
                 tableRows += Row('TOTAL EXPENSE:', totalExp, true);
@@ -956,7 +960,7 @@
                     tableRows += Row(`${d.note} * ${d.count}`, parseFloat(d.total.replace(/,/g, '')).toFixed(2));
                 });
                 tableRows += Row('COINS * 0', '0.00');
-                tableRows += Row('TOTAL', parseFloat(cb.replace(/[₹,]/g, '')).toFixed(2), true);
+                tableRows += Row('TOTAL', parseFloat(cb.replace(/[â‚¹,]/g, '')).toFixed(2), true);
 
                 const finalLayout = `
                     <div style="background: white; color: black; font-family: 'Courier New', Courier, monospace; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -996,11 +1000,73 @@
             document.getElementById('previewModal').style.display = 'none';
         }
 
-        function confirmPrint() {
-            window.print();
-            // Optional: Close after print dialog is dismissed (interaction dependent)
+        async function confirmPrint() {
+            try {
+                const getText = (id) => document.getElementById(id)?.innerText || 'â‚¹ 0.00';
+                const getVal = (id) => document.getElementById(id)?.value || '';
+
+                const date = getVal('reportDate');
+                const admin = getText('genBy').replace('ADMIN: ', '').split('|')[0].trim();
+                const syncTime = getText('genBy').split('SYNC TIME: ')[1] || new Date().toLocaleTimeString();
+
+                const payments = ['CASH', 'CARD', 'UPI', 'CREDIT'].map(mode => {
+                    const row = Array.from(document.querySelectorAll('#salesTableBody tr')).find(tr => tr.innerText.includes(mode));
+                    return { label: mode + ' Sales', val: row ? row.querySelector('td:nth-child(2)').innerText : 'â‚¹ 0.00' };
+                });
+
+                const categories = Array.from(document.querySelectorAll('#catTableBody tr')).map(tr => ({
+                    label: tr.querySelector('td:nth-child(1)').innerText,
+                    val: tr.querySelector('td:nth-child(2)').innerText
+                }));
+
+                const denominations = Array.from(document.querySelectorAll('.denom-input')).map(inp => ({
+                    note: inp.dataset.note,
+                    count: parseInt(inp.value) || 0,
+                    total: document.getElementById(`total-${inp.dataset.note}`).innerText
+                }));
+
+                const payload = {
+                    counter: counterLabel,
+                    date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
+                    time: syncTime,
+                    report_date: date.split('-').reverse().join('-'),
+                    total_sales: getText('totalSales'),
+                    payments: payments,
+                    categories: categories,
+                    biz_total: getText('totalBizCharges'),
+                    biz80: getText('biz80Val'),
+                    biz20: getText('biz20Val'),
+                    tsc_total: getText('totalTscVal'),
+                    total_exp: getText('cashExpVal'),
+                    ob: getText('obVal'),
+                    expected: getText('expectedVal'),
+                    cb: getText('actualVal'),
+                    cash_off: getText('netToOfficeVal'),
+                    denominations: denominations
+                };
+
+                const response = await fetch('/api/print-closure', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    alert("Report printed successfully.");
+                    closePreview();
+                } else {
+                    alert("Print failed: " + result.message);
+                }
+            } catch (err) {
+                alert("Print Error: " + err.message);
+            }
         }
     </script>
+    <script src='/theme.js'></script>
 </body>
 
 </html>
+
+
+

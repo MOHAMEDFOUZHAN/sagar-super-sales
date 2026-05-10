@@ -7,8 +7,9 @@ PROJECT DEPLOYMENT RECAP - APRIL 14, 2026
 - Added a "connection_debug.txt" logger for troubleshooting.
 
 2. SETTINGS FOR CLIENT SITE:
-- Server PC IP: 127.0.0.1
-- Client PC IP: 192.168.1.9 (or your Server's IP)
+- Server PC IP: Use the real LAN IP of the server PC, for example 192.168.1.50
+- Client PC URL: http://SERVER_PC_LAN_IP:5004/
+- Client PC database setting: MYSQL_HOST should be the real LAN IP of the server PC, not 127.0.0.1
 - Run software as Administrator.
 
 3. DEFAULT LOGINS:
