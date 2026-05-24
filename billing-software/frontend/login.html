@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sagar Super Login | Premium Access</title>
+    <title>MaplePro Login | Premium Access</title>
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* =========================================
-           ADVANCED Sagar Super THEME - GLASS & NEON
+           ADVANCED MaplePro THEME - GLASS & NEON
            ========================================= */
 
         :root {
@@ -179,6 +179,16 @@
         }
 
         /* --- FORMS & TYPOGRAPHY --- */
+        .brand {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-shadow: 0 0 20px var(--primary-glow);
+        }
+
         .login-header {
             text-align: center;
             margin-bottom: 35px;
@@ -396,7 +406,7 @@
         <div class="blob blob-3"></div>
     </div>
 
-    <!-- Falling Sagar Super Leaves Container -->
+    <!-- Falling Maple Leaves Container -->
     <div class="leaves-container" id="leavesContainer"></div>
 
     <div class="login-container">
@@ -408,6 +418,9 @@
             </div>
 
             <div class="login-header">
+                <div class="brand" style="justify-content: center; margin-bottom: 25px;">
+                    <img src="/images/logo.ico" style="width: 42px; height: 42px; object-fit: contain;"> MaplePro
+                </div>
                 <h2>Welcome Back</h2>
                 <p>Sign in to your sales dashboard</p>
             </div>
@@ -563,7 +576,7 @@
             if (!container) return;
 
             const leaf = document.createElement('i');
-            leaf.classList.add('fa-brands', 'fa-canadian-Sagar-leaf', 'leaf');
+            leaf.classList.add('fa-brands', 'fa-canadian-maple-leaf', 'leaf');
 
             // Random properties for "rain" effect from user snippet
             const size = Math.random() * 30 + 15; // 15px to 45px

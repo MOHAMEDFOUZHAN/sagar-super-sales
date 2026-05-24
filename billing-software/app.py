@@ -1851,6 +1851,15 @@ def get_stats():
     cursor.execute("SELECT SUM(amount) FROM expenses WHERE DATE(expense_date) = %s", (today,))
     expenses = cursor.fetchone()[0] or 0
     
+    # Fetch Bizz Charges (loyalty rewards paid in cash)
+    cursor.execute(f"""
+        SELECT SUM(bi.bizz_amount)
+        FROM bill_items bi
+        JOIN bills b ON bi.bill_id = b.id
+        WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter}
+    """, tuple(query_params))
+    biz_charges = float(cursor.fetchone()[0] or 0)
+    
     cursor.execute(f"SELECT payment_mode, SUM(total_amount) FROM bills WHERE DATE(bill_date) = %s AND status != 'Cancelled'{user_filter} GROUP BY payment_mode", tuple(query_params))
     modes = cursor.fetchall()
     
@@ -1877,6 +1886,7 @@ def get_stats():
         'cash_sales': cash_sales,
         'upi_sales': upi_sales,
         'card_sales': card_sales,
+        'biz_charges': biz_charges,
         'canceled_bills': canceled_count,
         'canceled_amount': float(canceled_amount),
         'avg_bill_value': float(avg_bill)
@@ -2523,7 +2533,7 @@ if __name__ == '__main__':
         url = f"http://{host}:{Config.SERVER_PORT}/"
         if webview:
             print("Launching Desktop Window...")
-            webview.create_window("Sagar Super- Billing System", url, width=1280, height=800, min_size=(1024, 768))
+            webview.create_window("MaplePro - Billing System", url, width=1280, height=800, min_size=(1024, 768))
             webview.start()
         else:
             webbrowser.open(url)
