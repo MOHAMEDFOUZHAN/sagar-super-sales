@@ -21,6 +21,12 @@
                 <i class="fa-solid fa-microchip"></i> Stock AI
             </a>
         </li>
+        <li>
+            <a href="{{ url_for('admin_intelligence_twin') }}"
+                class="nav-link {{ 'active' if request.endpoint == 'admin_intelligence_twin' else '' }}">
+                <i class="fa-solid fa-clone"></i> Business Twin
+            </a>
+        </li>
 
         <li
             style="margin-top: 10px; padding-left: 16px; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
@@ -175,6 +181,16 @@
             <a href="{{ url_for('admin_maintenance') }}"
                 class="nav-link {{ 'active' if 'admin_maintenance' in request.endpoint else '' }}">
                 <i class="fa-solid fa-gears"></i> System Maintenance
+            </a>
+        </li>
+        <li>
+            <a href="{{ url_for('admin_maintenance_health') }}"
+                class="nav-link {{ 'active' if 'admin_maintenance_health' in request.endpoint else '' }}"
+                style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                <span style="display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-tower-broadcast"></i> IT Autopilot
+                </span>
+                <span style="font-size: 0.6rem; background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700; letter-spacing: 0.05em; line-height: 1;">DEV</span>
             </a>
         </li>
     </ul>

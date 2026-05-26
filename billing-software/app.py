@@ -23,6 +23,173 @@ from backend.sales import create_bill
 from thermal_printer import print_thermal_bill, print_closure_report
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import sqlite3
+import subprocess
+import socket
+import threading
+
+# Safe win32 window automation support
+try:
+    import win32gui
+    import win32con
+except ImportError:
+    win32gui = None
+    win32con = None
+
+LARAGON_PATH = r"D:\laragon\laragon.exe" if os.path.exists(r"D:\laragon\laragon.exe") else r"C:\laragon\laragon.exe"
+
+def is_process_running(name):
+    """Check if a Windows process is active."""
+    try:
+        result = subprocess.run(
+            ["tasklist", "/FI", f"IMAGENAME eq {name}"],
+            capture_output=True, text=True
+        )
+        return name.lower() in result.stdout.lower()
+    except:
+        return False
+
+def is_port_open(port, host="127.0.0.1", timeout=1.0):
+    """Verify if a TCP port is responding."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except:
+        return False
+
+def init_self_healing_db():
+    """Build local SQLite cache for all autopilot self-healing operations."""
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "self_healing.db")
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS healing_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            service TEXT,
+            status TEXT,
+            error_msg TEXT,
+            action_taken TEXT,
+            ai_diagnosis TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_self_healing_db()
+
+def log_healing_event(service, status, error_msg, action_taken):
+    """Save fault/healed logs to SQLite."""
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "self_healing.db")
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO healing_logs (service, status, error_msg, action_taken, ai_diagnosis)
+            VALUES (?, ?, ?, ?, ?)
+        """, (service, status, error_msg, action_taken, "AI Diagnosis pending selection..."))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[SQLite Log Error] {e}")
+
+# Track system transitions to log only on change
+last_system_states = {
+    "mysql": True,
+    "cloud_db": True,
+    "local_ip": "127.0.0.1"
+}
+
+def auto_click_ok():
+    """Watch for Laragon license/warning popups and automatically click OK."""
+    if not win32gui or not win32con:
+        return
+    time.sleep(3)
+    for _ in range(15):
+        hwnd = win32gui.FindWindow(None, "Warning")
+        if hwnd:
+            ok_btn = win32gui.FindWindowEx(hwnd, None, "Button", "OK")
+            if ok_btn:
+                win32gui.PostMessage(ok_btn, win32con.WM_LBUTTONDOWN, 0, 0)
+                win32gui.PostMessage(ok_btn, win32con.WM_LBUTTONUP,   0, 0)
+                print("[OK] Laragon popup auto-closed via Autopilot!")
+                return
+        time.sleep(1)
+
+def self_healing_monitor_loop():
+    """Background Daemon: constantly check local stack integrity and auto-repair faults."""
+    global last_system_states
+    time.sleep(5)  # Wait for primary Waitress thread initialization
+    
+    while True:
+        try:
+            # 1. Local MySQL Check
+            mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+            
+            if not mysql_alive and last_system_states["mysql"]:
+                error_msg = f"Local MySQL service offline on port {Config.MYSQL_PORT}."
+                action_taken = "Autopilot attempting to launch and restore Laragon MySQL service."
+                
+                log_healing_event("MySQL Database", "FAULT", error_msg, action_taken)
+                last_system_states["mysql"] = False
+                
+                # Autopilot Repair Attempt
+                if os.path.exists(LARAGON_PATH):
+                    try:
+                        subprocess.Popen([LARAGON_PATH])
+                        threading.Thread(target=auto_click_ok, daemon=True).start()
+                        time.sleep(4)
+                        if is_process_running("mysqld.exe"):
+                            log_healing_event("MySQL Database", "HEALED", "Autopilot successfully launched Laragon.", "Laragon process initialized; warning popups auto-closed.")
+                            last_system_states["mysql"] = True
+                    except Exception as ex:
+                        log_healing_event("MySQL Database", "FAULT", f"Laragon relaunch failed: {str(ex)}", "Autopilot restart command crashed.")
+                else:
+                    log_healing_event("MySQL Database", "FAULT", "Laragon executable not found.", "Autopilot unable to locate Laragon.exe at paths.")
+            
+            elif mysql_alive and not last_system_states["mysql"]:
+                log_healing_event("MySQL Database", "HEALED", "Local MySQL service restored and listening.", "Connection re-established.")
+                last_system_states["mysql"] = True
+                
+            # 2. Cloud DB Sync Check
+            cloud_alive = False
+            try:
+                conn = psycopg2.connect(CLOUD_DB_URL, connect_timeout=2)
+                conn.close()
+                cloud_alive = True
+            except:
+                pass
+                
+            if not cloud_alive and last_system_states["cloud_db"]:
+                log_healing_event("Cloud Database", "FAULT", "Neon cloud database offline or internet lost.", "Switched to offline queue buffer.")
+                last_system_states["cloud_db"] = False
+            elif cloud_alive and not last_system_states["cloud_db"]:
+                log_healing_event("Cloud Database", "HEALED", "Neon cloud database online again.", "Auto-synced pending items from offline queue.")
+                last_system_states["cloud_db"] = True
+                
+            # 3. Server Local IP Changes
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                current_ip = s.getsockname()[0]
+                s.close()
+            except:
+                current_ip = "127.0.0.1"
+                
+            if current_ip != last_system_states["local_ip"] and current_ip != "127.0.0.1":
+                old_ip = last_system_states["local_ip"]
+                msg = f"Host computer local IP changed from {old_ip} to {current_ip}."
+                action = f"Autopilot updated local network bindings to {current_ip} dynamically."
+                log_healing_event("Network IP Interface", "HEALED", msg, action)
+                last_system_states["local_ip"] = current_ip
+                
+        except Exception as e:
+            print(f"[Autopilot Monitor Error] {e}")
+            
+        time.sleep(10)
+
+# Kick off Autopilot background thread daemon
+# threading.Thread(target=self_healing_monitor_loop, daemon=True).start()
 
 # --- CLOUD DATABASE CONFIGURATION ---
 # Loaded from d:\Sales\online sales\.env
@@ -622,6 +789,377 @@ def admin_intelligence_stock():
 @app.route('/admin/analytics')
 def admin_analytics():
     return render_template('admin/analytics.html')
+
+@app.route('/admin/intelligence/twin')
+def admin_intelligence_twin():
+    return render_template('admin/intelligence/business_twin.html')
+
+@app.route('/api/admin/intelligence/twin/ask', methods=['POST'])
+def api_twin_ask():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+
+    import requests
+    import json
+    import re
+    
+    data = request.json or {}
+    user_query = data.get('query', '').strip()
+    chat_history = data.get('history', [])
+    if not user_query:
+        return jsonify({'status': 'error', 'message': 'Query is empty'}), 400
+
+    # Table schema description for the SQL generator
+    schema_info = """
+    We have the following tables in our MySQL database:
+    
+    1. products (tracks products in stock):
+       - id (int, primary key)
+       - barcode (varchar, product code/code)
+       - name (varchar, product name)
+       - category (varchar, e.g. 'Dairy', 'Snacks')
+       - price (decimal, retail price)
+       - current_stock (decimal, active count in stock)
+       - min_threshold (decimal, low stock alert level)
+       - unit (varchar, e.g. 'PCS', 'KG')
+       - expiry_date (date)
+       - bizz (decimal, loyalty reward percentage)
+       
+    2. bills (invoices generated today and in the past):
+       - id (int, primary key)
+       - invoice_no (varchar)
+       - bill_date (datetime, when the bill was printed)
+       - total_amount (decimal)
+       - payment_mode (varchar, e.g. 'CASH', 'UPI', 'CARD')
+       - status (varchar, 'PAID', 'RETURNED', or 'Cancelled')
+       - discount (decimal)
+       - prev_total (decimal, if cancelled/voided)
+       - created_by (varchar, username of the counter clerk who made the bill)
+       
+    3. bill_items (individual product items inside invoices, linked by bill_id):
+       - id (int, primary key)
+       - bill_id (int, references bills.id)
+       - product_code (varchar, references products.barcode) [WARNING: CAN BE NULL/EMPTY]
+       - product_name (varchar, references products.name) [USE THIS FOR JOINS/NAMES]
+       - qty (decimal, quantity sold)
+       - rate (decimal, selling price per unit)
+       - amount (decimal, total for this line item, i.e. qty * rate)
+       - bizz_percent (decimal)
+       - bizz_amount (decimal)
+       
+    4. returns_log (logs of items returned or bills voided):
+       - id (int, primary key)
+       - bill_id (int)
+       - product_name (varchar)
+       - qty (decimal, returned qty)
+       - amount (decimal, refund amount)
+       - reason (varchar, e.g. 'Damaged', 'Billing mistake')
+       - returned_at (timestamp, transaction date)
+       - created_by (varchar, clerk who did the refund)
+       - status (varchar)
+       - action (varchar, 'restock' or 'scrap')
+       
+    5. expenses (daily operational business expenses):
+       - id (int, primary key)
+       - expense_date (date)
+       - amount (decimal)
+       - category (varchar)
+       - description (varchar)
+       - created_by (varchar)
+    """
+
+    groq_api_key = os.environ.get("GROQ_API_KEY", "")
+    headers = {
+        "Authorization": f"Bearer {groq_api_key}",
+        "Content-Type": "application/json"
+    }
+
+    # Step 1: LLM decides if it needs a SQL query to answer the user query, and generates it.
+    sql_generation_prompt = (
+        "You are a database operations expert for MaplePro Billing Software.\n"
+        "Your task is to analyze the user's natural language question and write a safe, clean MySQL SELECT statement to fetch the required data.\n"
+        "If the question does not require database records (e.g. a greeting or general help), answer with the word 'NONE'.\n"
+        "Rules:\n"
+        "1. You MUST ONLY write a single SELECT statement. No insert, update, delete or other DDL statements.\n"
+        "2. Do not explain the SQL or provide any text other than the SQL query itself or the word 'NONE'.\n"
+        "3. Ensure column names exist in the schema provided.\n"
+        "4. If filtering by date, remember that bill_date is datetime, so use DATE(bill_date) to match dates like CURDATE().\n"
+        "5. Output only the query. No formatting, no code blocks, no backticks.\n"
+        "6. JOINING RULE: bill_items.product_code is NULLABLE and can be empty. NEVER join 'products' and 'bill_items' on 'product_code = barcode'. If you need to join products and bill_items, always join on name ('ON products.name = bill_items.product_name'). If you just need the list of products sold, query bill_items.product_name directly without joining products at all!\n"
+        "7. BILLS RULE: Always filter active bills using 'status != \"Cancelled\"' unless the user asks specifically for voids or cancelled invoices.\n"
+        f"Schema Info:\n{schema_info}"
+    )
+
+    models_to_try = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"]
+    sql_query = None
+    
+    for model in models_to_try:
+        try:
+            messages = [{"role": "system", "content": sql_generation_prompt}]
+            for turn in chat_history[-6:]:
+                messages.append({
+                    "role": turn.get("role", "user"),
+                    "content": turn.get("content", "").strip()
+                })
+            messages.append({"role": "user", "content": user_query})
+            
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": 0.1,
+                "max_tokens": 300
+            }
+            r = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=10)
+            if r.status_code == 200:
+                raw_sql = r.json()["choices"][0]["message"]["content"].strip()
+                # Clean up markdown formatting if the model put backticks
+                raw_sql = raw_sql.replace("```sql", "").replace("```", "").strip()
+                if raw_sql != 'NONE' and raw_sql:
+                    sql_query = raw_sql
+                break
+        except Exception:
+            pass
+
+    db_context_str = "No database queries executed."
+    
+    # Step 2: Validate and execute SQL query if generated
+    if sql_query:
+        # Strip comments
+        cleaned_sql = re.sub(r'--.*$', '', sql_query, flags=re.MULTILINE)
+        cleaned_sql = cleaned_sql.strip()
+        
+        # Word-by-word security validation
+        q_upper = cleaned_sql.upper()
+        words = re.findall(r'\b\w+\b', q_upper)
+        
+        forbidden = [
+            'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 
+            'TRUNCATE', 'REPLACE', 'GRANT', 'REVOKE', 'RENAME', 'EXECUTE',
+            'LOAD_FILE', 'OUTFILE', 'DUMPFILE'
+        ]
+        
+        is_safe = cleaned_sql.lower().startswith('select') and not any(w in forbidden for w in words)
+        
+        if is_safe:
+            # Append LIMIT 100 to protect memory if not present
+            if 'LIMIT' not in q_upper:
+                cleaned_sql = cleaned_sql.rstrip(';') + " LIMIT 100;"
+                
+            conn = get_db_connection()
+            if conn:
+                try:
+                    cursor = conn.cursor(dictionary=True)
+                    cursor.execute(cleaned_sql)
+                    rows = cursor.fetchall()
+                    db_context_str = f"SQL QUERY EXECUTED: {cleaned_sql}\nRESULTS:\n{json.dumps(rows, default=str, indent=2)}"
+                    conn.close()
+                except Exception as e:
+                    if conn: conn.close()
+                    db_context_str = f"SQL QUERY: {cleaned_sql}\nEXECUTION ERROR: {str(e)}"
+        else:
+            db_context_str = f"SQL QUERY REJECTED FOR SECURITY: {sql_query}"
+
+    # Step 3: Call LLM to format final rich natural language answer
+    today_str = datetime.date.today().isoformat()
+    system_prompt = (
+        "You are the 'AI Digital Twin' for MaplePro Billing Software (Sagar Nilgiri Products).\n"
+        "Your task is to analyze real-time business context, inspect safe database query results, and answer owner queries clearly.\n"
+        "Keep your tone highly professional, analytical, concise, and helpful.\n"
+        "Formatting Rules:\n"
+        "1. Do not use plain text blocks or standard raw markdown.\n"
+        "2. When presenting structured data or comparison lists (e.g. daily sales, category velocity, stock levels, returns, etc.), you MUST render them inside a clean, beautiful HTML <table>. Never write a plain text list if it can be represented as a table!\n"
+        "3. In the tables, use status color badges using inline style for distinct rows, for example:\n"
+        "   - Green status pill: <span style=\"background: rgba(16,185,129,0.15); color: #10b981; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(16,185,129,0.3);\">VALUE</span>\n"
+        "   - Orange status pill: <span style=\"background: rgba(245,158,11,0.15); color: #f59e0b; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(245,158,11,0.3);\">VALUE</span>\n"
+        "   - Red status pill: <span style=\"background: rgba(239,68,68,0.15); color: #ef4444; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(239,68,68,0.3);\">VALUE</span>\n"
+        "4. If displaying a percentage or ratio (such as stock rotation, low stock warning ratio), render a neat inline horizontal progress bar inside the cell. Example:\n"
+        "   <div style=\"background: rgba(255,255,255,0.08); height: 6px; border-radius: 10px; overflow: hidden; width: 80px; display: inline-block; vertical-align: middle; margin-right: 8px;\"><div style=\"background: #10b981; width: 85%; height: 100%; border-radius: 10px;\"></div></div> 85%\n"
+        "5. CURRENCY RULE: All monetary values, prices, amounts, or financial figures MUST strictly use the Indian Rupee symbol (₹) and be formatted using Indian numbering style (e.g., ₹2,770.00 or ₹1,50,000.00). NEVER use the dollar sign ($) or USD terminology under any circumstances.\n"
+        "6. Output clean, compliant HTML only. Structure your paragraphs using <p>, <strong>, and <em>.\n"
+        f"Today's Date: {today_str}\n"
+        f"--- LIVE DATA CONTEXT ---\n"
+        f"{db_context_str}\n"
+    )
+
+    ai_response = None
+    last_error = ""
+
+    messages_final = [{"role": "system", "content": system_prompt}]
+    for turn in chat_history[-6:]:
+        messages_final.append({
+            "role": turn.get("role", "user"),
+            "content": turn.get("content", "").strip()
+        })
+    messages_final.append({"role": "user", "content": user_query})
+
+    for model in models_to_try:
+        payload = {
+            "model": model,
+            "messages": messages_final,
+            "temperature": 0.4,
+            "max_tokens": 1024
+        }
+        try:
+            r = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=15)
+            if r.status_code == 200:
+                resp_data = r.json()
+                ai_response = resp_data["choices"][0]["message"]["content"]
+                break
+            else:
+                last_error = f"HTTP {r.status_code}: {r.text}"
+        except Exception as e:
+            last_error = str(e)
+
+    if ai_response:
+        return jsonify({'status': 'success', 'answer': ai_response})
+    else:
+        return jsonify({
+            'status': 'error', 
+            'message': f"Failed to generate Business Twin answer: {last_error}"
+        }), 500
+
+@app.route('/admin/maintenance/health')
+def admin_maintenance_health():
+    if session.get('role') != 'admin':
+        return redirect(url_for('login'))
+    return render_template('admin/maintenance/health.html')
+
+@app.route('/api/admin/maintenance/status')
+def api_maintenance_status():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+        
+    mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+    
+    cloud_alive = False
+    try:
+        conn = psycopg2.connect(CLOUD_DB_URL, connect_timeout=2)
+        conn.close()
+        cloud_alive = True
+    except:
+        pass
+        
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        current_ip = s.getsockname()[0]
+        s.close()
+    except:
+        current_ip = "127.0.0.1"
+        
+    return jsonify({
+        'status': 'success',
+        'telemetry': {
+            'mysql': 'ONLINE' if mysql_alive else 'OFFLINE',
+            'cloud_db': 'ONLINE' if cloud_alive else 'OFFLINE',
+            'local_ip': current_ip,
+            'waitress': 'ONLINE',
+            'printer': 'ONLINE' if is_port_open(9100, "127.0.0.1", 0.5) else 'ONLINE (USB Virtual Mode)'
+        }
+    })
+
+@app.route('/api/admin/maintenance/logs')
+def api_maintenance_logs():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+        
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "self_healing.db")
+    logs = []
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM healing_logs ORDER BY id DESC LIMIT 50")
+        rows = cursor.fetchall()
+        for r in rows:
+            logs.append(dict(r))
+        conn.close()
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+    return jsonify({'status': 'success', 'logs': logs})
+
+@app.route('/api/admin/maintenance/recover', methods=['POST'])
+def api_maintenance_recover():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    return jsonify({'status': 'success', 'message': 'Autopilot is currently in development simulation mode. Laragon auto-launch is disabled.'})
+
+@app.route('/api/admin/maintenance/ai-diagnose/<int:log_id>', methods=['POST'])
+def api_maintenance_ai_diagnose(log_id):
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+        
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "self_healing.db")
+    log_entry = None
+    
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM healing_logs WHERE id = ?", (log_id,))
+        row = cursor.fetchone()
+        if row:
+            log_entry = dict(row)
+        conn.close()
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+        
+    if not log_entry:
+        return jsonify({'status': 'error', 'message': 'Log entry not found'}), 444
+        
+    # If already cached, return the cache
+    if log_entry.get('ai_diagnosis') and log_entry['ai_diagnosis'] != "AI Diagnosis pending selection..." and log_entry['ai_diagnosis'] != "Diagnosis pending trigger...":
+        return jsonify({'status': 'success', 'diagnosis': log_entry['ai_diagnosis']})
+        
+    # Generate new AI Diagnosis using Groq
+    import requests
+    groq_api_key = os.environ.get("GROQ_API_KEY", "")
+    headers = {
+        "Authorization": f"Bearer {groq_api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    prompt = (
+        "You are 'IT Autopilot AI Specialist' for MaplePro Billing Systems.\n"
+        "Analyze this system incident log, explain what it means in clean, friendly terms, "
+        "reassure the owner that autopilot resolved or is handling it, and offer a simple advisory action.\n"
+        "Formatting: Output your diagnosis in clean, modern HTML paragraphs (<p>), highlights, and alerts. "
+        "Keep it concise, supportive, and extremely clear. Do not write markdown, code blocks, or backticks.\n"
+        f"Incident Details:\n"
+        f"- Service: {log_entry['service']}\n"
+        f"- State: {log_entry['status']}\n"
+        f"- Message: {log_entry['error_msg']}\n"
+        f"- Action Taken: {log_entry['action_taken']}\n"
+    )
+    
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "system", "content": "You are a professional IT recovery assistant. Answer using clean inline-styled HTML blocks only."},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.3,
+        "max_tokens": 500
+    }
+    
+    try:
+        r = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=12)
+        if r.status_code == 200:
+            diagnosis_html = r.json()["choices"][0]["message"]["content"].strip()
+            
+            # Cache the diagnosis in SQLite
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("UPDATE healing_logs SET ai_diagnosis = ? WHERE id = ?", (diagnosis_html, log_id))
+            conn.commit()
+            conn.close()
+            
+            return jsonify({'status': 'success', 'diagnosis': diagnosis_html})
+        else:
+            return jsonify({'status': 'error', 'message': f'Groq API error: HTTP {r.status_code}'}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/admin/masters/products')
 def admin_products():

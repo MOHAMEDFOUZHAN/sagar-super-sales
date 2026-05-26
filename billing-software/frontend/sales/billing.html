@@ -1,1590 +1,1601 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <title>Billing | MaplePro</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        /* =========================================
-           ADVANCED MaplePro THEME - GLASS & NEON
-           ========================================= */
-
-        :root {
-            /* Color Palette */
-            --bg-dark: #0f172a;
-            --bg-darker: #020617;
-            --primary: #6366f1;
-            /* Indigo 500 */
-            --primary-glow: rgba(99, 102, 241, 0.4);
-            --secondary: #ec4899;
-            /* Pink 500 */
-            --accent: #06b6d4;
-            /* Cyan 500 */
-
-            --glass-bg: rgba(30, 41, 59, 0.7);
-            --glass-border: rgba(255, 255, 255, 0.08);
-            --glass-highlight: rgba(255, 255, 255, 0.03);
-
-            --text-main: #f1f5f9;
-            --text-muted: #94a3b8;
-
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-
-            /* Spacing & Radius */
-            --radius-lg: 16px;
-            --radius-md: 12px;
-            --radius-sm: 8px;
-
-            /* Transitions */
-            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        :root.light-mode {
-            --bg-dark: #f8fafc;
-            --bg-darker: #e2e8f0;
-            --primary: #4f46e5;
-            --primary-glow: rgba(79, 70, 229, 0.3);
-            --glass-bg: rgba(255, 255, 255, 0.85);
-            --glass-border: rgba(0, 0, 0, 0.1);
-            --glass-highlight: rgba(0, 0, 0, 0.05);
-            --text-main: #0f172a;
-            --text-muted: #475569;
-        }
-
-        body.light-mode {
-            background: radial-gradient(circle at top left, #e0e7ff, var(--bg-dark), var(--bg-darker));
-        }
-
-        body.light-mode .brand {
-            color: #0f172a;
-            text-shadow: none;
-        }
-
-        body.light-mode .input-dark {
-            background: rgba(255, 255, 255, 0.7);
-            color: #0f172a;
-        }
-
-        body.light-mode .input-dark:focus {
-            background: #ffffff;
-        }
-
-        body.light-mode .sidebar {
-            background: rgba(248, 250, 252, 0.8);
-        }
-
-        body.light-mode th {
-            background: rgba(79, 70, 229, 0.1);
-            color: #475569;
-        }
-
-        body.light-mode tr:hover td {
-            background: rgba(0, 0, 0, 0.03);
-        }
-
-        body.light-mode .modal-content {
-            background: #ffffff;
-            color: #0f172a;
-        }
-
-        body.light-mode .modal-header {
-            background: rgba(0,0,0,0.02);
-        }
-
-        body.light-mode .bill-list {
-            background: rgba(0,0,0,0.03);
-        }
-
-        body.light-mode .shortcut-badge b {
-            color: var(--primary);
-        }
-
-        body.light-mode #grand_total_input {
-            color: #059669 !important;
-        }
-
-        body.light-mode .nav-link {
-            color: #475569;
-        }
-
-        body.light-mode .nav-link:hover {
-            background: rgba(0,0,0,0.04);
-            color: #0f172a;
-        }
-
-        body.light-mode .nav-link.active {
-            color: #4f46e5;
-            background: rgba(79,70,229,0.1);
-            border-color: rgba(79,70,229,0.3);
-        }
-
-        body.light-mode .cat-item {
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-        }
-        
-        body.light-mode .table-wrapper {
-            background: rgba(255,255,255,0.5) !important;
-        }
-        
-        body.light-mode .glass-panel {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
-        }
-
-        body.light-mode .sidebar div[style*="font-weight: 600; color: white;"] {
-            color: var(--text-main) !important;
-        }
-
-        body.light-mode .bill-item-preview div[style*="color:white;"] {
-            color: var(--text-main) !important;
-        }
-
-        /* Global Reset */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            background: radial-gradient(circle at top left, #1e1b4b, var(--bg-dark), var(--bg-darker));
-            color: var(--text-main);
-            height: 100vh;
-            /* Fixed height for app-like layout */
-            display: flex;
-            overflow: hidden;
-            /* Prevent body scroll, handle in main */
-        }
-
-        /* Scrollbar Styling */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 4px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
-        }
-
-        /* =========================================
-           SIDEBAR COMPONENT
-           ========================================= */
-        .sidebar {
-            width: 260px;
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(20px);
-            border-right: 1px solid var(--glass-border);
-            display: flex;
-            flex-direction: column;
-            padding: 24px;
-            z-index: 50;
-            transition: width 0.3s var(--ease-out);
-        }
-
-        .brand {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: white;
-            margin-bottom: 40px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            text-shadow: 0 0 20px var(--primary-glow);
-        }
-
-        .brand i {
-            color: var(--primary);
-        }
-
-        .nav-menu {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            padding: 14px 16px;
-            color: var(--text-muted);
-            text-decoration: none;
-            border-radius: var(--radius-md);
-            transition: all 0.2s;
-            font-weight: 500;
-            border: 1px solid transparent;
-        }
-
-        .nav-link:hover {
-            background: rgba(255, 255, 255, 0.03);
-            color: white;
-            transform: translateX(4px);
-        }
-
-        .nav-link.active {
-            background: linear-gradient(90deg, rgba(99, 102, 241, 0.15), transparent);
-            border: 1px solid rgba(99, 102, 241, 0.3);
-            color: #818cf8;
-            box-shadow: 0 0 15px rgba(99, 102, 241, 0.1);
-        }
-
-        /* =========================================
-           MAIN LAYOUT & CARDS
-           ========================================= */
-        .main-content {
-            flex: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding: 30px;
-            position: relative;
-            background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wMykiLz48L3N2Zz4=');
-        }
-
-        .glass-panel {
-            background: var(--glass-bg);
-            backdrop-filter: blur(16px);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--radius-lg);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-
-        /* =========================================
-           FORMS & INPUTS - FUTURISTIC
-           ========================================= */
-        .form-group label {
-            display: block;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            margin-bottom: 6px;
-            font-weight: 600;
-        }
-
-        .input-dark {
-            width: 100%;
-            background: rgba(2, 6, 23, 0.5);
-            border: 1px solid var(--glass-border);
-            color: white;
-            padding: 10px 14px;
-            border-radius: var(--radius-sm);
-            font-size: 0.95rem;
-            transition: all 0.2s;
-            outline: none;
-        }
-
-        .input-dark:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
-            background: rgba(2, 6, 23, 0.8);
-        }
-
-        /* =========================================
-           TABLES - DATA RICH
-           ========================================= */
-        .table-wrapper {
-            width: 100%;
-            overflow-x: auto;
-            border-radius: var(--radius-md);
-            border: 1px solid var(--glass-border);
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.9rem;
-        }
-
-        th {
-            background: rgba(99, 102, 241, 0.2);
-            text-align: left;
-            padding: 14px;
-            color: var(--text-muted);
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.05em;
-            border-bottom: 1px solid var(--glass-border);
-        }
-
-        td {
-            padding: 12px 14px;
-            border-bottom: 1px solid var(--glass-border);
-            color: var(--text-main);
-        }
-
-        tr:hover td {
-            background: rgba(255, 255, 255, 0.02);
-        }
-
-        /* =========================================
-           BUTTONS - NEON
-           ========================================= */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 10px 20px;
-            border-radius: var(--radius-sm);
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            transition: all 0.2s;
-            text-transform: uppercase;
-            font-size: 0.8rem;
-            letter-spacing: 0.05em;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), #4f46e5);
-            color: white;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, var(--success), #059669);
-            color: white;
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, var(--danger), #dc2626);
-            color: white;
-        }
-
-        /* =========================================
-           UTILITIES & ANIMATIONS
-           ========================================= */
-        .flex-between {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .gap-10 {
-            gap: 10px;
-        }
-
-        .gap-20 {
-            gap: 20px;
-        }
-
-        .mt-20 {
-            margin-top: 20px;
-        }
-
-        .mb-20 {
-            margin-bottom: 20px;
-        }
-
-        .w-full {
-            width: 100%;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .animate-fade {
-            animation: fadeIn 0.5s var(--ease-out) forwards;
-        }
-
-        .shortcut-badge {
-            transition: all 0.2s;
-            cursor: default;
-        }
-
-        .shortcut-badge:hover {
-            background: rgba(99, 102, 241, 0.2) !important;
-            border-color: var(--primary) !important;
-            transform: translateY(-1px);
-        }
-    </style>
-    <style>
-        /* Specific Overrides for Billing Grid */
-        .billing-grid {
-            display: grid;
-            grid-template-rows: auto auto 1fr auto;
-            height: 100vh;
-            gap: 10px;
-        }
-
-        .entry-bar {
-            display: grid;
-            grid-template-columns: 50px 100px 100px 2fr 80px 80px 80px 100px 80px 100px;
-            gap: 10px;
-            align-items: end;
-            padding: 20px;
-        }
-
-        .footer-panel {
-            display: grid;
-            grid-template-columns: 1.5fr 1fr;
-            gap: 20px;
-            padding: 20px;
-        }
-
-        .cat-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 5px 20px;
-            font-size: 0.85rem;
-            max-height: 150px;
-            overflow-y: auto;
-        }
-
-        .cat-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .cat-val {
-            font-weight: 700;
-            color: var(--primary);
-        }
-
-        /* MODAL STYLES */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(5px);
-            z-index: 1000;
-            display: none;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background: var(--bg-darker);
-            border: 1px solid var(--glass-border);
-            width: 80%;
-            max-width: 900px;
-            height: 80vh;
-            border-radius: var(--radius-lg);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-        }
-
-        .modal-header {
-            padding: 20px;
-            background: rgba(255,255,255,0.05);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--glass-border);
-        }
-
-        .modal-body {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-
-        .bill-list {
-            width: 30%;
-            border-right: 1px solid var(--glass-border);
-            overflow-y: auto;
-            background: rgba(0, 0, 0, 0.2);
-        }
-
-        .bill-item-preview {
-            padding: 15px;
-            border-bottom: 1px solid var(--glass-border);
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .bill-item-preview:hover,
-        .bill-item-preview.active {
-            background: rgba(99, 102, 241, 0.1);
-            border-left: 3px solid var(--primary);
-        }
-
-        .bill-details {
-            width: 70%;
-            padding: 20px;
-            overflow-y: auto;
-        }
-
-        /* SETTLEMENT CONFIRMATION MODAL */
-        #settleModal .modal-content {
-            max-width: 450px;
-            height: auto;
-            border: 1px solid var(--primary);
-            box-shadow: 0 0 40px var(--primary-glow);
-        }
-
-        .confirm-card {
-            padding: 30px;
-            text-align: center;
-        }
-
-        .confirm-total {
-            font-size: 3.5rem;
-            font-weight: 900;
-            color: var(--success);
-            margin: 10px 0;
-            text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
-        }
-
-        .confirm-meta {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .confirm-badge {
-            background: rgba(255,255,255,0.05);
-            padding: 8px 15px;
-            border-radius: 20px;
-            border: 1px solid var(--glass-border);
-            font-size: 0.9rem;
-            color: var(--text-muted);
-        }
-
-        .confirm-badge b {
-            color: white;
-        }
-    </style>
-</head>
-
-<body>
-
-    <nav class="sidebar">
-        <div class="brand"><img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> MaplePro</div>
-        <ul class="nav-menu">
-            <li><a href="/sales/dashboard" class="nav-link"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
-            <li><a href="/sales/billing" class="nav-link active"><i class="fa-solid fa-cart-shopping"></i> Billing</a></li>
-            <li><a href="/sales/expenses" class="nav-link"><i class="fa-solid fa-receipt"></i> Expenses</a></li>
-            <li><a href="/sales/preview" class="nav-link"><i class="fa-solid fa-eye"></i> Preview Bills</a></li>
-            <li><a href="/sales/report" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Reports</a></li>
-            <li><a href="/sales/returns" class="nav-link"><i class="fa-solid fa-rotate-left"></i> Returns & Voids</a></li>
-        </ul>
-        <div style="margin-top: auto;">
-            <div style="padding: 12px 16px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: var(--radius-md); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 12px;">
-                <div style="width: 32px; height: 32px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white;">
-                    {{ session.username[0].upper() if session.username else 'C' }}
-                </div>
-                <div>
-                    <div style="font-size: 0.85rem; font-weight: 600; color: white;">
-                        {% if session.username.startswith('counter') %}Counter - {{ session.username[7:] }}
-                        {% else %}{{ session.username|capitalize }}{% endif %}
-                    </div>
-                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Active Session</div>
-                </div>
-            </div>
-            <a href="/" class="nav-link" style="color: var(--danger);"><i class="fa-solid fa-power-off"></i> Logout</a>
-        </div>
-    </nav>
-
-    <main class="main-content" style="padding: 0; display: flex; flex-direction: column;">
-
-        <!-- TOP HEADER -->
-        <div class="glass-panel"
-            style="margin: 10px; padding: 15px; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <img src="/images/logo.ico" style="width: 24px; height: 24px; object-fit: contain;">
-                <span style="color: var(--warning); font-weight: 800; letter-spacing: 1px; font-size: 1.1rem;">MAPLEPRO</span>
-            </div>
-
-            <!-- KEYBOARD SHORTCUTS LEGEND -->
-            <div style="display: flex; gap: 15px; align-items: center; background: rgba(0,0,0,0.2); padding: 6px 15px; border-radius: 20px; border: 1px solid var(--glass-border); font-size: 0.75rem; letter-spacing: 0.5px;">
-                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F2</b> CODE</span>
-                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F3</b> NAME</span>
-                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F4</b> QTY</span>
-                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F8</b> METHOD</span>
-                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F9</b> SETTLE</span>
-            </div>
-            <div style="display: flex; gap: 20px; font-size: 0.9rem;">
-                <button id="theme_toggle" class="btn" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.8rem; padding: 0 12px;" onclick="toggleTheme()" title="Toggle Light/Dark Mode">
-                    <i class="fa-solid fa-sun" id="theme_icon"></i>
-                </button>
-                <div class="flex-between gap-10">
-                    <span style="color: var(--text-muted);">DOC ID</span>
-                    <span id="doc_id_display" class="glass-panel"
-                        style="padding: 4px 10px; font-family: monospace; font-weight: bold; color: var(--primary);">00000</span>
-                </div>
-                <div class="flex-between gap-10">
-                    <span style="color: var(--text-muted);">DATE</span>
-                    <span id="current_date_display" class="glass-panel" style="padding: 4px 10px;">00-00-0000</span>
-                </div>
-                <button onclick="openHistory()" class="btn"
-                    style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.8rem;">
-                    <i class="fa-solid fa-clock-rotate-left"></i> HISTORY
-                </button>
-            </div>
-
-        </div>
-
-        <!-- ENTRY BAR -->
-        <div class="entry-bar glass-panel" style="margin: 0 10px;">
-            <div class="form-group"><label>#</label><input class="input-dark" value="1" readonly
-                    style="text-align: center;"></div>
-            <div class="form-group"><label>QR Code</label><input id="qr_search" class="input-dark" placeholder="Scan..."
-                    autofocus style="border-color: var(--accent);"></div>
-            <div class="form-group"><label>Category</label><input id="category" class="input-dark" placeholder="Cat">
-            </div>
-            <div class="form-group"><label>Product Name</label><input id="prod_name" class="input-dark"
-                    placeholder="Item Name"></div>
-            <div class="form-group"><label>Stock</label><input id="stock" class="input-dark" value="0" readonly></div>
-            <div class="form-group"><label>Unit</label><input id="unit" class="input-dark" value="PCS" readonly></div>
-            <div class="form-group"><label>Qty</label><input id="qty" class="input-dark" value="1"
-                    style="background: var(--warning); color: black; font-weight: bold; text-align: center;"></div>
-            <div class="form-group"><label>Rate</label><input id="rate" class="input-dark" value="0.00"></div>
-            <div class="form-group"><label>BIZ</label><input id="biz" class="input-dark" value="0"></div>
-            <div class="form-group"><label>Amount</label><input id="amount" class="input-dark" value="0.00" readonly
-                    style="font-weight: bold;"></div>
-        </div>
-
-        <!-- TABLE -->
-        <div style="flex: 1; margin: 10px; overflow: hidden; display: flex; flex-direction: column;">
-            <div class="table-wrapper" style="flex: 1; background: rgba(0,0,0,0.2);">
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="width: 50px;">#</th>
-                            <th style="width: 100px;">QR</th>
-                            <th>Product</th>
-                            <th style="width: 80px;">Stk</th>
-                            <th style="width: 80px;">Unit</th>
-                            <th style="width: 80px;">Qty</th>
-                            <th style="width: 100px;">Rate</th>
-                            <th style="width: 80px;">BIZ</th>
-                            <th style="width: 120px;">Amount</th>
-                            <th style="width: 50px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="bill_body">
-                        <!-- Dynamic rows will appear here -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- FOOTER -->
-        <div class="footer-panel glass-panel" style="margin: 0 10px 10px;">
-            <!-- Dynamic Category Summary -->
-            <div id="category_summary_grid" class="cat-grid">
-                <!-- Populated via JS -->
-            </div>
-
-            <!-- Totals -->
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-                <div class="flex-between">
-                    <span style="color: var(--text-muted);">NET TOTAL</span>
-                    <input id="grand_total_input" class="input-dark" value="0.00" readonly
-                        style="width: 150px; text-align: right; font-weight: bold; font-size: 1.1rem; color: var(--success);">
-                </div>
-                <div class="flex-between">
-                    <span style="color: var(--text-muted); font-size: 0.8rem;">TSC CHARGE</span>
-                    <span id="tsc_display" style="color: var(--accent); font-weight: bold;">₹0.00</span>
-                </div>
-                <div class="flex-between">
-                    <span style="color: var(--text-muted);">PAY MODE</span>
-                    <select id="pay_mode" class="input-dark" style="width: 150px;">
-                        <option value="CASH">CASH</option>
-                        <option value="UPI">UPI</option>
-                        <option value="CARD">CARD</option>
-                        <option value="CREDIT">CREDIT </option>
-                    </select>
-                </div>
-                <div class="flex-between" style="padding: 10px; background: rgba(220,38,38,0.1); border-radius: 5px; border: 1px solid rgba(220,38,38,0.3); margin-top: 10px;">
-                    <label for="test_mode_toggle" style="color: var(--danger); font-weight: bold; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; letter-spacing: 0.5px;">
-                        <input type="checkbox" id="test_mode_toggle" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--danger);">
-                        TEST MODE (SAVE ONLY, NO PRINT)
-                    </label>
-                </div>
-                <button id="save_bill_btn" class="btn btn-primary w-full mt-20" style="font-size: 1rem; padding: 15px;">
-                    <i class="fa-solid fa-check-double"></i> COMPLETE SALE
-                </button>
-            </div>
-        </div>
-
-    </main>
-
-    <!-- HIDDEN THERMAL RECEIPT TEMPLATE -->
-    <div id="receipt-template" style="display: none;">
-        <div class="receipt-copy">
-            <div class="copy-label"></div>
-            <div class="shop-title">
-                <div>SAGAR</div>
-                <div>NILGIRI PRODUCTS</div>
-                <div>SUPER</div>
-            </div>
-            <div class="full-copy-only shop-address">
-                <div>36 COMMERCIAL ROAD, NEXT TO A2B RESTAURANT,</div>
-                <div>OOTY - 643001</div>
-            </div>
-            <div class="full-copy-only meta-row">
-                <span class="print_phone">Ph: 9363596124</span>
-                <span class="print_type">Type: UPI</span>
-            </div>
-            <div class="short-copy-only meta-row">
-                <span>office purpose only</span>
-                <span class="print_type">Type: UPI</span>
-            </div>
-            <div class="full-copy-only meta-row">
-                <span class="print_gstin">GSTIN: 33ACMPC6407B1Z7</span>
-                <span class="print_date">Date: 09-04-2026</span>
-            </div>
-            <div class="short-copy-only meta-row">
-                <span class="print_date">Date: 09-04-2026</span>
-            </div>
-            <div class="meta-row">
-                <span class="print_bill_id">Bill No: SS#014682</span>
-                <span class="print_time">Time: 02:39 PM</span>
-            </div>
-            <div class="dashed"></div>
-            <div class="items-head">
-                <span class="product-head">Product</span>
-                <span>Qty</span>
-                <span>Rate</span>
-                <span>Amount</span>
-            </div>
-            <table class="items-table">
-                <tbody class="print_items_body"></tbody>
-            </table>
-            <div class="dashed"></div>
-            <div class="total-line">
-                <span>Total:</span>
-                <span class="print_total_val">0.00</span>
-            </div>
-            <div class="center-note">(PRICES INCLUSIVE OF GST)</div>
-            <div class="dashed"></div>
-            <div class="mode-line">
-                <span class="print_mode_label">UPI:</span>
-                <span class="print_mode_val">0.00</span>
-            </div>
-            <div class="center-note">(Rounded off to Nearest Rupees)</div>
-            <div class="dashed"></div>
-            <div class="full-copy-only footer-block">
-                <div>FIXED PRICE</div>
-                <div>Sagar - Since 1964</div>
-                <div>COMMITTED TO QUALITY</div>
-                <div class="shop-online">SHOP ONLINE @</div>
-                <div class="website">www.sagarnilgiriproducts.com</div>
-                <div class="thanks">*Thanks for shopping***Kindly Visit Again*</div>
-                <div style="font-weight: bold; margin: 5px 0;">No return no replacement</div>
-                <div class="trust">CELEBRATING 60 YEARS OF TRUST</div>
-            </div>
-            <div class="short-copy-only footer-block short-footer">
-                <div class="bill-copy">BILL COPY</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- HISTORY MODAL -->
-    <div id="historyModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Bills</h3>
-                <button onclick="closeHistory()" class="btn btn-danger" style="padding: 5px 10px;"><i
-                        class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="modal-body">
-                <!-- Left Side: List of Bills -->
-                <div class="bill-list" id="recent_bills_list">
-                    <!-- Loaded dynamically -->
-                </div>
-                <!-- Right Side: Bill Details -->
-                <div class="bill-details" id="bill_detail_view">
-                    <div style="text-align: center; color: var(--text-muted); margin-top: 100px;">
-                        Select a bill to view details
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- SETTLEMENT CONFIRMATION MODAL -->
-    <div id="settleModal" class="modal-overlay">
-        <div class="modal-content animate-fade">
-            <div class="modal-header" style="border-bottom: none;">
-                <h3 style="color: var(--primary);"><i class="fa-solid fa-file-invoice-dollar"></i> CONFIRM SALE</h3>
-                <button onclick="closeSettleModal()" class="btn" style="background: transparent; color: var(--text-muted); font-size: 1.5rem;"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="confirm-card">
-                <div style="color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem;">Grand Total</div>
-                <div id="confirm_total_display" class="confirm-total">₹0.00</div>
-                
-                <div class="confirm-meta">
-                    <div class="confirm-badge">PAYMENT: <b id="confirm_mode_display">CASH</b></div>
-                    <div id="confirm_tsc_badge" class="confirm-badge" style="display:none;">TSC: <b id="confirm_tsc_val">₹0.00</b></div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
-                    <button onclick="closeSettleModal()" class="btn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white; padding: 15px;">
-                        CANCEL (ESC)
-                    </button>
-                    <button id="final_confirm_btn" class="btn btn-success" style="padding: 15px; font-size: 1rem; box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);">
-                        CONFIRM & PRINT (ENTER)
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const qrInput = document.getElementById('qr_search');
-        const productNameInput = document.getElementById('prod_name');
-        const qtyInput = document.getElementById('qty');
-        const rateInput = document.getElementById('rate');
-        const amountInput = document.getElementById('amount');
-        const stockInput = document.getElementById('stock');
-        const catInput = document.getElementById('category');
-        const unitInput = document.getElementById('unit');
-        const tableBody = document.getElementById('bill_body');
-        const grandTotalInput = document.getElementById('grand_total_input');
-        const saveBtn = document.getElementById('save_bill_btn');
-        const payModeSelect = document.getElementById('pay_mode');
-
-        let items = [];
-        let currentProduct = null;
-        let correctionData = { isCorrection: false, sourceBillId: null };
-        let isSavingBill = false;
-
-        function escapeHtml(value) {
-            return String(value ?? '')
-                .replaceAll('&', '&amp;')
-                .replaceAll('<', '&lt;')
-                .replaceAll('>', '&gt;')
-                .replaceAll('"', '&quot;')
-                .replaceAll("'", '&#39;');
-        }
-
-        function formatReceiptBillNo(value) {
-            const raw = String(value ?? '').trim();
-            if (!raw) return 'SS#000000';
-            if (/^SS#/i.test(raw)) return raw;
-            const digits = raw.replace(/\D/g, '');
-            if (!digits) return `SS#${raw}`;
-            return `SS#${digits.padStart(6, '0')}`;
-        }
-
-        function formatMoney(value) {
-            return Number(value || 0).toFixed(2);
-        }
-
-        function setTextAll(root, selector, value) {
-            root.querySelectorAll(selector).forEach(node => {
-                node.innerText = value;
-            });
-        }
-
-        function createBillRequestId() {
-            if (window.crypto && window.crypto.randomUUID) {
-                return window.crypto.randomUUID();
-            }
-            return `bill-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-        }
-
-        // 1. QR CODE SCAN & AUTO-ADD (with 3s Delay)
-        let isFetchingProduct = false;
-        let scanTimeout = null;
-        let autoAddTimeout = null;
-
-        function processPendingAutoAdd() {
-            if (autoAddTimeout) {
-                clearTimeout(autoAddTimeout);
-                autoAddTimeout = null;
-                // Only add if there's actually a product selected in the inputs
-                if (currentProduct) {
-                    addItem();
-                }
-            }
-        }
-
-        function parseWeighingBarcode(barcode) {
-            if (barcode.length > 4 && /^\d+$/.test(barcode)) {
-                return {
-                    code: barcode.substring(0, 4),
-                    weight: parseFloat(barcode.substring(4)) || 0
-                };
-            }
-            return null;
-        }
-
-        qrInput.addEventListener('input', () => {
-            const rawBarcode = qrInput.value.trim();
-            if (!rawBarcode) return;
-
-            // Small debounce for the actual scan/type action
-            clearTimeout(scanTimeout);
-            scanTimeout = setTimeout(async () => {
-                if (isFetchingProduct || !qrInput.value.trim()) return;
-                
-                isFetchingProduct = true;
-                try {
-                    // 1. Try to fetch exact full barcode match first
-                    const response = await fetch(`/api/products?q=${encodeURIComponent(rawBarcode)}`);
-                    const products = await response.json();
-
-                    let exactMatch = products.find(p => String(p.barcode) === rawBarcode);
-                    let parsed = null;
-
-                    if (!exactMatch && rawBarcode.length > 4 && /^\d+$/.test(rawBarcode)) {
-                        // 2. Fallback: Check if it's a weighing scale barcode (first 4 digits = code)
-                        const scannedCode = rawBarcode.substring(0, 4);
-                        const scannedWeight = parseFloat(rawBarcode.substring(4)) || 0;
-                        
-                        const retryRes = await fetch(`/api/products?q=${encodeURIComponent(scannedCode)}`);
-                        const retryProducts = await retryRes.json();
-                        
-                        exactMatch = retryProducts.find(p => String(p.barcode) === scannedCode);
-                        if (exactMatch) {
-                            parsed = { code: scannedCode, weight: scannedWeight };
-                        }
-                    }
-
-                    if (exactMatch) {
-                        // 1. If there's a pending item from a previous scan, add it now
-                        processPendingAutoAdd();
-
-                        // 2. Immediately fill the "area" (inputs)
-                        selectProduct(exactMatch);
-
-                        if (parsed) {
-                            qtyInput.value = parsed.weight;
-                            updateRowAmount();
-                        }
-                        
-                        qrInput.value = ''; // Clear QR input so they can scan next one
-                        
-                        // 3. Wait 1 second before moving it "down" to the cart
-                        autoAddTimeout = setTimeout(() => {
-                            addItem();
-                            autoAddTimeout = null;
-                        }, 1000);
-                    }
-                } catch (err) {
-                    console.error("Auto-scan error:", err);
-                } finally {
-                    isFetchingProduct = false;
-                }
-            }, 150); 
-        });
-
-        // Backup for Enter key (immediate action)
-        qrInput.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                e.stopPropagation(); // Prevent bubbling to window listener
-                clearTimeout(scanTimeout);
-                processPendingAutoAdd(); // Add any existing pending item
-                
-                if (isFetchingProduct) return;
-
-                const rawBarcode = qrInput.value.trim();
-                if (!rawBarcode) {
-                    // IF EMPTY: Trigger Settle (Complete Sale)
-                    if (items.length > 0) {
-                        e.preventDefault();
-                        saveBtn.click();
-                    }
-                    return;
-                }
-
-                isFetchingProduct = true;
-                try {
-                    const response = await fetch(`/api/products?q=${encodeURIComponent(rawBarcode)}`);
-                    const products = await response.json();
-
-                    let match = products.find(p => String(p.barcode) === rawBarcode);
-                    let parsed = null;
-
-                    if (!match && rawBarcode.length > 4 && /^\d+$/.test(rawBarcode)) {
-                        const scannedCode = rawBarcode.substring(0, 4);
-                        const scannedWeight = parseFloat(rawBarcode.substring(4)) || 0;
-                        
-                        const retryRes = await fetch(`/api/products?q=${encodeURIComponent(scannedCode)}`);
-                        const retryProducts = await retryRes.json();
-                        
-                        match = retryProducts.find(p => String(p.barcode) === scannedCode) || retryProducts[0];
-                        if (match) {
-                            parsed = { code: scannedCode, weight: scannedWeight };
-                        }
-                    } else if (!match && products.length > 0) {
-                        match = products[0];
-                    }
-
-                    if (match) {
-                        selectProduct(match);
-                        if (parsed) {
-                            qtyInput.value = parsed.weight;
-                            updateRowAmount();
-                        }
-                        addItem();
-                    } else {
-                        alert("Product not found!");
-                        qrInput.focus();
-                        qrInput.select();
-                    }
-                } catch (err) {
-                    console.error("Fetch error:", err);
-                    qrInput.focus();
-                } finally {
-                    isFetchingProduct = false;
-                }
-            }
-        });
-
-        // Product Name Search (Enter)
-        productNameInput.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                e.stopPropagation(); // Prevent bubbling
-                const query = productNameInput.value.trim();
-                if (!query) return;
-                
-                try {
-                    const response = await fetch(`/api/products?q=${encodeURIComponent(query)}`);
-                    const products = await response.json();
-                    if (products.length > 0) {
-                        selectProduct(products[0]);
-                        qtyInput.focus();
-                        qtyInput.select();
-                    } else {
-                        // If not found, allow manual entry or move to next field
-                        rateInput.focus();
-                        rateInput.select();
-                    }
-                } catch (err) {
-                    console.error("Search error:", err);
-                }
-            }
-        });
-
-        function selectProduct(product) {
-            currentProduct = product;
-            catInput.value = product.category;
-            productNameInput.value = product.name;
-            rateInput.value = product.price;
-            unitInput.value = product.unit;
-            stockInput.value = product.current_stock;
-            qtyInput.value = 1;
-            document.getElementById('biz').value = product.bizz || 0; // Auto-fill BIZZ
-            updateRowAmount();
-        }
-
-        function updateRowAmount() {
-            const qty = parseFloat(qtyInput.value) || 0;
-            const rate = parseFloat(rateInput.value) || 0;
-            amountInput.value = (qty * rate).toFixed(2);
-        }
-
-        [qtyInput, rateInput].forEach(inp => inp.addEventListener('input', updateRowAmount));
-
-        // 2. ADD ITEM ON ENTER IN QTY
-        qtyInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                e.stopPropagation(); // Prevent bubbling
-                addItem();
-            }
-        });
-
-        function addItem() {
-            if (!currentProduct) {
-                const manualName = productNameInput.value;
-                if (!manualName) return;
-            }
-
-            const name = productNameInput.value;
-            const qtyToAdd = parseFloat(qtyInput.value) || 0;
-            const rate = parseFloat(rateInput.value) || 0;
-            const biz = parseFloat(document.getElementById('biz').value) || 0;
-            const qr = currentProduct ? currentProduct.barcode : "";
-
-            if (!name || qtyToAdd <= 0) {
-                alert("Select product and quantity!");
-                return;
-            }
-
-            // Enhanced Stock Check (Aggregate Cart Qty)
-            const existingItem = items.find(item => item.name === name);
-            const currentQtyInCart = existingItem ? existingItem.qty : 0;
-            const totalQty = currentQtyInCart + qtyToAdd;
-            const stockAvailable = currentProduct ? currentProduct.current_stock : (parseFloat(stockInput.value) || 0);
-
-            if (totalQty > stockAvailable) {
-                alert(`Insufficient Stock! Available: ${stockAvailable}, Already in cart: ${currentQtyInCart}, Requested: ${qtyToAdd}`);
-                return;
-            }
-
-            if (existingItem) {
-                // Update existing item
-                existingItem.qty = totalQty;
-                existingItem.amount = existingItem.qty * existingItem.rate;
-            } else {
-                // Add new item
-                items.push({
-                    qr: qr,
-                    name: name,
-                    category: catInput.value,
-                    unit: unitInput.value,
-                    stock: stockAvailable,
-                    qty: qtyToAdd,
-                    rate: rate,
-                    bizz: biz,
-                    amount: qtyToAdd * rate
-                });
-            }
-
-            renderTable();
-            clearInputs();
-        }
-
-        function clearInputs() {
-            qrInput.value = '';
-            productNameInput.value = '';
-            qtyInput.value = '1';
-            rateInput.value = '0.00';
-            amountInput.value = '0.00';
-            catInput.value = '';
-            stockInput.value = '0';
-            document.getElementById('biz').value = '0';
-            qrInput.focus();
-            currentProduct = null;
-        }
-
-        function renderTable() {
-            tableBody.innerHTML = '';
-            let total = 0;
-            const catSummary = {};
-
-            items.forEach((item, index) => {
-                total += item.amount;
-
-                // Track category totals
-                const cat = item.category || 'GENERAL';
-                catSummary[cat] = (catSummary[cat] || 0) + item.amount;
-
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${item.qr || '-'}</td>
-                    <td>${item.name}</td>
-                    <td>${item.stock || '-'}</td>
-                    <td>${item.unit || 'PCS'}</td>
-                    <td>${item.qty}</td>
-                    <td>${item.rate.toFixed(2)}</td>
-                    <td>${item.bizz}%</td>
-                    <td style="font-weight: bold;">${item.amount.toFixed(2)}</td>
-                    <td><i class="fa-solid fa-trash" style="color: var(--danger); cursor: pointer;" onclick="removeItem(${index})"></i></td>
-                `;
-                tableBody.appendChild(tr);
-            });
-
-            grandTotalInput.value = total.toFixed(2);
-            renderCategorySummary(catSummary);
-            updateTscDisplay(total);
-        }
-
-        function updateTscDisplay(total) {
-            let tscPercent = 0;
-            if (total >= 10000) tscPercent = 3.0;
-            else if (total >= 7000) tscPercent = 2.5;
-            else if (total >= 5000) tscPercent = 2.0;
-            else if (total >= 2500) tscPercent = 1.5;
-            else if (total >= 1000) tscPercent = 1.0;
-
-            const tscAmt = (total * tscPercent) / 100;
-            document.getElementById('tsc_display').innerText = `₹${tscAmt.toFixed(2)} (${tscPercent}%)`;
-        }
-
-        function renderCategorySummary(summary) {
-            const grid = document.getElementById('category_summary_grid');
-            grid.innerHTML = '';
-
-            Object.keys(summary).sort().forEach(cat => {
-                const div = document.createElement('div');
-                div.className = 'cat-item';
-                div.innerHTML = `<span>${cat.toUpperCase()}</span> <span class="cat-val">${summary[cat].toFixed(2)}</span>`;
-                grid.appendChild(div);
-            });
-
-            if (Object.keys(summary).length === 0) {
-                grid.innerHTML = '<div class="cat-item"><span>READY</span> <span class="cat-val">0.00</span></div>';
-            }
-        }
-
-        window.removeItem = (index) => {
-            items.splice(index, 1);
-            renderTable();
-        };
-
-        // 3. SETTLE MODAL FLOW
-        function openSettleModal() {
-            if (items.length === 0) {
-                alert("No items in bill!");
-                return;
-            }
-            const total = parseFloat(grandTotalInput.value);
-            const payMode = payModeSelect.value;
-            
-            document.getElementById('confirm_total_display').innerText = `₹${total.toFixed(2)}`;
-            document.getElementById('confirm_mode_display').innerText = payMode;
-            
-            // Show TSC in modal if applicable
-            const tscText = document.getElementById('tsc_display').innerText;
-            if (tscText.includes('₹') && !tscText.includes('₹0.00')) {
-                document.getElementById('confirm_tsc_badge').style.display = 'block';
-                document.getElementById('confirm_tsc_val').innerText = tscText.split(' ')[0];
-            } else {
-                document.getElementById('confirm_tsc_badge').style.display = 'none';
-            }
-
-            document.getElementById('settleModal').style.display = 'flex';
-            document.getElementById('final_confirm_btn').focus();
-        }
-
-        function closeSettleModal() {
-            document.getElementById('settleModal').style.display = 'none';
-            qrInput.focus();
-        }
-
-        saveBtn.addEventListener('click', openSettleModal);
-
-        document.getElementById('final_confirm_btn').addEventListener('click', async () => {
-            if (isSavingBill) return;
-            isSavingBill = true;
-            const btn = document.getElementById('final_confirm_btn');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> SAVING...';
-
-            const total = parseFloat(grandTotalInput.value);
-            const payMode = payModeSelect.value;
-
-            try {
-                const response = await fetch('/api/save-bill', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        items: items,
-                        total: total,
-                        payment_mode: payMode,
-                        is_correction: correctionData.isCorrection,
-                        source_bill_id: correctionData.sourceBillId
-                    })
-                });
-
-                const result = await response.json();
-                if (result.status === 'success') {
-                    if (!document.getElementById('test_mode_toggle').checked) {
-                        printBill(
-                            result.invoice_display || result.invoice_no,
-                            total,
-                            payMode,
-                            result.bill_date,
-                            result.bill_time
-                        );
-                    } else {
-                        // Visual confirmation for testing so they know it saved
-                        alert(`TEST MODE: Bill #${formatReceiptBillNo(result.invoice_display || result.invoice_no)} saved successfully to database without printing.`);
-                    }
-                    items = [];
-                    renderTable();
-                    fetchNextDocId();
-                    correctionData = { isCorrection: false, sourceBillId: null };
-                    closeSettleModal();
-                } else {
-                    alert(result.message);
-                }
-            } catch (err) {
-                alert("Error saving bill: " + err);
-            } finally {
-                isSavingBill = false;
-                btn.disabled = false;
-                btn.innerHTML = 'CONFIRM & PRINT (ENTER)';
-            }
-        });
-
-        async function fetchNextDocId() {
-            try {
-                const response = await fetch('/api/next-invoice');
-                const data = await response.json();
-                document.getElementById('doc_id_display').innerText = data.display_id || formatReceiptBillNo(data.next_id);
-            } catch (e) { console.error("Doc ID fail", e); }
-        }
-
-        function setTodayDate() {
-            const today = new Date();
-            const dd = String(today.getDate()).padStart(2, '0');
-            const mm = String(today.getMonth() + 1).padStart(2, '0');
-            const yyyy = today.getFullYear();
-            document.getElementById('current_date_display').innerText = `${dd}-${mm}-${yyyy}`;
-        }
-
-        async function checkReprocess() {
-            try {
-                const response = await fetch('/api/reprocess/load');
-                const data = await response.json();
-                if (data.cart && data.cart.length > 0) {
-                    items = data.cart;
-                    correctionData.isCorrection = true;
-                    correctionData.sourceBillId = data.source_bill_id;
-                    renderTable();
-                    alert("Corrected Items Loaded for Bill #" + data.source_bill_id);
-                }
-            } catch (e) { console.error("Reprocess load failed", e); }
-        }
-
-        fetchNextDocId();
-        setTodayDate();
-        checkReprocess();
-
-        async function openHistory() {
-            document.getElementById('historyModal').style.display = 'flex';
-            const listContainer = document.getElementById('recent_bills_list');
-            listContainer.innerHTML = '<div style="padding:20px; text-align:center;">Loading...</div>';
-
-            try {
-                const response = await fetch('/api/bills/recent');
-                const bills = await response.json();
-
-                listContainer.innerHTML = '';
-                bills.forEach(bill => {
-                    const div = document.createElement('div');
-                    div.className = 'bill-item-preview';
-                    div.innerHTML = `
-                        <div style="font-weight:bold; color:white;">Bill #${formatReceiptBillNo(bill.invoice_no)}</div>
-                        <div style="font-size:0.8rem; color:var(--text-muted); display:flex; justify-content:space-between;">
-                            <span>${new Date(bill.bill_date).toLocaleTimeString()}</span>
-                            <span style="color:var(--success); font-weight:bold;">₹${parseFloat(bill.total_amount).toFixed(2)}</span>
-                        </div>
-                    `;
-                    div.onclick = () => loadBillDetails(bill.id, div);
-                    listContainer.appendChild(div);
-                });
-            } catch (e) {
-                listContainer.innerHTML = '<div style="padding:20px; color:red;">Error loading history</div>';
-            }
-        }
-
-        function closeHistory() {
-            document.getElementById('historyModal').style.display = 'none';
-        }
-
-        async function loadBillDetails(billId, element) {
-            document.querySelectorAll('.bill-item-preview').forEach(el => el.classList.remove('active'));
-            element.classList.add('active');
-
-            const container = document.getElementById('bill_detail_view');
-            container.innerHTML = '<div style="text-align:center; margin-top:50px;">Loading details...</div>';
-
-            try {
-                const response = await fetch(`/api/bills/${billId}/items`);
-                const itemsList = await response.json();
-
-                let html = `
-                    <h3 style="margin-bottom:20px; border-bottom:1px solid var(--glass-border); padding-bottom:10px;">
-                        Bill Details
-                    </h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th>Qty</th>
-                                <th>Rate</th>
-                                <th>Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-
-                let total = 0;
-                itemsList.forEach(item => {
-                    total += item.amount;
-                    html += `
-                        <tr>
-                            <td>${item.product_name}</td>
-                            <td>${item.qty}</td>
-                            <td>${item.rate.toFixed(2)}</td>
-                            <td style="font-weight:bold;">${item.amount.toFixed(2)}</td>
-                        </tr>
-                    `;
-                });
-
-                html += `
-                        </tbody>
-                    </table>
-                    <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
-                        <div style="display:flex; gap:10px;">
-                            <button class="btn btn-danger" onclick="voidBill(${billId})">VOID</button>
-                        </div>
-                        <div style="text-align:right; font-size:1.2rem; font-weight:bold; color:var(--success);">
-                            Total: ₹${total.toFixed(2)}
-                        </div>
-                    </div>
-                `;
-
-                container.innerHTML = html;
-            } catch (e) {
-                container.innerHTML = '<div style="color:red;">Failed to load items</div>';
-            }
-        }
-
-        async function voidBill(billId) {
-            if (!confirm("Are you sure you want to VOID this bill?")) return;
-            try {
-                const res = await fetch('/api/cancel-bill', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ bill_id: billId })
-                });
-                const result = await res.json();
-                if (result.status === 'success') {
-                    alert("Bill Voided!");
-                    openHistory(); 
-                } else alert(result.message);
-            } catch (e) { alert("Action failed"); }
-        }
-
-        async function printBill(invoiceNo, total, payMode, billDate, billTime) {
-            try {
-                const response = await fetch('/api/print-thermal', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        items: items,
-                        bill_no: invoiceNo,
-                        bill_date: billDate,
-                        bill_time: billTime,
-                        bill_type: payMode
-                    })
-                });
-                const result = await response.json();
-                if (result.status !== 'success') {
-                    console.error("Thermal print failed:", result.message);
-                }
-            } catch (err) {
-                console.error("Thermal print error:", err);
-            }
-        }
-
-        // 4. KEYBOARD SHORTCUTS
-        window.addEventListener('keydown', (e) => {
-            // Prevent default function key behavior for the app
-            switch(e.key) {
-                case 'F2':
-                    e.preventDefault();
-                    qrInput.focus();
-                    break;
-                case 'F3':
-                    e.preventDefault();
-                    productNameInput.focus();
-                    break;
-                case 'F4':
-                    e.preventDefault();
-                    qtyInput.focus();
-                    qtyInput.select();
-                    break;
-                case 'F8':
-                    e.preventDefault();
-                    payModeSelect.focus();
-                    break;
-                case 'F9':
-                    e.preventDefault();
-                    openSettleModal();
-                    break;
-                case 'Enter':
-                    // If settlement modal is open, Enter confirms it
-                    if (document.getElementById('settleModal').style.display === 'flex') {
-                        e.preventDefault();
-                        document.getElementById('final_confirm_btn').click();
-                        return;
-                    }
-                    // Global Enter only settles if we are NOT in an input field 
-                    // (prevents double triggers since inputs have their own handlers)
-                    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT' && items.length > 0) {
-                        e.preventDefault();
-                        openSettleModal();
-                    }
-                    break;
-                case 'Escape':
-                    if (document.getElementById('settleModal').style.display === 'flex') {
-                        closeSettleModal();
-                    }
-                    if (document.getElementById('historyModal').style.display === 'flex') {
-                        closeHistory();
-                    }
-                    break;
-            }
-        });
-
-        // Add Enter support for Pay Mode selection
-        payModeSelect.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                e.stopPropagation(); // Prevent bubbling
-                openSettleModal();
-            }
-        });
-
-        // Theme Toggle Logic
-        function toggleTheme() {
-            const isLight = document.documentElement.classList.toggle('light-mode');
-            document.body.classList.toggle('light-mode');
-            const icon = document.getElementById('theme_icon');
-            if (isLight) {
-                icon.classList.remove('fa-sun');
-                icon.classList.add('fa-moon');
-                localStorage.setItem('billing_theme', 'light');
-            } else {
-                icon.classList.remove('fa-moon');
-                icon.classList.add('fa-sun');
-                localStorage.setItem('billing_theme', 'dark');
-            }
-        }
-
-        // Load saved theme
-        if (localStorage.getItem('billing_theme') === 'light') {
-            document.documentElement.classList.add('light-mode');
-            document.body.classList.add('light-mode');
-            document.getElementById('theme_icon').classList.remove('fa-sun');
-            document.getElementById('theme_icon').classList.add('fa-moon');
-        }
-
-    </script>
-</body>
-
-</html>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Billing | MaplePro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* =========================================
+           ADVANCED MaplePro THEME - GLASS & NEON
+           ========================================= */
+
+        :root {
+            /* Color Palette */
+            --bg-dark: #0f172a;
+            --bg-darker: #020617;
+            --primary: #6366f1;
+            /* Indigo 500 */
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --secondary: #ec4899;
+            /* Pink 500 */
+            --accent: #06b6d4;
+            /* Cyan 500 */
+
+            --glass-bg: rgba(30, 41, 59, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-highlight: rgba(255, 255, 255, 0.03);
+
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+
+            /* Spacing & Radius */
+            --radius-lg: 16px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+
+            /* Transitions */
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        :root.light-mode {
+            --bg-dark: #f8fafc;
+            --bg-darker: #e2e8f0;
+            --primary: #4f46e5;
+            --primary-glow: rgba(79, 70, 229, 0.3);
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(0, 0, 0, 0.1);
+            --glass-highlight: rgba(0, 0, 0, 0.05);
+            --text-main: #0f172a;
+            --text-muted: #475569;
+        }
+
+        body.light-mode {
+            background: radial-gradient(circle at top left, #e0e7ff, var(--bg-dark), var(--bg-darker));
+        }
+
+        body.light-mode .brand {
+            color: #0f172a;
+            text-shadow: none;
+        }
+
+        body.light-mode .input-dark {
+            background: rgba(255, 255, 255, 0.7);
+            color: #0f172a;
+        }
+
+        body.light-mode .input-dark:focus {
+            background: #ffffff;
+        }
+
+        body.light-mode .sidebar {
+            background: rgba(248, 250, 252, 0.8);
+        }
+
+        body.light-mode th {
+            background: rgba(79, 70, 229, 0.1);
+            color: #475569;
+        }
+
+        body.light-mode tr:hover td {
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        body.light-mode .modal-content {
+            background: #ffffff;
+            color: #0f172a;
+        }
+
+        body.light-mode .modal-header {
+            background: rgba(0,0,0,0.02);
+        }
+
+        body.light-mode .bill-list {
+            background: rgba(0,0,0,0.03);
+        }
+
+        body.light-mode .shortcut-badge b {
+            color: var(--primary);
+        }
+
+        body.light-mode #grand_total_input {
+            color: #059669 !important;
+        }
+
+        body.light-mode .nav-link {
+            color: #475569;
+        }
+
+        body.light-mode .nav-link:hover {
+            background: rgba(0,0,0,0.04);
+            color: #0f172a;
+        }
+
+        body.light-mode .nav-link.active {
+            color: #4f46e5;
+            background: rgba(79,70,229,0.1);
+            border-color: rgba(79,70,229,0.3);
+        }
+
+        body.light-mode .cat-item {
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        body.light-mode .table-wrapper {
+            background: rgba(255,255,255,0.5) !important;
+        }
+        
+        body.light-mode .glass-panel {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+        }
+
+        body.light-mode .sidebar div[style*="font-weight: 600; color: white;"] {
+            color: var(--text-main) !important;
+        }
+
+        body.light-mode .bill-item-preview div[style*="color:white;"] {
+            color: var(--text-main) !important;
+        }
+
+        /* Global Reset */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: radial-gradient(circle at top left, #1e1b4b, var(--bg-dark), var(--bg-darker));
+            color: var(--text-main);
+            height: 100vh;
+            /* Fixed height for app-like layout */
+            display: flex;
+            overflow: hidden;
+            /* Prevent body scroll, handle in main */
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* =========================================
+           SIDEBAR COMPONENT
+           ========================================= */
+        .sidebar {
+            width: 260px;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            z-index: 50;
+            transition: width 0.3s var(--ease-out);
+        }
+
+        .brand {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        .brand i {
+            color: var(--primary);
+        }
+
+        .nav-menu {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: var(--radius-md);
+            transition: all 0.2s;
+            font-weight: 500;
+            border: 1px solid transparent;
+        }
+
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.03);
+            color: white;
+            transform: translateX(4px);
+        }
+
+        .nav-link.active {
+            background: linear-gradient(90deg, rgba(99, 102, 241, 0.15), transparent);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            color: #818cf8;
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.1);
+        }
+
+        /* =========================================
+           MAIN LAYOUT & CARDS
+           ========================================= */
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 30px;
+            position: relative;
+            background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wMykiLz48L3N2Zz4=');
+        }
+
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        /* =========================================
+           FORMS & INPUTS - FUTURISTIC
+           ========================================= */
+        .form-group label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .input-dark {
+            width: 100%;
+            background: rgba(2, 6, 23, 0.5);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.95rem;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .input-dark:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+            background: rgba(2, 6, 23, 0.8);
+        }
+
+        /* =========================================
+           TABLES - DATA RICH
+           ========================================= */
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: rgba(99, 102, 241, 0.2);
+            text-align: left;
+            padding: 14px;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        td {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--text-main);
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* =========================================
+           BUTTONS - NEON
+           ========================================= */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), #4f46e5);
+            color: white;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success), #059669);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            color: white;
+        }
+
+        /* =========================================
+           UTILITIES & ANIMATIONS
+           ========================================= */
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .gap-10 {
+            gap: 10px;
+        }
+
+        .gap-20 {
+            gap: 20px;
+        }
+
+        .mt-20 {
+            margin-top: 20px;
+        }
+
+        .mb-20 {
+            margin-bottom: 20px;
+        }
+
+        .w-full {
+            width: 100%;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade {
+            animation: fadeIn 0.5s var(--ease-out) forwards;
+        }
+
+        .shortcut-badge {
+            transition: all 0.2s;
+            cursor: default;
+        }
+
+        .shortcut-badge:hover {
+            background: rgba(99, 102, 241, 0.2) !important;
+            border-color: var(--primary) !important;
+            transform: translateY(-1px);
+        }
+    </style>
+    <style>
+        /* Specific Overrides for Billing Grid */
+        .billing-grid {
+            display: grid;
+            grid-template-rows: auto auto 1fr auto;
+            height: 100vh;
+            gap: 10px;
+        }
+
+        .entry-bar {
+            display: grid;
+            grid-template-columns: 50px 100px 100px 2fr 80px 80px 80px 100px 80px 100px;
+            gap: 10px;
+            align-items: end;
+            padding: 20px;
+        }
+
+        .footer-panel {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .cat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px 20px;
+            font-size: 0.85rem;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .cat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .cat-val {
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        /* MODAL STYLES */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: var(--bg-darker);
+            border: 1px solid var(--glass-border);
+            width: 80%;
+            max-width: 900px;
+            height: 80vh;
+            border-radius: var(--radius-lg);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            padding: 20px;
+            background: rgba(255,255,255,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .modal-body {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .bill-list {
+            width: 30%;
+            border-right: 1px solid var(--glass-border);
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .bill-item-preview {
+            padding: 15px;
+            border-bottom: 1px solid var(--glass-border);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .bill-item-preview:hover,
+        .bill-item-preview.active {
+            background: rgba(99, 102, 241, 0.1);
+            border-left: 3px solid var(--primary);
+        }
+
+        .bill-details {
+            width: 70%;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        /* SETTLEMENT CONFIRMATION MODAL */
+        #settleModal .modal-content {
+            max-width: 450px;
+            height: auto;
+            border: 1px solid var(--primary);
+            box-shadow: 0 0 40px var(--primary-glow);
+        }
+
+        .confirm-card {
+            padding: 30px;
+            text-align: center;
+        }
+
+        .confirm-total {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: var(--success);
+            margin: 10px 0;
+            text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .confirm-meta {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .confirm-badge {
+            background: rgba(255,255,255,0.05);
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .confirm-badge b {
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="sidebar">
+        <div class="brand"><img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> MaplePro</div>
+        <ul class="nav-menu">
+            <li><a href="/sales/dashboard" class="nav-link"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+            <li><a href="/sales/billing" class="nav-link active"><i class="fa-solid fa-cart-shopping"></i> Billing</a></li>
+            <li><a href="/sales/expenses" class="nav-link"><i class="fa-solid fa-receipt"></i> Expenses</a></li>
+            <li><a href="/sales/preview" class="nav-link"><i class="fa-solid fa-eye"></i> Preview Bills</a></li>
+            <li><a href="/sales/report" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Reports</a></li>
+            <li><a href="/sales/returns" class="nav-link"><i class="fa-solid fa-rotate-left"></i> Returns & Voids</a></li>
+        </ul>
+        <div style="margin-top: auto;">
+            <div style="padding: 12px 16px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: var(--radius-md); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 12px;">
+                <div style="width: 32px; height: 32px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white;">
+                    {{ session.username[0].upper() if session.username else 'C' }}
+                </div>
+                <div>
+                    <div style="font-size: 0.85rem; font-weight: 600; color: white;">
+                        {% if session.username.startswith('counter') %}Counter - {{ session.username[7:] }}
+                        {% else %}{{ session.username|capitalize }}{% endif %}
+                    </div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Active Session</div>
+                </div>
+            </div>
+            <a href="/" class="nav-link" style="color: var(--danger);"><i class="fa-solid fa-power-off"></i> Logout</a>
+        </div>
+    </nav>
+
+    <main class="main-content" style="padding: 0; display: flex; flex-direction: column;">
+
+        <!-- TOP HEADER -->
+        <div class="glass-panel"
+            style="margin: 10px; padding: 15px; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <img src="/images/logo.ico" style="width: 24px; height: 24px; object-fit: contain;">
+                <span style="color: var(--warning); font-weight: 800; letter-spacing: 1px; font-size: 1.1rem;">MAPLEPRO</span>
+            </div>
+
+            <!-- KEYBOARD SHORTCUTS LEGEND -->
+            <div style="display: flex; gap: 15px; align-items: center; background: rgba(0,0,0,0.2); padding: 6px 15px; border-radius: 20px; border: 1px solid var(--glass-border); font-size: 0.75rem; letter-spacing: 0.5px;">
+                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F2</b> CODE</span>
+                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F3</b> NAME</span>
+                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F4</b> QTY</span>
+                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F8</b> METHOD</span>
+                <span class="shortcut-badge" style="color: var(--text-muted);"><b style="color: var(--primary); font-weight: 800;">F9</b> SETTLE</span>
+            </div>
+            <div style="display: flex; gap: 20px; font-size: 0.9rem;">
+                <button id="theme_toggle" class="btn" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.8rem; padding: 0 12px;" onclick="toggleTheme()" title="Toggle Light/Dark Mode">
+                    <i class="fa-solid fa-sun" id="theme_icon"></i>
+                </button>
+                <div class="flex-between gap-10">
+                    <span style="color: var(--text-muted);">DOC ID</span>
+                    <span id="doc_id_display" class="glass-panel"
+                        style="padding: 4px 10px; font-family: monospace; font-weight: bold; color: var(--primary);">00000</span>
+                </div>
+                <div class="flex-between gap-10">
+                    <span style="color: var(--text-muted);">DATE</span>
+                    <span id="current_date_display" class="glass-panel" style="padding: 4px 10px;">00-00-0000</span>
+                </div>
+                <button onclick="openHistory()" class="btn"
+                    style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.8rem;">
+                    <i class="fa-solid fa-clock-rotate-left"></i> HISTORY
+                </button>
+            </div>
+
+        </div>
+
+        <!-- ENTRY BAR -->
+        <div class="entry-bar glass-panel" style="margin: 0 10px;">
+            <div class="form-group"><label>#</label><input class="input-dark" value="1" readonly
+                    style="text-align: center;"></div>
+            <div class="form-group"><label>QR Code</label><input id="qr_search" class="input-dark" placeholder="Scan..."
+                    autofocus style="border-color: var(--accent);"></div>
+            <div class="form-group"><label>Category</label><input id="category" class="input-dark" placeholder="Cat">
+            </div>
+            <div class="form-group"><label>Product Name</label><input id="prod_name" class="input-dark"
+                    placeholder="Item Name"></div>
+            <div class="form-group"><label>Stock</label><input id="stock" class="input-dark" value="0" readonly></div>
+            <div class="form-group"><label>Unit</label><input id="unit" class="input-dark" value="PCS" readonly></div>
+            <div class="form-group"><label>Qty</label><input id="qty" class="input-dark" value="1"
+                    style="background: var(--warning); color: black; font-weight: bold; text-align: center;"></div>
+            <div class="form-group"><label>Rate</label><input id="rate" class="input-dark" value="0.00"></div>
+            <div class="form-group"><label>BIZ</label><input id="biz" class="input-dark" value="0"></div>
+            <div class="form-group"><label>Amount</label><input id="amount" class="input-dark" value="0.00" readonly
+                    style="font-weight: bold;"></div>
+        </div>
+
+        <!-- TABLE -->
+        <div style="flex: 1; margin: 10px; overflow: hidden; display: flex; flex-direction: column;">
+            <div class="table-wrapper" style="flex: 1; background: rgba(0,0,0,0.2);">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">#</th>
+                            <th style="width: 100px;">QR</th>
+                            <th>Product</th>
+                            <th style="width: 80px;">Stk</th>
+                            <th style="width: 80px;">Unit</th>
+                            <th style="width: 80px;">Qty</th>
+                            <th style="width: 100px;">Rate</th>
+                            <th style="width: 80px;">BIZ</th>
+                            <th style="width: 120px;">Amount</th>
+                            <th style="width: 50px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="bill_body">
+                        <!-- Dynamic rows will appear here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer-panel glass-panel" style="margin: 0 10px 10px;">
+            <!-- Dynamic Category Summary -->
+            <div id="category_summary_grid" class="cat-grid">
+                <!-- Populated via JS -->
+            </div>
+
+            <!-- Totals -->
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div class="flex-between">
+                    <span style="color: var(--text-muted);">NET TOTAL</span>
+                    <input id="grand_total_input" class="input-dark" value="0.00" readonly
+                        style="width: 150px; text-align: right; font-weight: bold; font-size: 1.1rem; color: var(--success);">
+                </div>
+                <div class="flex-between">
+                    <span style="color: var(--text-muted); font-size: 0.8rem;">TSC CHARGE</span>
+                    <span id="tsc_display" style="color: var(--accent); font-weight: bold;">₹0.00</span>
+                </div>
+                <div class="flex-between">
+                    <span style="color: var(--text-muted);">PAY MODE</span>
+                    <select id="pay_mode" class="input-dark" style="width: 150px;">
+                        <option value="CASH">CASH</option>
+                        <option value="UPI">UPI</option>
+                        <option value="CARD">CARD</option>
+                        <option value="CREDIT">CREDIT </option>
+                    </select>
+                </div>
+                <div class="flex-between" style="padding: 10px; background: rgba(220,38,38,0.1); border-radius: 5px; border: 1px solid rgba(220,38,38,0.3); margin-top: 10px;">
+                    <label for="test_mode_toggle" style="color: var(--danger); font-weight: bold; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; letter-spacing: 0.5px;">
+                        <input type="checkbox" id="test_mode_toggle" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--danger);">
+                        TEST MODE (SAVE ONLY, NO PRINT)
+                    </label>
+                </div>
+                <button id="save_bill_btn" class="btn btn-primary w-full mt-20" style="font-size: 1rem; padding: 15px;">
+                    <i class="fa-solid fa-check-double"></i> COMPLETE SALE
+                </button>
+            </div>
+        </div>
+
+    
+<style>
+    @media print {
+        .dynamic-footer {
+            display: none !important;
+        }
+    }
+</style>
+<footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
+    <p>© 2025 Sagar Nilgiri Products | Maple Pro</p>
+</footer>
+</main>
+
+    <!-- HIDDEN THERMAL RECEIPT TEMPLATE -->
+    <div id="receipt-template" style="display: none;">
+        <div class="receipt-copy">
+            <div class="copy-label"></div>
+            <div class="shop-title">
+                <div>SAGAR</div>
+                <div>NILGIRI PRODUCTS</div>
+                <div>SUPER</div>
+            </div>
+            <div class="full-copy-only shop-address">
+                <div>36 COMMERCIAL ROAD, NEXT TO A2B RESTAURANT,</div>
+                <div>OOTY - 643001</div>
+            </div>
+            <div class="full-copy-only meta-row">
+                <span class="print_phone">Ph: 9363596124</span>
+                <span class="print_type">Type: UPI</span>
+            </div>
+            <div class="short-copy-only meta-row">
+                <span>office purpose only</span>
+                <span class="print_type">Type: UPI</span>
+            </div>
+            <div class="full-copy-only meta-row">
+                <span class="print_gstin">GSTIN: 33ACMPC6407B1Z7</span>
+                <span class="print_date">Date: 09-04-2026</span>
+            </div>
+            <div class="short-copy-only meta-row">
+                <span class="print_date">Date: 09-04-2026</span>
+            </div>
+            <div class="meta-row">
+                <span class="print_bill_id">Bill No: SS#014682</span>
+                <span class="print_time">Time: 02:39 PM</span>
+            </div>
+            <div class="dashed"></div>
+            <div class="items-head">
+                <span class="product-head">Product</span>
+                <span>Qty</span>
+                <span>Rate</span>
+                <span>Amount</span>
+            </div>
+            <table class="items-table">
+                <tbody class="print_items_body"></tbody>
+            </table>
+            <div class="dashed"></div>
+            <div class="total-line">
+                <span>Total:</span>
+                <span class="print_total_val">0.00</span>
+            </div>
+            <div class="center-note">(PRICES INCLUSIVE OF GST)</div>
+            <div class="dashed"></div>
+            <div class="mode-line">
+                <span class="print_mode_label">UPI:</span>
+                <span class="print_mode_val">0.00</span>
+            </div>
+            <div class="center-note">(Rounded off to Nearest Rupees)</div>
+            <div class="dashed"></div>
+            <div class="full-copy-only footer-block">
+                <div>FIXED PRICE</div>
+                <div>Sagar - Since 1964</div>
+                <div>COMMITTED TO QUALITY</div>
+                <div class="shop-online">SHOP ONLINE @</div>
+                <div class="website">www.sagarnilgiriproducts.com</div>
+                <div class="thanks">*Thanks for shopping***Kindly Visit Again*</div>
+                <div style="font-weight: bold; margin: 5px 0;">No return no replacement</div>
+                <div class="trust">CELEBRATING 60 YEARS OF TRUST</div>
+            </div>
+            <div class="short-copy-only footer-block short-footer">
+                <div class="bill-copy">BILL COPY</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HISTORY MODAL -->
+    <div id="historyModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-clock-rotate-left"></i> Recent Bills</h3>
+                <button onclick="closeHistory()" class="btn btn-danger" style="padding: 5px 10px;"><i
+                        class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <!-- Left Side: List of Bills -->
+                <div class="bill-list" id="recent_bills_list">
+                    <!-- Loaded dynamically -->
+                </div>
+                <!-- Right Side: Bill Details -->
+                <div class="bill-details" id="bill_detail_view">
+                    <div style="text-align: center; color: var(--text-muted); margin-top: 100px;">
+                        Select a bill to view details
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTLEMENT CONFIRMATION MODAL -->
+    <div id="settleModal" class="modal-overlay">
+        <div class="modal-content animate-fade">
+            <div class="modal-header" style="border-bottom: none;">
+                <h3 style="color: var(--primary);"><i class="fa-solid fa-file-invoice-dollar"></i> CONFIRM SALE</h3>
+                <button onclick="closeSettleModal()" class="btn" style="background: transparent; color: var(--text-muted); font-size: 1.5rem;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="confirm-card">
+                <div style="color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem;">Grand Total</div>
+                <div id="confirm_total_display" class="confirm-total">₹0.00</div>
+                
+                <div class="confirm-meta">
+                    <div class="confirm-badge">PAYMENT: <b id="confirm_mode_display">CASH</b></div>
+                    <div id="confirm_tsc_badge" class="confirm-badge" style="display:none;">TSC: <b id="confirm_tsc_val">₹0.00</b></div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px;">
+                    <button onclick="closeSettleModal()" class="btn" style="background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); color: white; padding: 15px;">
+                        CANCEL (ESC)
+                    </button>
+                    <button id="final_confirm_btn" class="btn btn-success" style="padding: 15px; font-size: 1rem; box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);">
+                        CONFIRM & PRINT (ENTER)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const qrInput = document.getElementById('qr_search');
+        const productNameInput = document.getElementById('prod_name');
+        const qtyInput = document.getElementById('qty');
+        const rateInput = document.getElementById('rate');
+        const amountInput = document.getElementById('amount');
+        const stockInput = document.getElementById('stock');
+        const catInput = document.getElementById('category');
+        const unitInput = document.getElementById('unit');
+        const tableBody = document.getElementById('bill_body');
+        const grandTotalInput = document.getElementById('grand_total_input');
+        const saveBtn = document.getElementById('save_bill_btn');
+        const payModeSelect = document.getElementById('pay_mode');
+
+        let items = [];
+        let currentProduct = null;
+        let correctionData = { isCorrection: false, sourceBillId: null };
+        let isSavingBill = false;
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function formatReceiptBillNo(value) {
+            const raw = String(value ?? '').trim();
+            if (!raw) return 'SS#000000';
+            if (/^SS#/i.test(raw)) return raw;
+            const digits = raw.replace(/\D/g, '');
+            if (!digits) return `SS#${raw}`;
+            return `SS#${digits.padStart(6, '0')}`;
+        }
+
+        function formatMoney(value) {
+            return Number(value || 0).toFixed(2);
+        }
+
+        function setTextAll(root, selector, value) {
+            root.querySelectorAll(selector).forEach(node => {
+                node.innerText = value;
+            });
+        }
+
+        function createBillRequestId() {
+            if (window.crypto && window.crypto.randomUUID) {
+                return window.crypto.randomUUID();
+            }
+            return `bill-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        }
+
+        // 1. QR CODE SCAN & AUTO-ADD (with 3s Delay)
+        let isFetchingProduct = false;
+        let scanTimeout = null;
+        let autoAddTimeout = null;
+
+        function processPendingAutoAdd() {
+            if (autoAddTimeout) {
+                clearTimeout(autoAddTimeout);
+                autoAddTimeout = null;
+                // Only add if there's actually a product selected in the inputs
+                if (currentProduct) {
+                    addItem();
+                }
+            }
+        }
+
+        function parseWeighingBarcode(barcode) {
+            if (barcode.length > 4 && /^\d+$/.test(barcode)) {
+                return {
+                    code: barcode.substring(0, 4),
+                    weight: parseFloat(barcode.substring(4)) || 0
+                };
+            }
+            return null;
+        }
+
+        qrInput.addEventListener('input', () => {
+            const rawBarcode = qrInput.value.trim();
+            if (!rawBarcode) return;
+
+            // Small debounce for the actual scan/type action
+            clearTimeout(scanTimeout);
+            scanTimeout = setTimeout(async () => {
+                if (isFetchingProduct || !qrInput.value.trim()) return;
+                
+                isFetchingProduct = true;
+                try {
+                    // 1. Try to fetch exact full barcode match first
+                    const response = await fetch(`/api/products?q=${encodeURIComponent(rawBarcode)}`);
+                    const products = await response.json();
+
+                    let exactMatch = products.find(p => String(p.barcode) === rawBarcode);
+                    let parsed = null;
+
+                    if (!exactMatch && rawBarcode.length > 4 && /^\d+$/.test(rawBarcode)) {
+                        // 2. Fallback: Check if it's a weighing scale barcode (first 4 digits = code)
+                        const scannedCode = rawBarcode.substring(0, 4);
+                        const scannedWeight = parseFloat(rawBarcode.substring(4)) || 0;
+                        
+                        const retryRes = await fetch(`/api/products?q=${encodeURIComponent(scannedCode)}`);
+                        const retryProducts = await retryRes.json();
+                        
+                        exactMatch = retryProducts.find(p => String(p.barcode) === scannedCode);
+                        if (exactMatch) {
+                            parsed = { code: scannedCode, weight: scannedWeight };
+                        }
+                    }
+
+                    if (exactMatch) {
+                        // 1. If there's a pending item from a previous scan, add it now
+                        processPendingAutoAdd();
+
+                        // 2. Immediately fill the "area" (inputs)
+                        selectProduct(exactMatch);
+
+                        if (parsed) {
+                            qtyInput.value = parsed.weight;
+                            updateRowAmount();
+                        }
+                        
+                        qrInput.value = ''; // Clear QR input so they can scan next one
+                        
+                        // 3. Wait 1 second before moving it "down" to the cart
+                        autoAddTimeout = setTimeout(() => {
+                            addItem();
+                            autoAddTimeout = null;
+                        }, 1000);
+                    }
+                } catch (err) {
+                    console.error("Auto-scan error:", err);
+                } finally {
+                    isFetchingProduct = false;
+                }
+            }, 150); 
+        });
+
+        // Backup for Enter key (immediate action)
+        qrInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation(); // Prevent bubbling to window listener
+                clearTimeout(scanTimeout);
+                processPendingAutoAdd(); // Add any existing pending item
+                
+                if (isFetchingProduct) return;
+
+                const rawBarcode = qrInput.value.trim();
+                if (!rawBarcode) {
+                    // IF EMPTY: Trigger Settle (Complete Sale)
+                    if (items.length > 0) {
+                        e.preventDefault();
+                        saveBtn.click();
+                    }
+                    return;
+                }
+
+                isFetchingProduct = true;
+                try {
+                    const response = await fetch(`/api/products?q=${encodeURIComponent(rawBarcode)}`);
+                    const products = await response.json();
+
+                    let match = products.find(p => String(p.barcode) === rawBarcode);
+                    let parsed = null;
+
+                    if (!match && rawBarcode.length > 4 && /^\d+$/.test(rawBarcode)) {
+                        const scannedCode = rawBarcode.substring(0, 4);
+                        const scannedWeight = parseFloat(rawBarcode.substring(4)) || 0;
+                        
+                        const retryRes = await fetch(`/api/products?q=${encodeURIComponent(scannedCode)}`);
+                        const retryProducts = await retryRes.json();
+                        
+                        match = retryProducts.find(p => String(p.barcode) === scannedCode) || retryProducts[0];
+                        if (match) {
+                            parsed = { code: scannedCode, weight: scannedWeight };
+                        }
+                    } else if (!match && products.length > 0) {
+                        match = products[0];
+                    }
+
+                    if (match) {
+                        selectProduct(match);
+                        if (parsed) {
+                            qtyInput.value = parsed.weight;
+                            updateRowAmount();
+                        }
+                        addItem();
+                    } else {
+                        alert("Product not found!");
+                        qrInput.focus();
+                        qrInput.select();
+                    }
+                } catch (err) {
+                    console.error("Fetch error:", err);
+                    qrInput.focus();
+                } finally {
+                    isFetchingProduct = false;
+                }
+            }
+        });
+
+        // Product Name Search (Enter)
+        productNameInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation(); // Prevent bubbling
+                const query = productNameInput.value.trim();
+                if (!query) return;
+                
+                try {
+                    const response = await fetch(`/api/products?q=${encodeURIComponent(query)}`);
+                    const products = await response.json();
+                    if (products.length > 0) {
+                        selectProduct(products[0]);
+                        qtyInput.focus();
+                        qtyInput.select();
+                    } else {
+                        // If not found, allow manual entry or move to next field
+                        rateInput.focus();
+                        rateInput.select();
+                    }
+                } catch (err) {
+                    console.error("Search error:", err);
+                }
+            }
+        });
+
+        function selectProduct(product) {
+            currentProduct = product;
+            catInput.value = product.category;
+            productNameInput.value = product.name;
+            rateInput.value = product.price;
+            unitInput.value = product.unit;
+            stockInput.value = product.current_stock;
+            qtyInput.value = 1;
+            document.getElementById('biz').value = product.bizz || 0; // Auto-fill BIZZ
+            updateRowAmount();
+        }
+
+        function updateRowAmount() {
+            const qty = parseFloat(qtyInput.value) || 0;
+            const rate = parseFloat(rateInput.value) || 0;
+            amountInput.value = (qty * rate).toFixed(2);
+        }
+
+        [qtyInput, rateInput].forEach(inp => inp.addEventListener('input', updateRowAmount));
+
+        // 2. ADD ITEM ON ENTER IN QTY
+        qtyInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation(); // Prevent bubbling
+                addItem();
+            }
+        });
+
+        function addItem() {
+            if (!currentProduct) {
+                const manualName = productNameInput.value;
+                if (!manualName) return;
+            }
+
+            const name = productNameInput.value;
+            const qtyToAdd = parseFloat(qtyInput.value) || 0;
+            const rate = parseFloat(rateInput.value) || 0;
+            const biz = parseFloat(document.getElementById('biz').value) || 0;
+            const qr = currentProduct ? currentProduct.barcode : "";
+
+            if (!name || qtyToAdd <= 0) {
+                alert("Select product and quantity!");
+                return;
+            }
+
+            // Enhanced Stock Check (Aggregate Cart Qty)
+            const existingItem = items.find(item => item.name === name);
+            const currentQtyInCart = existingItem ? existingItem.qty : 0;
+            const totalQty = currentQtyInCart + qtyToAdd;
+            const stockAvailable = currentProduct ? currentProduct.current_stock : (parseFloat(stockInput.value) || 0);
+
+            if (totalQty > stockAvailable) {
+                alert(`Insufficient Stock! Available: ${stockAvailable}, Already in cart: ${currentQtyInCart}, Requested: ${qtyToAdd}`);
+                return;
+            }
+
+            if (existingItem) {
+                // Update existing item
+                existingItem.qty = totalQty;
+                existingItem.amount = existingItem.qty * existingItem.rate;
+            } else {
+                // Add new item
+                items.push({
+                    qr: qr,
+                    name: name,
+                    category: catInput.value,
+                    unit: unitInput.value,
+                    stock: stockAvailable,
+                    qty: qtyToAdd,
+                    rate: rate,
+                    bizz: biz,
+                    amount: qtyToAdd * rate
+                });
+            }
+
+            renderTable();
+            clearInputs();
+        }
+
+        function clearInputs() {
+            qrInput.value = '';
+            productNameInput.value = '';
+            qtyInput.value = '1';
+            rateInput.value = '0.00';
+            amountInput.value = '0.00';
+            catInput.value = '';
+            stockInput.value = '0';
+            document.getElementById('biz').value = '0';
+            qrInput.focus();
+            currentProduct = null;
+        }
+
+        function renderTable() {
+            tableBody.innerHTML = '';
+            let total = 0;
+            const catSummary = {};
+
+            items.forEach((item, index) => {
+                total += item.amount;
+
+                // Track category totals
+                const cat = item.category || 'GENERAL';
+                catSummary[cat] = (catSummary[cat] || 0) + item.amount;
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${item.qr || '-'}</td>
+                    <td>${item.name}</td>
+                    <td>${item.stock || '-'}</td>
+                    <td>${item.unit || 'PCS'}</td>
+                    <td>${item.qty}</td>
+                    <td>${item.rate.toFixed(2)}</td>
+                    <td>${item.bizz}%</td>
+                    <td style="font-weight: bold;">${item.amount.toFixed(2)}</td>
+                    <td><i class="fa-solid fa-trash" style="color: var(--danger); cursor: pointer;" onclick="removeItem(${index})"></i></td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            grandTotalInput.value = total.toFixed(2);
+            renderCategorySummary(catSummary);
+            updateTscDisplay(total);
+        }
+
+        function updateTscDisplay(total) {
+            let tscPercent = 0;
+            if (total >= 10000) tscPercent = 3.0;
+            else if (total >= 7000) tscPercent = 2.5;
+            else if (total >= 5000) tscPercent = 2.0;
+            else if (total >= 2500) tscPercent = 1.5;
+            else if (total >= 1000) tscPercent = 1.0;
+
+            const tscAmt = (total * tscPercent) / 100;
+            document.getElementById('tsc_display').innerText = `₹${tscAmt.toFixed(2)} (${tscPercent}%)`;
+        }
+
+        function renderCategorySummary(summary) {
+            const grid = document.getElementById('category_summary_grid');
+            grid.innerHTML = '';
+
+            Object.keys(summary).sort().forEach(cat => {
+                const div = document.createElement('div');
+                div.className = 'cat-item';
+                div.innerHTML = `<span>${cat.toUpperCase()}</span> <span class="cat-val">${summary[cat].toFixed(2)}</span>`;
+                grid.appendChild(div);
+            });
+
+            if (Object.keys(summary).length === 0) {
+                grid.innerHTML = '<div class="cat-item"><span>READY</span> <span class="cat-val">0.00</span></div>';
+            }
+        }
+
+        window.removeItem = (index) => {
+            items.splice(index, 1);
+            renderTable();
+        };
+
+        // 3. SETTLE MODAL FLOW
+        function openSettleModal() {
+            if (items.length === 0) {
+                alert("No items in bill!");
+                return;
+            }
+            const total = parseFloat(grandTotalInput.value);
+            const payMode = payModeSelect.value;
+            
+            document.getElementById('confirm_total_display').innerText = `₹${total.toFixed(2)}`;
+            document.getElementById('confirm_mode_display').innerText = payMode;
+            
+            // Show TSC in modal if applicable
+            const tscText = document.getElementById('tsc_display').innerText;
+            if (tscText.includes('₹') && !tscText.includes('₹0.00')) {
+                document.getElementById('confirm_tsc_badge').style.display = 'block';
+                document.getElementById('confirm_tsc_val').innerText = tscText.split(' ')[0];
+            } else {
+                document.getElementById('confirm_tsc_badge').style.display = 'none';
+            }
+
+            document.getElementById('settleModal').style.display = 'flex';
+            document.getElementById('final_confirm_btn').focus();
+        }
+
+        function closeSettleModal() {
+            document.getElementById('settleModal').style.display = 'none';
+            qrInput.focus();
+        }
+
+        saveBtn.addEventListener('click', openSettleModal);
+
+        document.getElementById('final_confirm_btn').addEventListener('click', async () => {
+            if (isSavingBill) return;
+            isSavingBill = true;
+            const btn = document.getElementById('final_confirm_btn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> SAVING...';
+
+            const total = parseFloat(grandTotalInput.value);
+            const payMode = payModeSelect.value;
+
+            try {
+                const response = await fetch('/api/save-bill', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: items,
+                        total: total,
+                        payment_mode: payMode,
+                        is_correction: correctionData.isCorrection,
+                        source_bill_id: correctionData.sourceBillId
+                    })
+                });
+
+                const result = await response.json();
+                if (result.status === 'success') {
+                    if (!document.getElementById('test_mode_toggle').checked) {
+                        printBill(
+                            result.invoice_display || result.invoice_no,
+                            total,
+                            payMode,
+                            result.bill_date,
+                            result.bill_time
+                        );
+                    } else {
+                        // Visual confirmation for testing so they know it saved
+                        alert(`TEST MODE: Bill #${formatReceiptBillNo(result.invoice_display || result.invoice_no)} saved successfully to database without printing.`);
+                    }
+                    items = [];
+                    renderTable();
+                    fetchNextDocId();
+                    correctionData = { isCorrection: false, sourceBillId: null };
+                    closeSettleModal();
+                } else {
+                    alert(result.message);
+                }
+            } catch (err) {
+                alert("Error saving bill: " + err);
+            } finally {
+                isSavingBill = false;
+                btn.disabled = false;
+                btn.innerHTML = 'CONFIRM & PRINT (ENTER)';
+            }
+        });
+
+        async function fetchNextDocId() {
+            try {
+                const response = await fetch('/api/next-invoice');
+                const data = await response.json();
+                document.getElementById('doc_id_display').innerText = data.display_id || formatReceiptBillNo(data.next_id);
+            } catch (e) { console.error("Doc ID fail", e); }
+        }
+
+        function setTodayDate() {
+            const today = new Date();
+            const dd = String(today.getDate()).padStart(2, '0');
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const yyyy = today.getFullYear();
+            document.getElementById('current_date_display').innerText = `${dd}-${mm}-${yyyy}`;
+        }
+
+        async function checkReprocess() {
+            try {
+                const response = await fetch('/api/reprocess/load');
+                const data = await response.json();
+                if (data.cart && data.cart.length > 0) {
+                    items = data.cart;
+                    correctionData.isCorrection = true;
+                    correctionData.sourceBillId = data.source_bill_id;
+                    renderTable();
+                    alert("Corrected Items Loaded for Bill #" + data.source_bill_id);
+                }
+            } catch (e) { console.error("Reprocess load failed", e); }
+        }
+
+        fetchNextDocId();
+        setTodayDate();
+        checkReprocess();
+
+        async function openHistory() {
+            document.getElementById('historyModal').style.display = 'flex';
+            const listContainer = document.getElementById('recent_bills_list');
+            listContainer.innerHTML = '<div style="padding:20px; text-align:center;">Loading...</div>';
+
+            try {
+                const response = await fetch('/api/bills/recent');
+                const bills = await response.json();
+
+                listContainer.innerHTML = '';
+                bills.forEach(bill => {
+                    const div = document.createElement('div');
+                    div.className = 'bill-item-preview';
+                    div.innerHTML = `
+                        <div style="font-weight:bold; color:white;">Bill #${formatReceiptBillNo(bill.invoice_no)}</div>
+                        <div style="font-size:0.8rem; color:var(--text-muted); display:flex; justify-content:space-between;">
+                            <span>${new Date(bill.bill_date).toLocaleTimeString()}</span>
+                            <span style="color:var(--success); font-weight:bold;">₹${parseFloat(bill.total_amount).toFixed(2)}</span>
+                        </div>
+                    `;
+                    div.onclick = () => loadBillDetails(bill.id, div);
+                    listContainer.appendChild(div);
+                });
+            } catch (e) {
+                listContainer.innerHTML = '<div style="padding:20px; color:red;">Error loading history</div>';
+            }
+        }
+
+        function closeHistory() {
+            document.getElementById('historyModal').style.display = 'none';
+        }
+
+        async function loadBillDetails(billId, element) {
+            document.querySelectorAll('.bill-item-preview').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+
+            const container = document.getElementById('bill_detail_view');
+            container.innerHTML = '<div style="text-align:center; margin-top:50px;">Loading details...</div>';
+
+            try {
+                const response = await fetch(`/api/bills/${billId}/items`);
+                const itemsList = await response.json();
+
+                let html = `
+                    <h3 style="margin-bottom:20px; border-bottom:1px solid var(--glass-border); padding-bottom:10px;">
+                        Bill Details
+                    </h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Qty</th>
+                                <th>Rate</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                let total = 0;
+                itemsList.forEach(item => {
+                    total += item.amount;
+                    html += `
+                        <tr>
+                            <td>${item.product_name}</td>
+                            <td>${item.qty}</td>
+                            <td>${item.rate.toFixed(2)}</td>
+                            <td style="font-weight:bold;">${item.amount.toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                        </tbody>
+                    </table>
+                    <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn btn-danger" onclick="voidBill(${billId})">VOID</button>
+                        </div>
+                        <div style="text-align:right; font-size:1.2rem; font-weight:bold; color:var(--success);">
+                            Total: ₹${total.toFixed(2)}
+                        </div>
+                    </div>
+                `;
+
+                container.innerHTML = html;
+            } catch (e) {
+                container.innerHTML = '<div style="color:red;">Failed to load items</div>';
+            }
+        }
+
+        async function voidBill(billId) {
+            if (!confirm("Are you sure you want to VOID this bill?")) return;
+            try {
+                const res = await fetch('/api/cancel-bill', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bill_id: billId })
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    alert("Bill Voided!");
+                    openHistory(); 
+                } else alert(result.message);
+            } catch (e) { alert("Action failed"); }
+        }
+
+        async function printBill(invoiceNo, total, payMode, billDate, billTime) {
+            try {
+                const response = await fetch('/api/print-thermal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: items,
+                        bill_no: invoiceNo,
+                        bill_date: billDate,
+                        bill_time: billTime,
+                        bill_type: payMode
+                    })
+                });
+                const result = await response.json();
+                if (result.status !== 'success') {
+                    console.error("Thermal print failed:", result.message);
+                }
+            } catch (err) {
+                console.error("Thermal print error:", err);
+            }
+        }
+
+        // 4. KEYBOARD SHORTCUTS
+        window.addEventListener('keydown', (e) => {
+            // Prevent default function key behavior for the app
+            switch(e.key) {
+                case 'F2':
+                    e.preventDefault();
+                    qrInput.focus();
+                    break;
+                case 'F3':
+                    e.preventDefault();
+                    productNameInput.focus();
+                    break;
+                case 'F4':
+                    e.preventDefault();
+                    qtyInput.focus();
+                    qtyInput.select();
+                    break;
+                case 'F8':
+                    e.preventDefault();
+                    payModeSelect.focus();
+                    break;
+                case 'F9':
+                    e.preventDefault();
+                    openSettleModal();
+                    break;
+                case 'Enter':
+                    // If settlement modal is open, Enter confirms it
+                    if (document.getElementById('settleModal').style.display === 'flex') {
+                        e.preventDefault();
+                        document.getElementById('final_confirm_btn').click();
+                        return;
+                    }
+                    // Global Enter only settles if we are NOT in an input field 
+                    // (prevents double triggers since inputs have their own handlers)
+                    if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT' && items.length > 0) {
+                        e.preventDefault();
+                        openSettleModal();
+                    }
+                    break;
+                case 'Escape':
+                    if (document.getElementById('settleModal').style.display === 'flex') {
+                        closeSettleModal();
+                    }
+                    if (document.getElementById('historyModal').style.display === 'flex') {
+                        closeHistory();
+                    }
+                    break;
+            }
+        });
+
+        // Add Enter support for Pay Mode selection
+        payModeSelect.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation(); // Prevent bubbling
+                openSettleModal();
+            }
+        });
+
+        // Theme Toggle Logic
+        function toggleTheme() {
+            const isLight = document.documentElement.classList.toggle('light-mode');
+            document.body.classList.toggle('light-mode');
+            const icon = document.getElementById('theme_icon');
+            if (isLight) {
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+                localStorage.setItem('billing_theme', 'light');
+            } else {
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+                localStorage.setItem('billing_theme', 'dark');
+            }
+        }
+
+        // Load saved theme
+        if (localStorage.getItem('billing_theme') === 'light') {
+            document.documentElement.classList.add('light-mode');
+            document.body.classList.add('light-mode');
+            document.getElementById('theme_icon').classList.remove('fa-sun');
+            document.getElementById('theme_icon').classList.add('fa-moon');
+        }
+
+    </script>
+</body>
+
+</html>
