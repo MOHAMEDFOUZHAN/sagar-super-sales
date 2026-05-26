@@ -118,6 +118,12 @@ def auto_click_ok():
 
 def perform_database_sync(mysql_conn, pg_conn):
     """Bidirectional Sync Engine: Synchronizes counter sales, expenses, and aligns inventory."""
+    def format_dt_str(val):
+        if not val: return None
+        if hasattr(val, 'strftime'):
+            return val.strftime('%Y-%m-%d %H:%M:%S')
+        return str(val)
+
     try:
         mysql_cur = mysql_conn.cursor(dictionary=True)
         pg_cur = pg_conn.cursor(dictionary=True)
@@ -142,10 +148,12 @@ def perform_database_sync(mysql_conn, pg_conn):
                 mysql_cur.execute("SELECT * FROM bill_items WHERE bill_id = %s", (bill['id'],))
                 items = mysql_cur.fetchall()
 
+                bill_date_str = format_dt_str(bill['bill_date'])
+
                 pg_cur.execute("""
                     INSERT INTO bills (invoice_no, bill_date, total_amount, payment_mode, tsc_percent, tsc_amount, status, source_bill_id, discount, created_by)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (bill['invoice_no'], bill['bill_date'], bill['total_amount'], bill['payment_mode'], 
+                """, (bill['invoice_no'], bill_date_str, bill['total_amount'], bill['payment_mode'], 
                       bill['tsc_percent'], bill['tsc_amount'], bill['status'], bill['source_bill_id'], bill['discount'], bill['created_by']))
                 
                 new_bill_id = pg_cur.lastrowid
@@ -180,10 +188,12 @@ def perform_database_sync(mysql_conn, pg_conn):
                 pg_cur.execute("SELECT * FROM bill_items WHERE bill_id = %s", (bill['id'],))
                 items = pg_cur.fetchall()
 
+                bill_date_str = format_dt_str(bill['bill_date'])
+
                 mysql_cur.execute("""
                     INSERT INTO bills (invoice_no, bill_date, total_amount, payment_mode, tsc_percent, tsc_amount, status, source_bill_id, discount, created_by)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (bill['invoice_no'], bill['bill_date'], bill['total_amount'], bill['payment_mode'], 
+                """, (bill['invoice_no'], bill_date_str, bill['total_amount'], bill['payment_mode'], 
                       bill['tsc_percent'], bill['tsc_amount'], bill['status'], bill['source_bill_id'], bill['discount'], bill['created_by']))
                 
                 new_bill_id = mysql_cur.lastrowid
@@ -207,22 +217,48 @@ def perform_database_sync(mysql_conn, pg_conn):
                 mysql_conn.rollback()
                 print(f"[SYNC ERROR] Cloud -> Local failed for SS#{inv}: {e}")
 
+        # (c) Sync Bill Status Changes (e.g. Cancellations from the last 7 days)
+        common_invoices = mysql_invoices & pg_invoices
+        if common_invoices:
+            recent_date = (datetime.date.today() - datetime.timedelta(days=7)).isoformat()
+            
+            mysql_cur.execute("SELECT invoice_no, status FROM bills WHERE DATE(bill_date) >= %s", (recent_date,))
+            mysql_statuses = {row['invoice_no']: row['status'] for row in mysql_cur.fetchall()}
+            
+            pg_cur.execute("SELECT invoice_no, status FROM bills WHERE DATE(bill_date) >= %s", (recent_date,))
+            pg_statuses = {row['invoice_no']: row['status'] for row in pg_cur.fetchall()}
+            
+            for inv in mysql_statuses:
+                if inv in pg_statuses:
+                    m_status = mysql_statuses[inv]
+                    p_status = pg_statuses[inv]
+                    if m_status != p_status:
+                        if m_status == 'Cancelled':
+                            pg_cur.execute("UPDATE bills SET status = 'Cancelled', total_amount = 0 WHERE invoice_no = %s", (inv,))
+                            pg_conn.commit()
+                            print(f"[SYNC] Synced cancellation status for Bill SS#{inv} to Cloud.")
+                        elif p_status == 'Cancelled':
+                            mysql_cur.execute("UPDATE bills SET status = 'Cancelled', total_amount = 0 WHERE invoice_no = %s", (inv,))
+                            mysql_conn.commit()
+                            print(f"[SYNC] Synced cancellation status for Bill SS#{inv} to Local.")
+
         # ----------------------------------------------------
         # 2. SYNC EXPENSES (Bidirectional)
         # ----------------------------------------------------
         mysql_cur.execute("SELECT id, expense_date, category, amount, description FROM expenses")
-        mysql_exps = { (row['expense_date'].strftime('%Y-%m-%d') if row['expense_date'] else '', row['category'], float(row['amount'])) : row for row in mysql_cur.fetchall() }
+        mysql_exps = { (format_dt_str(row['expense_date']) if row['expense_date'] else '', row['category'], float(row['amount'])) : row for row in mysql_cur.fetchall() }
 
         pg_cur.execute("SELECT id, expense_date, category, amount, description FROM expenses")
-        pg_exps = { (row['expense_date'].strftime('%Y-%m-%d') if row['expense_date'] else '', row['category'], float(row['amount'])) : row for row in pg_cur.fetchall() }
+        pg_exps = { (format_dt_str(row['expense_date']) if row['expense_date'] else '', row['category'], float(row['amount'])) : row for row in pg_cur.fetchall() }
 
         for key, exp in mysql_exps.items():
             if key not in pg_exps:
                 try:
+                    exp_date_str = format_dt_str(exp['expense_date'])
                     pg_cur.execute("""
                         INSERT INTO expenses (expense_date, category, amount, description, source_expense_id)
                         VALUES (%s, %s, %s, %s, %s)
-                    """, (exp['expense_date'], exp['category'], exp['amount'], exp['description'], exp['id']))
+                    """, (exp_date_str, exp['category'], exp['amount'], exp['description'], exp['id']))
                     pg_conn.commit()
                 except Exception:
                     pg_conn.rollback()
@@ -230,10 +266,11 @@ def perform_database_sync(mysql_conn, pg_conn):
         for key, exp in pg_exps.items():
             if key not in mysql_exps:
                 try:
+                    exp_date_str = format_dt_str(exp['expense_date'])
                     mysql_cur.execute("""
                         INSERT INTO expenses (expense_date, category, amount, description)
                         VALUES (%s, %s, %s, %s)
-                    """, (exp['expense_date'], exp['category'], exp['amount'], exp['description']))
+                    """, (exp_date_str, exp['category'], exp['amount'], exp['description']))
                     mysql_conn.commit()
                 except Exception:
                     mysql_conn.rollback()
@@ -389,6 +426,48 @@ def get_cloud_db_connection():
     except Exception as e:
         print(f"Cloud DB Connection Error: {e}")
         return None
+
+def trigger_immediate_sync():
+    """Spawns an immediate background thread to replicate data between local and cloud instantly."""
+    def run():
+        mysql_conn = None
+        pg_conn = None
+        try:
+            # 1. Local MySQL Check
+            mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+            if not mysql_alive: return
+
+            # 2. Supabase Check
+            pg_conn = psycopg2.connect(
+                host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+                port=6543,
+                database="postgres",
+                user="postgres",
+                password=SUPABASE_PASSWORD,
+                connect_timeout=3
+            )
+            pg_conn.autocommit = True
+
+            # 3. Local MySQL connection
+            mysql_conn = mysql.connector.connect(
+                host=Config.MYSQL_HOST,
+                port=Config.MYSQL_PORT,
+                user=Config.MYSQL_USER,
+                password=Config.MYSQL_PASSWORD,
+                database=Config.MYSQL_DB
+            )
+            wrapped_pg = PostgreSQLProxyConnection(pg_conn)
+            perform_database_sync(mysql_conn, wrapped_pg)
+        except Exception as e:
+            print(f"[IMMEDIATE SYNC ERROR] {e}")
+        finally:
+            if mysql_conn:
+                try: mysql_conn.close()
+                except: pass
+            if pg_conn:
+                try: pg_conn.close()
+                except: pass
+    threading.Thread(target=run, daemon=True).start()
 
 # Global queue for real-time notifications
 # In a multi-worker environment like Waitress, we use a simple list of queues
@@ -2374,6 +2453,7 @@ def save_shift_data():
 
         conn.commit()
         conn.close()
+        trigger_immediate_sync()
         return jsonify({'status': 'success'})
     except Exception as e:
         if conn: conn.rollback(); conn.close()
@@ -2683,6 +2763,7 @@ def save_bill():
         
         log_audit(cursor, 'CREATE_BILL', 'bills', bill_id, None, f"Invoice: {invoice_no}, Total: {total}")
         conn.commit(); conn.close()
+        trigger_immediate_sync()
         
         # Trigger Real-time update
         announcer.announce("update")
@@ -3220,6 +3301,7 @@ def cancel_bill():
             session.modified = True
             
         conn.commit(); conn.close()
+        trigger_immediate_sync()
         
         # Real-time trigger
         announcer.announce("update")
