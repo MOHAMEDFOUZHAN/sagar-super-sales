@@ -116,12 +116,161 @@ def auto_click_ok():
                 return
         time.sleep(1)
 
+def perform_database_sync(mysql_conn, pg_conn):
+    """Bidirectional Sync Engine: Synchronizes counter sales, expenses, and aligns inventory."""
+    try:
+        mysql_cur = mysql_conn.cursor(dictionary=True)
+        pg_cur = pg_conn.cursor(dictionary=True)
+
+        # ----------------------------------------------------
+        # 1. SYNC BILLS & BILL ITEMS (Bidirectional)
+        # ----------------------------------------------------
+        mysql_cur.execute("SELECT invoice_no FROM bills")
+        mysql_invoices = {row['invoice_no'] for row in mysql_cur.fetchall()}
+
+        pg_cur.execute("SELECT invoice_no FROM bills")
+        pg_invoices = {row['invoice_no'] for row in pg_cur.fetchall()}
+
+        # (a) Sync local MySQL -> Supabase Cloud (Offline counter creations)
+        missing_on_cloud = mysql_invoices - pg_invoices
+        for inv in missing_on_cloud:
+            try:
+                mysql_cur.execute("SELECT * FROM bills WHERE invoice_no = %s", (inv,))
+                bill = mysql_cur.fetchone()
+                if not bill: continue
+
+                mysql_cur.execute("SELECT * FROM bill_items WHERE bill_id = %s", (bill['id'],))
+                items = mysql_cur.fetchall()
+
+                pg_cur.execute("""
+                    INSERT INTO bills (invoice_no, bill_date, total_amount, payment_mode, tsc_percent, tsc_amount, status, source_bill_id, discount, created_by)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (bill['invoice_no'], bill['bill_date'], bill['total_amount'], bill['payment_mode'], 
+                      bill['tsc_percent'], bill['tsc_amount'], bill['status'], bill['source_bill_id'], bill['discount'], bill['created_by']))
+                
+                new_bill_id = pg_cur.lastrowid
+
+                for item in items:
+                    pg_cur.execute("""
+                        INSERT INTO bill_items (bill_id, product_name, qty, rate, amount, bizz_percent, bizz_amount)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (new_bill_id, item['product_name'], item['qty'], item['rate'], item['amount'], item['bizz_percent'], item['bizz_amount']))
+                    pg_cur.execute("UPDATE products SET current_stock = current_stock - %s WHERE name = %s", (item['qty'], item['product_name']))
+                
+                # Cloud audit log
+                pg_cur.execute("""
+                    INSERT INTO audit_logs (action_type, table_name, record_id, old_values, new_values, performed_by)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, ('SYNC_LOCAL_TO_CLOUD', 'bills', new_bill_id, None, f"Invoice: {bill['invoice_no']}", 'SYSTEM'))
+
+                pg_conn.commit()
+                print(f"[SYNC] Uploaded Offline Bill SS#{bill['invoice_no']} to Supabase Cloud.")
+            except Exception as e:
+                pg_conn.rollback()
+                print(f"[SYNC ERROR] Local -> Cloud failed for SS#{inv}: {e}")
+
+        # (b) Sync Supabase Cloud -> local MySQL (Failover counter creations)
+        missing_locally = pg_invoices - mysql_invoices
+        for inv in missing_locally:
+            try:
+                pg_cur.execute("SELECT * FROM bills WHERE invoice_no = %s", (inv,))
+                bill = pg_cur.fetchone()
+                if not bill: continue
+
+                pg_cur.execute("SELECT * FROM bill_items WHERE bill_id = %s", (bill['id'],))
+                items = pg_cur.fetchall()
+
+                mysql_cur.execute("""
+                    INSERT INTO bills (invoice_no, bill_date, total_amount, payment_mode, tsc_percent, tsc_amount, status, source_bill_id, discount, created_by)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (bill['invoice_no'], bill['bill_date'], bill['total_amount'], bill['payment_mode'], 
+                      bill['tsc_percent'], bill['tsc_amount'], bill['status'], bill['source_bill_id'], bill['discount'], bill['created_by']))
+                
+                new_bill_id = mysql_cur.lastrowid
+
+                for item in items:
+                    mysql_cur.execute("""
+                        INSERT INTO bill_items (bill_id, product_name, qty, rate, amount, bizz_percent, bizz_amount)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (new_bill_id, item['product_name'], item['qty'], item['rate'], item['amount'], item['bizz_percent'], item['bizz_amount']))
+                    mysql_cur.execute("UPDATE products SET current_stock = current_stock - %s WHERE name = %s", (item['qty'], item['product_name']))
+                
+                # Local audit log
+                mysql_cur.execute("""
+                    INSERT INTO audit_logs (action_type, table_name, record_id, old_values, new_values, performed_by)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, ('SYNC_CLOUD_TO_LOCAL', 'bills', new_bill_id, None, f"Invoice: {bill['invoice_no']}", 'SYSTEM'))
+
+                mysql_conn.commit()
+                print(f"[SYNC] Downloaded Cloud Bill SS#{bill['invoice_no']} to Local MySQL.")
+            except Exception as e:
+                mysql_conn.rollback()
+                print(f"[SYNC ERROR] Cloud -> Local failed for SS#{inv}: {e}")
+
+        # ----------------------------------------------------
+        # 2. SYNC EXPENSES (Bidirectional)
+        # ----------------------------------------------------
+        mysql_cur.execute("SELECT id, expense_date, category, amount, description FROM expenses")
+        mysql_exps = { (row['expense_date'].strftime('%Y-%m-%d') if row['expense_date'] else '', row['category'], float(row['amount'])) : row for row in mysql_cur.fetchall() }
+
+        pg_cur.execute("SELECT id, expense_date, category, amount, description FROM expenses")
+        pg_exps = { (row['expense_date'].strftime('%Y-%m-%d') if row['expense_date'] else '', row['category'], float(row['amount'])) : row for row in pg_cur.fetchall() }
+
+        for key, exp in mysql_exps.items():
+            if key not in pg_exps:
+                try:
+                    pg_cur.execute("""
+                        INSERT INTO expenses (expense_date, category, amount, description, source_expense_id)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, (exp['expense_date'], exp['category'], exp['amount'], exp['description'], exp['id']))
+                    pg_conn.commit()
+                except Exception:
+                    pg_conn.rollback()
+
+        for key, exp in pg_exps.items():
+            if key not in mysql_exps:
+                try:
+                    mysql_cur.execute("""
+                        INSERT INTO expenses (expense_date, category, amount, description)
+                        VALUES (%s, %s, %s, %s)
+                    """, (exp['expense_date'], exp['category'], exp['amount'], exp['description']))
+                    mysql_conn.commit()
+                except Exception:
+                    mysql_conn.rollback()
+
+        # ----------------------------------------------------
+        # 3. SYNC PRODUCTS STOCK (Local MySQL -> Cloud primary alignment)
+        # ----------------------------------------------------
+        mysql_cur.execute("SELECT barcode, current_stock FROM products")
+        mysql_products = {row['barcode']: row for row in mysql_cur.fetchall()}
+
+        pg_cur.execute("SELECT barcode, current_stock FROM products")
+        pg_products = {row['barcode']: row for row in pg_cur.fetchall()}
+
+        for barcode, prod in mysql_products.items():
+            if barcode in pg_products:
+                pg_prod = pg_products[barcode]
+                if float(prod['current_stock']) != float(pg_prod['current_stock']):
+                    try:
+                        pg_cur.execute("UPDATE products SET current_stock = %s WHERE barcode = %s", (prod['current_stock'], barcode))
+                        pg_conn.commit()
+                    except Exception:
+                        pg_conn.rollback()
+
+        mysql_cur.close()
+        pg_cur.close()
+    except Exception as e:
+        print(f"[SYNC ENGINE ERROR] {e}")
+
+
 def self_healing_monitor_loop():
-    """Background Daemon: constantly check local stack integrity and auto-repair faults."""
+    """Background Daemon: constantly check local stack integrity, auto-repair faults, and sync databases."""
     global last_system_states
     time.sleep(5)  # Wait for primary Waitress thread initialization
     
     while True:
+        mysql_conn = None
+        pg_conn = None
         try:
             # 1. Local MySQL Check
             mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
@@ -154,20 +303,56 @@ def self_healing_monitor_loop():
             # 2. Cloud DB Sync Check
             cloud_alive = False
             try:
-                conn = psycopg2.connect(CLOUD_DB_URL, connect_timeout=2)
-                conn.close()
+                pg_conn = psycopg2.connect(
+                    host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+                    port=6543,
+                    database="postgres",
+                    user="postgres",
+                    password=SUPABASE_PASSWORD,
+                    connect_timeout=3
+                )
+                pg_conn.autocommit = True
                 cloud_alive = True
             except:
-                pass
+                if pg_conn:
+                    try: pg_conn.close()
+                    except: pass
+                    pg_conn = None
                 
             if not cloud_alive and last_system_states["cloud_db"]:
-                log_healing_event("Cloud Database", "FAULT", "Neon cloud database offline or internet lost.", "Switched to offline queue buffer.")
+                log_healing_event("Cloud Database", "FAULT", "Supabase Cloud Database offline or internet lost.", "Switched to offline queue buffer.")
                 last_system_states["cloud_db"] = False
             elif cloud_alive and not last_system_states["cloud_db"]:
-                log_healing_event("Cloud Database", "HEALED", "Neon cloud database online again.", "Auto-synced pending items from offline queue.")
+                log_healing_event("Cloud Database", "HEALED", "Supabase Cloud Database online again.", "Auto-synced pending items from offline queue.")
                 last_system_states["cloud_db"] = True
-                
-            # 3. Server Local IP Changes
+
+            # 3. If BOTH are alive, execute bidirectional sync!
+            if mysql_alive and cloud_alive:
+                try:
+                    # Establish local connection
+                    mysql_conn = mysql.connector.connect(
+                        host=Config.MYSQL_HOST,
+                        port=Config.MYSQL_PORT,
+                        user=Config.MYSQL_USER,
+                        password=Config.MYSQL_PASSWORD,
+                        database=Config.MYSQL_DB
+                    )
+                    # Wrapped cloud connection
+                    wrapped_pg = PostgreSQLProxyConnection(pg_conn)
+                    
+                    # Perform Bidirectional Sync
+                    perform_database_sync(mysql_conn, wrapped_pg)
+                except Exception as sync_conn_err:
+                    print(f"[AUTOPILOT SYNC] Connection failed during sync startup: {sync_conn_err}")
+                finally:
+                    if mysql_conn:
+                        try: mysql_conn.close()
+                        except: pass
+                    if pg_conn:
+                        try: pg_conn.close()
+                        except: pass
+
+            # 4. Server Local IP Changes
             try:
                 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 s.connect(("8.8.8.8", 80))
@@ -186,10 +371,10 @@ def self_healing_monitor_loop():
         except Exception as e:
             print(f"[Autopilot Monitor Error] {e}")
             
-        time.sleep(10)
+        time.sleep(15)
 
 # Kick off Autopilot background thread daemon
-# threading.Thread(target=self_healing_monitor_loop, daemon=True).start()
+threading.Thread(target=self_healing_monitor_loop, daemon=True).start()
 
 # --- CLOUD DATABASE CONFIGURATION ---
 # Loaded from d:\Sales\online sales\.env
