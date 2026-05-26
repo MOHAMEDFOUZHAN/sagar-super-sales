@@ -759,11 +759,12 @@ def get_db_connection():
 
 @app.route('/api/db-status')
 def get_db_status_route():
-    global DB_STATUS
+    global DB_STATUS, MYSQL_IS_ALIVE
+    current_status = "local" if MYSQL_IS_ALIVE else "cloud"
     return jsonify({
-        'status': DB_STATUS,
-        'label': 'Local MySQL' if DB_STATUS == 'local' else 'Supabase Cloud',
-        'color': '#10b981' if DB_STATUS == 'local' else '#a855f7'
+        'status': current_status,
+        'label': 'Local MySQL' if current_status == 'local' else 'Supabase Cloud',
+        'color': '#10b981' if current_status == 'local' else '#a855f7'
     })
 
 @app.route('/api/config/server-ip', methods=['GET', 'POST'])
