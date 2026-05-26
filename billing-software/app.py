@@ -316,6 +316,27 @@ SUPABASE_PASSWORD = "Fouzfif@3110"
 # Global database status tracker
 DB_STATUS = "local"
 
+class PostgreSQLDictRow(dict):
+    def __getitem__(self, key):
+        try:
+            return super().__getitem__(key)
+        except KeyError:
+            key_upper = str(key).upper()
+            if key_upper.startswith("SUM(") and "sum" in self:
+                return self["sum"]
+            if key_upper.startswith("COUNT(") and "count" in self:
+                return self["count"]
+            if key_upper.startswith("AVG(") and "avg" in self:
+                return self["avg"]
+            raise
+
+    def get(self, key, default=None):
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+
 class PostgreSQLProxyCursor:
     def __init__(self, raw_cursor):
         self._cursor = raw_cursor
@@ -343,6 +364,18 @@ class PostgreSQLProxyCursor:
         translated_query = self._translate_mysql_to_pg(query)
         self._cursor.executemany(translated_query, seq_of_params)
         return self
+
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        if row is not None and isinstance(row, dict):
+            return PostgreSQLDictRow(row)
+        return row
+
+    def fetchall(self):
+        rows = self._cursor.fetchall()
+        if rows and isinstance(rows[0], dict):
+            return [PostgreSQLDictRow(r) for r in rows]
+        return rows
 
     def _translate_mysql_to_pg(self, query):
         query_upper = query.upper()
@@ -2584,8 +2617,8 @@ def get_advanced_stats():
     for i in range(6, -1, -1):
         d = today - datetime.timedelta(days=i)
         d_str = d.isoformat()
-        cursor.execute("SELECT SUM(total_amount) FROM bills WHERE DATE(bill_date) = %s AND status != 'Cancelled'", (d_str,))
-        amt = cursor.fetchone()['SUM(total_amount)'] or 0
+        cursor.execute("SELECT SUM(total_amount) as total_amount FROM bills WHERE DATE(bill_date) = %s AND status != 'Cancelled'", (d_str,))
+        amt = cursor.fetchone()['total_amount'] or 0
         trend.append({'date': d.strftime('%b %d'), 'amount': float(amt)})
     
     last_30 = (today - datetime.timedelta(days=30)).isoformat()
