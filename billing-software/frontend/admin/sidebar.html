@@ -209,36 +209,43 @@
         
         <script>
             document.addEventListener("DOMContentLoaded", function() {
-                fetch("/api/db-status")
-                    .then(res => res.json())
-                    .then(data => {
-                        const badge = document.getElementById("db-status-badge");
-                        const dot = document.getElementById("db-status-dot");
-                        const text = document.getElementById("db-status-text");
-                        const container = document.getElementById("db-status-container");
-                        
-                        if (data.status === "local") {
-                            container.style.background = "rgba(16, 185, 129, 0.05)";
-                            badge.style.background = "rgba(16, 185, 129, 0.15)";
-                            badge.style.color = "#10b981";
-                            badge.style.border = "1px solid rgba(16, 185, 129, 0.3)";
-                            dot.style.background = "#10b981";
-                            dot.style.boxShadow = "0 0 6px #10b981";
-                            text.innerText = "LOCAL";
-                        } else {
-                            container.style.background = "rgba(168, 85, 247, 0.05)";
-                            badge.style.background = "rgba(168, 85, 247, 0.15)";
-                            badge.style.color = "#a855f7";
-                            badge.style.border = "1px solid rgba(168, 85, 247, 0.3)";
-                            dot.style.background = "#a855f7";
-                            dot.style.boxShadow = "0 0 6px #a855f7";
-                            text.innerText = "CLOUD";
-                        }
-                    })
-                    .catch(() => {
-                        const text = document.getElementById("db-status-text");
-                        text.innerText = "UNKNOWN";
-                    });
+                function updateDbStatus() {
+                    fetch("/api/db-status")
+                        .then(res => res.json())
+                        .then(data => {
+                            const badge = document.getElementById("db-status-badge");
+                            const dot = document.getElementById("db-status-dot");
+                            const text = document.getElementById("db-status-text");
+                            const container = document.getElementById("db-status-container");
+                            
+                            if (data.status === "local") {
+                                container.style.background = "rgba(16, 185, 129, 0.05)";
+                                badge.style.background = "rgba(16, 185, 129, 0.15)";
+                                badge.style.color = "#10b981";
+                                badge.style.border = "1px solid rgba(16, 185, 129, 0.3)";
+                                dot.style.background = "#10b981";
+                                dot.style.boxShadow = "0 0 6px #10b981";
+                                text.innerText = "LOCAL";
+                            } else {
+                                container.style.background = "rgba(168, 85, 247, 0.05)";
+                                badge.style.background = "rgba(168, 85, 247, 0.15)";
+                                badge.style.color = "#a855f7";
+                                badge.style.border = "1px solid rgba(168, 85, 247, 0.3)";
+                                dot.style.background = "#a855f7";
+                                dot.style.boxShadow = "0 0 6px #a855f7";
+                                text.innerText = "CLOUD";
+                            }
+                        })
+                        .catch(() => {
+                            const text = document.getElementById("db-status-text");
+                            text.innerText = "UNKNOWN";
+                        });
+                }
+                
+                // Fetch immediately
+                updateDbStatus();
+                // Check database status dynamically every 3 seconds for real-time live responsiveness!
+                setInterval(updateDbStatus, 3000);
             });
         </script>
 

@@ -274,6 +274,8 @@ def self_healing_monitor_loop():
         try:
             # 1. Local MySQL Check
             mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+            global MYSQL_IS_ALIVE
+            MYSQL_IS_ALIVE = mysql_alive
             
             if not mysql_alive and last_system_states["mysql"]:
                 error_msg = f"Local MySQL service offline on port {Config.MYSQL_PORT}."
@@ -500,6 +502,7 @@ SUPABASE_PASSWORD = "Fouzfif@3110"
 
 # Global database status tracker
 DB_STATUS = "local"
+MYSQL_IS_ALIVE = True
 
 class PostgreSQLDictRow(dict):
     def __getitem__(self, key):
@@ -637,25 +640,27 @@ class PostgreSQLProxyConnection:
 
 
 def get_db_connection():
-    global DB_STATUS
+    global DB_STATUS, MYSQL_IS_ALIVE
     
-    # 1. Try connecting to local Laragon MySQL Pool (Primary)
-    try:
-        pool = get_db_pool()
-        if pool:
-            conn = pool.get_connection()
-            conn.autocommit = Config.MYSQL_AUTOCOMMIT
-            cursor = conn.cursor()
-            cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
-            cursor.close()
-            DB_STATUS = "local"
-            return conn
-    except Exception as local_err:
-        err_msg = f"[AUTOPILOT] Local MySQL Failed, falling back to Supabase: {local_err}"
-        print(err_msg)
-        log_error(err_msg)
-        
-    # 2. If primary fails, instantly route to Supabase PostgreSQL (Failover) on transaction pooler Port 6543
+    # 1. Try connecting to local Laragon MySQL Pool (Primary) if it is alive in memory
+    if MYSQL_IS_ALIVE:
+        try:
+            pool = get_db_pool()
+            if pool:
+                conn = pool.get_connection()
+                conn.autocommit = Config.MYSQL_AUTOCOMMIT
+                cursor = conn.cursor()
+                cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+                cursor.close()
+                DB_STATUS = "local"
+                return conn
+        except Exception as local_err:
+            err_msg = f"[AUTOPILOT] Local MySQL Failed, instantly bypassing for future requests: {local_err}"
+            print(err_msg)
+            log_error(err_msg)
+            MYSQL_IS_ALIVE = False  # Skip MySQL for future requests until background loop heals it!
+            
+    # 2. If primary fails or is bypassed, instantly route to Supabase PostgreSQL (Failover) on Port 6543
     try:
         raw_pg_conn = psycopg2.connect(
             host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
