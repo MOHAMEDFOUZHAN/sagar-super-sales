@@ -196,6 +196,52 @@
     </ul>
 
     <div style="margin-top: auto;">
+        <!-- Database Status Indicator -->
+        <div id="db-status-container" style="padding: 10px 16px; margin-bottom: 8px; border-radius: var(--radius-md); font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); transition: all 0.3s;">
+            <span style="display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 0.75rem;">
+                <i class="fa-solid fa-database"></i> DB Connection
+            </span>
+            <span id="db-status-badge" style="padding: 4px 10px; border-radius: 20px; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 6px; font-weight: 800;">
+                <span id="db-status-dot" style="width: 6px; height: 6px; border-radius: 50%;"></span>
+                <span id="db-status-text">Checking...</span>
+            </span>
+        </div>
+        
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                fetch("/api/db-status")
+                    .then(res => res.json())
+                    .then(data => {
+                        const badge = document.getElementById("db-status-badge");
+                        const dot = document.getElementById("db-status-dot");
+                        const text = document.getElementById("db-status-text");
+                        const container = document.getElementById("db-status-container");
+                        
+                        if (data.status === "local") {
+                            container.style.background = "rgba(16, 185, 129, 0.05)";
+                            badge.style.background = "rgba(16, 185, 129, 0.15)";
+                            badge.style.color = "#10b981";
+                            badge.style.border = "1px solid rgba(16, 185, 129, 0.3)";
+                            dot.style.background = "#10b981";
+                            dot.style.boxShadow = "0 0 6px #10b981";
+                            text.innerText = "LOCAL";
+                        } else {
+                            container.style.background = "rgba(168, 85, 247, 0.05)";
+                            badge.style.background = "rgba(168, 85, 247, 0.15)";
+                            badge.style.color = "#a855f7";
+                            badge.style.border = "1px solid rgba(168, 85, 247, 0.3)";
+                            dot.style.background = "#a855f7";
+                            dot.style.boxShadow = "0 0 6px #a855f7";
+                            text.innerText = "CLOUD";
+                        }
+                    })
+                    .catch(() => {
+                        const text = document.getElementById("db-status-text");
+                        text.innerText = "UNKNOWN";
+                    });
+            });
+        </script>
+
         <div style="padding: 12px 16px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: var(--radius-md); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 12px;">
             <div style="width: 32px; height: 32px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white;">
                 {{ session.username[0].upper() if session.username else 'A' }}

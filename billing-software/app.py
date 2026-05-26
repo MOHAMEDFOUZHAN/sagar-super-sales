@@ -306,21 +306,163 @@ def get_db_pool():
             db_pool = None
     return db_pool
 
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+# Supabase cloud database credentials
+SUPABASE_PROJECT_ID = "ibpiixejgrxpejivdekc"
+SUPABASE_PASSWORD = "Fouzfif@3110"
+
+# Global database status tracker
+DB_STATUS = "local"
+
+class PostgreSQLProxyCursor:
+    def __init__(self, raw_cursor):
+        self._cursor = raw_cursor
+        self._lastrowid = None
+
+    def execute(self, query, params=None):
+        translated_query = self._translate_mysql_to_pg(query)
+        translated_params = self._translate_params(query, params)
+        
+        self._cursor.execute(translated_query, translated_params)
+        
+        # Capture lastrowid for INSERT queries using PostgreSQL lastval()
+        upper_query = query.upper().strip()
+        if upper_query.startswith("INSERT "):
+            try:
+                conn = self._cursor.connection
+                with conn.cursor() as temp_cursor:
+                    temp_cursor.execute("SELECT lastval();")
+                    self._lastrowid = temp_cursor.fetchone()[0]
+            except Exception:
+                self._lastrowid = None
+        return self
+
+    def executemany(self, query, seq_of_params):
+        translated_query = self._translate_mysql_to_pg(query)
+        self._cursor.executemany(translated_query, seq_of_params)
+        return self
+
+    def _translate_mysql_to_pg(self, query):
+        query_upper = query.upper()
+        
+        # Translate SET FOREIGN_KEY_CHECKS
+        if "SET FOREIGN_KEY_CHECKS" in query_upper:
+            return "SELECT 1"
+            
+        # Translate INSERT IGNORE
+        if "INSERT IGNORE" in query_upper:
+            query = query.replace("INSERT IGNORE", "INSERT")
+            if "ON CONFLICT" not in query.upper():
+                query += " ON CONFLICT DO NOTHING"
+                
+        # Translate ON DUPLICATE KEY UPDATE for cash_balance
+        if "ON DUPLICATE KEY UPDATE" in query_upper and "CASH_BALANCE" in query_upper:
+            if "'CLOSED'" in query:
+                query = """
+                    INSERT INTO cash_balance (balance_date, opening_balance, closing_balance, actual_closing, difference, status)
+                    VALUES (%s, %s, %s, %s, %s, 'CLOSED')
+                    ON CONFLICT (balance_date) DO UPDATE SET 
+                    opening_balance=EXCLUDED.opening_balance, closing_balance=EXCLUDED.closing_balance, 
+                    actual_closing=EXCLUDED.actual_closing, difference=EXCLUDED.difference, status='CLOSED'
+                """
+            else:
+                query = """
+                    INSERT INTO cash_balance (balance_date, opening_balance, closing_balance, actual_closing, difference, status)
+                    VALUES (%s, %s, %s, %s, %s, 'OPEN')
+                    ON CONFLICT (balance_date) DO UPDATE SET 
+                    opening_balance=EXCLUDED.opening_balance, closing_balance=EXCLUDED.closing_balance, 
+                    actual_closing=EXCLUDED.actual_closing, difference=EXCLUDED.difference
+                """
+        return query
+
+    def _translate_params(self, query, params):
+        if not params:
+            return params
+        query_upper = query.upper()
+        if "ON DUPLICATE KEY UPDATE" in query_upper and "CASH_BALANCE" in query_upper:
+            # PostgreSQL ON CONFLICT set values does not need secondary parameter duplicates
+            return tuple(list(params)[:5])
+        return params
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class PostgreSQLProxyConnection:
+    def __init__(self, raw_conn):
+        self._conn = raw_conn
+        self.autocommit = True
+
+    def cursor(self, dictionary=False):
+        if dictionary:
+            cursor_factory = RealDictCursor
+        else:
+            cursor_factory = None
+            
+        raw_cursor = self._conn.cursor(cursor_factory=cursor_factory)
+        return PostgreSQLProxyCursor(raw_cursor)
+
+    def commit(self):
+        return self._conn.commit()
+
+    def rollback(self):
+        return self._conn.rollback()
+
+    def close(self):
+        return self._conn.close()
+
+    @property
+    def connection_id(self):
+        return "postgres"
+
+
 def get_db_connection():
+    global DB_STATUS
+    
+    # 1. Try connecting to local Laragon MySQL Pool (Primary)
     try:
         pool = get_db_pool()
-        if not pool: return None
-        conn = pool.get_connection()
-        conn.autocommit = Config.MYSQL_AUTOCOMMIT
-        cursor = conn.cursor()
-        cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
-        cursor.close()
-        return conn
-    except Exception as err:
-        err_msg = f"Connection Error: {err}"
+        if pool:
+            conn = pool.get_connection()
+            conn.autocommit = Config.MYSQL_AUTOCOMMIT
+            cursor = conn.cursor()
+            cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+            cursor.close()
+            DB_STATUS = "local"
+            return conn
+    except Exception as local_err:
+        err_msg = f"[AUTOPILOT] Local MySQL Failed, falling back to Supabase: {local_err}"
+        print(err_msg)
+        log_error(err_msg)
+        
+    # 2. If primary fails, instantly route to Supabase PostgreSQL (Failover) on transaction pooler Port 6543
+    try:
+        raw_pg_conn = psycopg2.connect(
+            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+            port=6543,
+            database="postgres",
+            user="postgres",
+            password=SUPABASE_PASSWORD,
+            connect_timeout=4
+        )
+        DB_STATUS = "cloud"
+        return PostgreSQLProxyConnection(raw_pg_conn)
+    except Exception as pg_err:
+        err_msg = f"[CRITICAL FAILOVER ERROR] Supabase Connection Failed: {pg_err}"
         print(err_msg)
         log_error(err_msg)
         return None
+
+@app.route('/api/db-status')
+def get_db_status_route():
+    global DB_STATUS
+    return jsonify({
+        'status': DB_STATUS,
+        'label': 'Local MySQL' if DB_STATUS == 'local' else 'Supabase Cloud',
+        'color': '#10b981' if DB_STATUS == 'local' else '#a855f7'
+    })
 
 @app.route('/api/config/server-ip', methods=['GET', 'POST'])
 def manage_server_ip():
