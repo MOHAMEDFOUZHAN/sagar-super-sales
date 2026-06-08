@@ -10,7 +10,7 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Expense Analytics | MaplePro Premium</title>
+    <title>Expense Analytics | Sagar Super Maple Pro</title>
 
     <!-- Fonts & Icons -->
 
@@ -898,7 +898,7 @@
 
     <nav class="sidebar">
 
-        <div class="brand"><img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> MaplePro</div>
+        <div class="brand"><img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> Sagar Super Maple Pro</div>
 
         <ul class="nav-menu">
 
@@ -1072,7 +1072,7 @@
 
                             style="font-size: 0.65rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase;">Total Cash Counted</span>
 
-                        <div id="denom_total" style="font-size: 1.8rem; font-weight: 900; color: var(--accent);">₹ 0
+                        <div id="denom_total" style="font-size: 1.8rem; font-weight: 900; color: var(--accent);">&#8377; 0
 
                         </div>
 
@@ -1192,7 +1192,7 @@
 
                                 style="font-size: 0.6rem; color: var(--text-muted); font-weight: 800; text-transform: uppercase; display: block;">Total Spent</span>
 
-                            <span id="label_expense_center" style="font-size: 1.4rem; font-weight: 900;">₹ 0</span>
+                            <span id="label_expense_center" style="font-size: 1.4rem; font-weight: 900;">&#8377; 0</span>
 
                         </div>
 
@@ -1226,7 +1226,7 @@
 
                             <label>Cash Sales Today (+)</label>
 
-                            <span id="label_sales" style="color: var(--success);">+ ₹ 0</span>
+                            <span id="label_sales" style="color: var(--success);">+ &#8377; 0</span>
 
                         </div>
 
@@ -1234,7 +1234,7 @@
 
                             <label>Total Expenses Paid (-)</label>
 
-                            <span id="label_expense" style="color: var(--danger);">- ₹ 0</span>
+                            <span id="label_expense" style="color: var(--danger);">- &#8377; 0</span>
 
                         </div>
 
@@ -1246,7 +1246,7 @@
 
                                 style="font-size: 0.65rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase;">Cash Expected in Box</label>
 
-                            <span class="val" id="label_final">₹ 0.00</span>
+                            <span class="val" id="label_final">&#8377; 0.00</span>
 
                         </div>
 
@@ -1262,7 +1262,7 @@
 
                             <span id="label_variance"
 
-                                style="font-weight: 900; font-size: 1.1rem; color: var(--warning);">₹ 0</span>
+                                style="font-weight: 900; font-size: 1.1rem; color: var(--warning);">&#8377; 0</span>
 
                         </div>
 
@@ -1285,7 +1285,7 @@
     }
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-    <p>© 2025 Sagar Nilgiri Products | Maple Pro</p>
+    <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
 </footer>
 </main>
 
@@ -1377,7 +1377,7 @@
 
                 bizCharges = data.biz_charges || 0;
 
-                document.getElementById('label_sales').innerText = '+ ₹ ' + dailySales.toLocaleString('en-IN');
+                document.getElementById('label_sales').innerText = '+ \u20B9 ' + dailySales.toLocaleString('en-IN');
 
                 updateCalculations();
 
@@ -1403,7 +1403,7 @@
 
             });
 
-            document.getElementById('denom_total').innerText = '₹ ' + denomTotal.toLocaleString('en-IN');
+            document.getElementById('denom_total').innerText = '\u20B9 ' + denomTotal.toLocaleString('en-IN');
 
 
 
@@ -1431,9 +1431,9 @@
 
             });
 
-            document.getElementById('label_expense').innerText = '- ₹ ' + expTotal.toLocaleString('en-IN');
+            document.getElementById('label_expense').innerText = '- \u20B9 ' + expTotal.toLocaleString('en-IN');
 
-            document.getElementById('label_expense_center').innerText = '₹ ' + expTotal.toLocaleString('en-IN');
+            document.getElementById('label_expense_center').innerText = '\u20B9 ' + expTotal.toLocaleString('en-IN');
 
 
 
@@ -1445,7 +1445,7 @@
 
             const expectedBalance = (ob + inflow + dailySales) - expTotal - bizCharges;
 
-            document.getElementById('label_final').innerText = '₹ ' + expectedBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+            document.getElementById('label_final').innerText = '\u20B9 ' + expectedBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
 
 
@@ -1461,7 +1461,7 @@
 
             if (Math.abs(variance) < 1) {
 
-                varDisplay.innerText = '₹ 0';
+                varDisplay.innerText = '\u20B9 0';
 
                 varDisplay.style.color = 'var(--success)';
 
@@ -1471,7 +1471,7 @@
 
             } else {
 
-                varDisplay.innerText = (variance > 0 ? '+ ₹ ' : '- ₹ ') + Math.abs(variance).toLocaleString('en-IN');
+                varDisplay.innerText = (variance > 0 ? '+ \u20B9 ' : '- \u20B9 ') + Math.abs(variance).toLocaleString('en-IN');
 
                 varDisplay.style.color = (variance > 0 ? 'var(--accent)' : 'var(--danger)');
 
@@ -1649,11 +1649,19 @@
                 if (typeof loadData === 'function') loadData();
                 if (typeof updateDashboard === 'function') updateDashboard();
                 if (typeof refreshData === 'function') refreshData();
-                if (typeof fetchNextDocId === 'function') fetchNextDocId();
-                if (typeof loadBills === 'function') loadBills();
-                if (typeof loadRecentBills === 'function') loadRecentBills();
-                if (typeof loadReturns === 'function') loadReturns();
-                if (typeof loadExpenses === 'function') loadExpenses();
+                if (typeof loadReport === 'function') loadReport();
+                if (typeof loadStoreStatistics === 'function') loadStoreStatistics();
+                if (typeof searchBill === 'function') searchBill();
+                if (typeof loadStock === 'function') loadStock();
+                if (typeof renderList === 'function') renderList();
+                if (typeof fetchTelemetry === 'function') fetchTelemetry();
+                if (typeof fetchForecastData === 'function') fetchForecastData();
+                if (typeof loadIntel === 'function') loadIntel();
+                if (typeof loadInvoices === 'function') loadInvoices();
+                if (typeof loadCounters === 'function') loadCounters();
+                if (typeof fetchBills === 'function') fetchBills();
+                if (typeof loadClosureReport === 'function') loadClosureReport();
+                if (typeof fetchDailySales === 'function') fetchDailySales();
             });
         }
 

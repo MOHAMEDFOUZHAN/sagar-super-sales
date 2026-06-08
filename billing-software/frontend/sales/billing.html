@@ -8,7 +8,7 @@
 
     <meta charset="UTF-8">
 
-    <title>Billing | MaplePro</title>
+    <title>Billing | Sagar Super Maple Pro</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -18,7 +18,7 @@
 
         /* =========================================
 
-           ADVANCED MaplePro THEME - GLASS & NEON
+           ADVANCED Sagar Super Maple Pro THEME - GLASS & NEON
 
            ========================================= */
 
@@ -158,7 +158,7 @@
 
         body.light-mode th {
 
-            background: rgba(79, 70, 229, 0.1);
+            background: #f1f5f9;
 
             color: #475569;
 
@@ -606,6 +606,8 @@
 
             overflow-x: auto;
 
+            overflow-y: auto;
+
             border-radius: var(--radius-md);
 
             border: 1px solid var(--glass-border);
@@ -618,7 +620,9 @@
 
             width: 100%;
 
-            border-collapse: collapse;
+            border-collapse: separate;
+
+            border-spacing: 0;
 
             font-size: 0.9rem;
 
@@ -626,9 +630,15 @@
 
 
 
-        th {
+        thead th {
 
-            background: rgba(99, 102, 241, 0.2);
+            position: sticky !important;
+
+            top: 0 !important;
+
+            background: #111422 !important;
+
+            z-index: 100 !important;
 
             text-align: left;
 
@@ -645,6 +655,12 @@
             letter-spacing: 0.05em;
 
             border-bottom: 1px solid var(--glass-border);
+
+        }
+
+        body.light-mode thead th {
+
+            background: #f1f5f9 !important;
 
         }
 
@@ -890,7 +906,7 @@
 
             align-items: end;
 
-            padding: 20px;
+            padding: 10px 20px;
 
         }
 
@@ -902,9 +918,9 @@
 
             grid-template-columns: 1.5fr 1fr;
 
-            gap: 20px;
+            gap: 15px;
 
-            padding: 20px;
+            padding: 10px 20px;
 
         }
 
@@ -1182,7 +1198,7 @@
 
     <nav class="sidebar">
 
-        <div class="brand"><img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> MaplePro</div>
+        <div class="brand"><img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> Sagar Super Maple Pro</div>
 
         <ul class="nav-menu">
 
@@ -1234,7 +1250,7 @@
 
 
 
-    <main class="main-content" style="padding: 0; display: flex; flex-direction: column;">
+    <main class="main-content" style="padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden;">
 
 
 
@@ -1242,7 +1258,7 @@
 
         <div class="glass-panel"
 
-            style="margin: 10px; padding: 15px; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
+            style="margin: 8px 10px; padding: 8px 15px; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center;">
 
             <div style="display: flex; align-items: center; gap: 8px;">
 
@@ -1356,7 +1372,7 @@
 
         <div style="flex: 1; margin: 10px; overflow: hidden; display: flex; flex-direction: column;">
 
-            <div class="table-wrapper" style="flex: 1; background: rgba(0,0,0,0.2);">
+            <div class="table-wrapper" style="flex: 1; background: rgba(0,0,0,0.2); height: 100%; overflow-y: auto;">
 
                 <table>
 
@@ -1418,57 +1434,69 @@
 
             <!-- Totals -->
 
-            <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; flex-direction: column; gap: 8px;">
 
-                <div class="flex-between">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
 
-                    <span style="color: var(--text-muted);">NET TOTAL</span>
+                    <div class="flex-between">
 
-                    <input id="grand_total_input" class="input-dark" value="0.00" readonly
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">NET TOTAL</span>
 
-                        style="width: 150px; text-align: right; font-weight: bold; font-size: 1.1rem; color: var(--success);">
+                        <input id="grand_total_input" class="input-dark" value="0.00" readonly
 
-                </div>
+                            style="width: 100px; text-align: right; font-weight: bold; font-size: 1.1rem; color: var(--success); padding: 6px 10px;">
 
-                <div class="flex-between">
+                    </div>
 
-                    <span style="color: var(--text-muted); font-size: 0.8rem;">TSC CHARGE</span>
+                    <div class="flex-between">
 
-                    <span id="tsc_display" style="color: var(--accent); font-weight: bold;">₹0.00</span>
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">PAY MODE</span>
 
-                </div>
+                        <select id="pay_mode" class="input-dark" style="width: 100px; padding: 6px 10px;">
 
-                <div class="flex-between">
+                            <option value="CASH">CASH</option>
 
-                    <span style="color: var(--text-muted);">PAY MODE</span>
+                            <option value="UPI">UPI</option>
 
-                    <select id="pay_mode" class="input-dark" style="width: 150px;">
+                            <option value="CARD">CARD</option>
 
-                        <option value="CASH">CASH</option>
+                            <option value="CREDIT">CREDIT </option>
 
-                        <option value="UPI">UPI</option>
+                        </select>
 
-                        <option value="CARD">CARD</option>
-
-                        <option value="CREDIT">CREDIT </option>
-
-                    </select>
+                    </div>
 
                 </div>
 
-                <div class="flex-between" style="padding: 10px; background: rgba(220,38,38,0.1); border-radius: 5px; border: 1px solid rgba(220,38,38,0.3); margin-top: 10px;">
 
-                    <label for="test_mode_toggle" style="color: var(--danger); font-weight: bold; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; letter-spacing: 0.5px;">
 
-                        <input type="checkbox" id="test_mode_toggle" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--danger);">
+                <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 10px; align-items: center;">
 
-                        TEST MODE (SAVE ONLY, NO PRINT)
+                    <div class="flex-between">
 
-                    </label>
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">TSC CHARGE</span>
+
+                        <span id="tsc_display" style="color: var(--accent); font-weight: bold; font-size: 0.85rem;">&#8377;0.00</span>
+
+                    </div>
+
+                    <div style="padding: 6px 10px; background: rgba(220,38,38,0.1); border-radius: 5px; border: 1px solid rgba(220,38,38,0.3); display: flex; align-items: center; justify-content: center;">
+
+                        <label for="test_mode_toggle" style="color: var(--danger); font-weight: bold; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 6px; letter-spacing: 0.5px; margin: 0;">
+
+                            <input type="checkbox" id="test_mode_toggle" style="width: 14px; height: 14px; cursor: pointer; accent-color: var(--danger);">
+
+                            TEST MODE
+
+                        </label>
+
+                    </div>
 
                 </div>
 
-                <button id="save_bill_btn" class="btn btn-primary w-full mt-20" style="font-size: 1rem; padding: 15px;">
+
+
+                <button id="save_bill_btn" class="btn btn-primary w-full" style="margin-top: 5px; padding: 10px; font-size: 0.95rem;">
 
                     <i class="fa-solid fa-check-double"></i> COMPLETE SALE
 
@@ -1488,8 +1516,8 @@
         }
     }
 </style>
-<footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-    <p>© 2025 Sagar Nilgiri Products | Maple Pro</p>
+<footer class="dynamic-footer" style="margin-top: 5px; padding: 2px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.75rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
+    <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
 </footer>
 </main>
 
@@ -1505,9 +1533,7 @@
 
             <div class="shop-title">
 
-                <div>SAGAR</div>
-
-                <div>NILGIRI PRODUCTS</div>
+                <div>SAGAR NILGIRI PRODUCTS</div>
 
                 <div>SUPER</div>
 
@@ -1701,7 +1727,7 @@
 
                 <div style="color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; font-size: 0.8rem;">Grand Total</div>
 
-                <div id="confirm_total_display" class="confirm-total">₹0.00</div>
+                <div id="confirm_total_display" class="confirm-total">&#8377;0.00</div>
 
                 
 
@@ -1709,7 +1735,7 @@
 
                     <div class="confirm-badge">PAYMENT: <b id="confirm_mode_display">CASH</b></div>
 
-                    <div id="confirm_tsc_badge" class="confirm-badge" style="display:none;">TSC: <b id="confirm_tsc_val">₹0.00</b></div>
+                    <div id="confirm_tsc_badge" class="confirm-badge" style="display:none;">TSC: <b id="confirm_tsc_val">&#8377;0.00</b></div>
 
                 </div>
 
@@ -1775,6 +1801,20 @@
 
         let isSavingBill = false;
 
+        let scanMode = 'auto'; // 'auto' or 'manual' - fetched from server
+
+        // Fetch scan mode setting from server
+        (async function loadScanModeSetting() {
+            try {
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+                scanMode = data.scan_mode || 'auto';
+                console.log('[BILLING] Scan mode:', scanMode);
+            } catch (e) {
+                console.error('Failed to load scan mode, defaulting to auto');
+            }
+        })();
+
 
 
         function escapeHtml(value) {
@@ -1799,15 +1839,23 @@
 
             const raw = String(value ?? '').trim();
 
-            if (!raw) return 'SS#000000';
+            if (!raw) return 'SS-0';
 
-            if (/^SS#/i.test(raw)) return raw;
+            if (/^SS-/i.test(raw)) return raw;
+
+            if (/^SS#/i.test(raw)) return raw.replace(/^SS#0*/, 'SS-');
+
+
 
             const digits = raw.replace(/\D/g, '');
 
-            if (!digits) return `SS#${raw}`;
 
-            return `SS#${digits.padStart(6, '0')}`;
+
+            if (!digits) return `SS-${raw}`;
+
+
+
+            return `SS-${digits}`;
 
         }
 
@@ -1991,15 +2039,17 @@
 
                         
 
-                        // 3. Wait 1 second before moving it "down" to the cart
-
-                        autoAddTimeout = setTimeout(() => {
-
-                            addItem();
-
-                            autoAddTimeout = null;
-
-                        }, 1000);
+                        if (scanMode === 'manual') {
+                            // MANUAL MODE: Focus qty box so user can adjust and press Enter
+                            qtyInput.focus();
+                            qtyInput.select();
+                        } else {
+                            // AUTO MODE: Wait 1 second before moving it "down" to the cart
+                            autoAddTimeout = setTimeout(() => {
+                                addItem();
+                                autoAddTimeout = null;
+                            }, 1000);
+                        }
 
                     }
 
@@ -2117,7 +2167,14 @@
 
                         }
 
-                        addItem();
+                        if (scanMode === 'manual') {
+                            // MANUAL MODE: Focus qty box
+                            qrInput.value = '';
+                            qtyInput.focus();
+                            qtyInput.select();
+                        } else {
+                            addItem();
+                        }
 
                     } else {
 
@@ -2396,47 +2453,33 @@
 
 
             items.forEach((item, index) => {
-
                 total += item.amount;
 
-
-
                 // Track category totals
-
                 const cat = item.category || 'GENERAL';
-
                 catSummary[cat] = (catSummary[cat] || 0) + item.amount;
 
-
-
+                const isOutOfStock = item.qty > item.stock;
                 const tr = document.createElement('tr');
+                if (isOutOfStock) {
+                    tr.style.background = 'rgba(239, 68, 68, 0.12)';
+                    tr.style.color = '#ff6b6b';
+                    tr.style.borderLeft = '4px solid var(--danger)';
+                }
 
                 tr.innerHTML = `
-
                     <td>${index + 1}</td>
-
                     <td>${item.qr || '-'}</td>
-
                     <td>${item.name}</td>
-
-                    <td>${item.stock || '-'}</td>
-
+                    <td>${isOutOfStock ? `<span style="color: var(--danger); font-weight: bold;"><i class="fa-solid fa-triangle-exclamation"></i> ${item.stock}</span>` : (item.stock || '-')}</td>
                     <td>${item.unit || 'PCS'}</td>
-
                     <td>${item.qty}</td>
-
                     <td>${item.rate.toFixed(2)}</td>
-
                     <td>${item.bizz}%</td>
-
                     <td style="font-weight: bold;">${item.amount.toFixed(2)}</td>
-
                     <td><i class="fa-solid fa-trash" style="color: var(--danger); cursor: pointer;" onclick="removeItem(${index})"></i></td>
-
                 `;
-
                 tableBody.appendChild(tr);
-
             });
 
 
@@ -2469,7 +2512,7 @@
 
             const tscAmt = (total * tscPercent) / 100;
 
-            document.getElementById('tsc_display').innerText = `₹${tscAmt.toFixed(2)} (${tscPercent}%)`;
+            document.getElementById('tsc_display').innerText = `\u20B9${tscAmt.toFixed(2)} (${tscPercent}%)`;
 
         }
 
@@ -2535,7 +2578,7 @@
 
             
 
-            document.getElementById('confirm_total_display').innerText = `₹${total.toFixed(2)}`;
+            document.getElementById('confirm_total_display').innerText = `\u20B9${total.toFixed(2)}`;
 
             document.getElementById('confirm_mode_display').innerText = payMode;
 
@@ -2545,7 +2588,7 @@
 
             const tscText = document.getElementById('tsc_display').innerText;
 
-            if (tscText.includes('₹') && !tscText.includes('₹0.00')) {
+            if (tscText.includes('\u20B9') && !tscText.includes('\u20B90.00')) {
 
                 document.getElementById('confirm_tsc_badge').style.display = 'block';
 
@@ -2791,7 +2834,7 @@
 
                             <span>${new Date(bill.bill_date).toLocaleTimeString()}</span>
 
-                            <span style="color:var(--success); font-weight:bold;">₹${parseFloat(bill.total_amount).toFixed(2)}</span>
+                            <span style="color:var(--success); font-weight:bold;">\u20B9${parseFloat(bill.total_amount).toFixed(2)}</span>
 
                         </div>
 
@@ -2917,7 +2960,7 @@
 
                         <div style="text-align:right; font-size:1.2rem; font-weight:bold; color:var(--success);">
 
-                            Total: ₹${total.toFixed(2)}
+                            Total: \u20B9${total.toFixed(2)}
 
                         </div>
 
@@ -3182,15 +3225,59 @@
 
 
     
+        async function updateCartStockAndWarnings() {
+            try {
+                const response = await fetch('/api/inventory/products');
+                if (!response.ok) return;
+                const products = await response.json();
+                
+                const productMap = {};
+                products.forEach(p => {
+                    productMap[p.name] = p.current_stock;
+                    if (p.barcode) {
+                        productMap[p.barcode] = p.current_stock;
+                    }
+                });
+                
+                let cartChanged = false;
+                if (typeof items !== 'undefined' && items && items.length > 0) {
+                    items.forEach(item => {
+                        const updatedStock = productMap[item.name] !== undefined ? productMap[item.name] : (productMap[item.qr] !== undefined ? productMap[item.qr] : null);
+                        if (updatedStock !== null && item.stock !== updatedStock) {
+                            item.stock = updatedStock;
+                            cartChanged = true;
+                        }
+                    });
+                }
+                
+                if (typeof currentProduct !== 'undefined' && currentProduct) {
+                    const updatedStock = productMap[currentProduct.name] !== undefined ? productMap[currentProduct.name] : (productMap[currentProduct.barcode] !== undefined ? productMap[currentProduct.barcode] : null);
+                    if (updatedStock !== null) {
+                        currentProduct.current_stock = updatedStock;
+                        if (typeof stockInput !== 'undefined' && stockInput) {
+                            stockInput.value = updatedStock;
+                        }
+                    }
+                }
+                
+                if (typeof renderTable === 'function') {
+                    renderTable();
+                }
+            } catch (err) {
+                console.error("Error updating cart stock on sync:", err);
+            }
+        }
+
         // --- REAL-TIME SOCKET SYNC ---
         function initSocketIO() {
             const socket = io();
             socket.on('connect', () => {
                 console.log('Connected to real-time Socket.IO server (Billing)');
             });
-            socket.on('stock_updated', (data) => {
+            socket.on('stock_updated', async (data) => {
                 console.log('Stock update event received in Billing:', data);
                 if (typeof fetchNextDocId === 'function') fetchNextDocId();
+                await updateCartStockAndWarnings();
             });
         }
 

@@ -1,143 +1,283 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Position - MaplePro</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        .report-container {
-            padding: 20px;
-        }
-
-        .filter-panel {
-            display: flex;
-            gap: 15px;
-            align-items: flex-end;
-            margin-bottom: 25px;
-            background: var(--glass-bg);
-            padding: 20px;
-            border-radius: var(--radius-md);
-            border: 1px solid var(--glass-border);
-        }
-
-        .col-code { width: 120px; font-family: monospace; text-align: center; }
-        .col-closing { width: 120px; text-align: center; font-weight: 800; color: var(--success); }
-        .col-outgoing { width: 120px; text-align: center; font-weight: 800; color: var(--danger); }
-        
-        .search-box-container {
-            position: relative;
-        }
-
-        #productSearchDropdown {
-            display: none;
-            position: absolute;
-            top: 100%;
-            right: 0;
-            width: 350px;
-            z-index: 1001;
-            padding: 15px;
-            margin-top: 10px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-        }
-
-        .search-result-item {
-            padding: 10px;
-            cursor: pointer;
-            border-radius: var(--radius-sm);
-            margin-bottom: 5px;
-            transition: all 0.2s;
-            border: 1px solid transparent;
-        }
-
-        .search-result-item:hover {
-            background: rgba(255,255,255,0.08);
-            border-color: var(--primary);
-        }
-
-        .print-only-header {
-            display: none;
-        }
-
-        @media print {
-            .col-closing, .col-outgoing {
-                color: black !important;
-            }
-            .no-print {
-                display: none !important;
-            }
-        }
-    </style>
-</head>
-
-<body>
-    {% include 'admin/sidebar.html' %}
-
-    <main class="main-content">
-        <header class="section-header">
-            <div>
-                <h1>Daily Position</h1>
-                <p style="color: var(--text-muted);">Real-time inventory movement and closing status.</p>
-            </div>
-            <div style="display: flex; gap: 12px;">
-                <div class="search-box-container">
-                    <button class="btn btn-primary" onclick="toggleSearch()">
-                        <i class="fa-solid fa-plus"></i> ADD PRODUCT
-                    </button>
-                    <div id="productSearchDropdown" class="glass-panel">
-                        <h4 style="margin-bottom: 12px; font-size: 0.8rem; color: var(--primary);">SELECT PRODUCT TO ADD</h4>
-                        <input type="text" id="addProdInput" class="input-dark" placeholder="Search name or barcode..." onkeyup="searchProducts(this.value)" autocomplete="off">
-                        <div id="searchResults" style="max-height: 250px; overflow-y: auto; margin-top: 15px;"></div>
-                    </div>
-                </div>
-                <button class="btn btn-secondary" onclick="loadData()">
-                    <i class="fa-solid fa-sync"></i> REFRESH
-                </button>
-                <button class="btn btn-primary btn-print" onclick="window.print()">
-                    <i class="fa-solid fa-print"></i> PRINT REPORT
-                </button>
-            </div>
-        </header>
-
-        <div class="report-container">
-            <div class="filter-panel">
-                <div class="form-group" style="flex: 1;">
-                    <input type="text" id="tableSearch" class="input-dark" placeholder="Filter current list by name or code..." onkeyup="filterTable()">
-                </div>
-                <div class="header-info" style="font-weight: 700; color: var(--primary); text-align: right;">
-                    <div id="headerDate" style="font-size: 1.1rem;"></div>
-                    <div id="headerDay" style="font-size: 0.7rem; color: var(--text-muted); opacity: 0.8;"></div>
-                </div>
-            </div>
-
-            <div class="print-only-header">
-                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">MAPLEPRO</h1>
-                <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">SUPER - DAILY POSITION</p>
-                <p id="printHeaderInfo" style="margin: 2px 0; font-weight: bold;"></p>
-                <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
-            </div>
-
-            <div class="glass-panel animate-fade" style="padding: 20px;">
-                <div class="table-wrapper">
-                    <table id="posTable">
-                        <thead>
-                            <tr>
-                                <th class="col-code">CODE</th>
-                                <th>PRODUCT NAME</th>
-                                <th style="text-align: center;">CLOSING STOCK</th>
-                                <th style="text-align: center;">OUTGOING (TODAY)</th>
-                                <th class="no-print" style="width: 50px;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="posBody">
-                            <!-- Data will be loaded here -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+<!DOCTYPE html>
+
+<html lang="en">
+
+
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Daily Position - Sagar Super</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+
+        .report-container {
+
+            padding: 20px;
+
+        }
+
+
+
+        .filter-panel {
+
+            display: flex;
+
+            gap: 15px;
+
+            align-items: flex-end;
+
+            margin-bottom: 25px;
+
+            background: var(--glass-bg);
+
+            padding: 20px;
+
+            border-radius: var(--radius-md);
+
+            border: 1px solid var(--glass-border);
+
+        }
+
+
+
+        .col-code { width: 120px; font-family: monospace; text-align: center; }
+
+        .col-closing { width: 120px; text-align: center; font-weight: 800; color: var(--success); }
+
+        .col-outgoing { width: 120px; text-align: center; font-weight: 800; color: var(--danger); }
+
+        
+
+        .search-box-container {
+
+            position: relative;
+
+        }
+
+
+
+        #productSearchDropdown {
+
+            display: none;
+
+            position: absolute;
+
+            top: 100%;
+
+            right: 0;
+
+            width: 350px;
+
+            z-index: 1001;
+
+            padding: 15px;
+
+            margin-top: 10px;
+
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+
+        }
+
+
+
+        .search-result-item {
+
+            padding: 10px;
+
+            cursor: pointer;
+
+            border-radius: var(--radius-sm);
+
+            margin-bottom: 5px;
+
+            transition: all 0.2s;
+
+            border: 1px solid transparent;
+
+        }
+
+
+
+        .search-result-item:hover {
+
+            background: rgba(255,255,255,0.08);
+
+            border-color: var(--primary);
+
+        }
+
+
+
+        .print-only-header {
+
+            display: none;
+
+        }
+
+
+
+        @media print {
+
+            .col-closing, .col-outgoing {
+
+                color: black !important;
+
+            }
+
+            .no-print {
+
+                display: none !important;
+
+            }
+
+        }
+
+    </style>
+
+</head>
+
+
+
+<body>
+
+    {% include 'admin/sidebar.html' %}
+
+
+
+    <main class="main-content">
+
+        <header class="section-header">
+
+            <div>
+
+                <h1>Daily Position</h1>
+
+                <p style="color: var(--text-muted);">Real-time inventory movement and closing status.</p>
+
+            </div>
+
+            <div style="display: flex; gap: 12px;">
+
+                <div class="search-box-container">
+
+                    <button class="btn btn-primary" onclick="toggleSearch()">
+
+                        <i class="fa-solid fa-plus"></i> ADD PRODUCT
+
+                    </button>
+
+                    <div id="productSearchDropdown" class="glass-panel">
+
+                        <h4 style="margin-bottom: 12px; font-size: 0.8rem; color: var(--primary);">SELECT PRODUCT TO ADD</h4>
+
+                        <input type="text" id="addProdInput" class="input-dark" placeholder="Search name or barcode..." onkeyup="searchProducts(this.value)" autocomplete="off">
+
+                        <div id="searchResults" style="max-height: 250px; overflow-y: auto; margin-top: 15px;"></div>
+
+                    </div>
+
+                </div>
+
+                <button class="btn btn-secondary" onclick="loadData()">
+
+                    <i class="fa-solid fa-sync"></i> REFRESH
+
+                </button>
+
+                <button class="btn btn-primary btn-print" onclick="window.print()">
+
+                    <i class="fa-solid fa-print"></i> PRINT REPORT
+
+                </button>
+
+            </div>
+
+        </header>
+
+
+
+        <div class="report-container">
+
+            <div class="filter-panel">
+
+                <div class="form-group" style="flex: 1;">
+
+                    <input type="text" id="tableSearch" class="input-dark" placeholder="Filter current list by name or code..." onkeyup="filterTable()">
+
+                </div>
+
+                <div class="header-info" style="font-weight: 700; color: var(--primary); text-align: right;">
+
+                    <div id="headerDate" style="font-size: 1.1rem;"></div>
+
+                    <div id="headerDay" style="font-size: 0.7rem; color: var(--text-muted); opacity: 0.8;"></div>
+
+                </div>
+
+            </div>
+
+
+
+            <div class="print-only-header">
+
+                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER</h1>
+
+                <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">SUPER - DAILY POSITION</p>
+
+                <p id="printHeaderInfo" style="margin: 2px 0; font-weight: bold;"></p>
+
+                <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+
+            </div>
+
+
+
+            <div class="glass-panel animate-fade" style="padding: 20px;">
+
+                <div class="table-wrapper">
+
+                    <table id="posTable">
+
+                        <thead>
+
+                            <tr>
+
+                                <th class="col-code">CODE</th>
+
+                                <th>PRODUCT NAME</th>
+
+                                <th style="text-align: center;">CLOSING STOCK</th>
+
+                                <th style="text-align: center;">OUTGOING (TODAY)</th>
+
+                                <th class="no-print" style="width: 50px;"></th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="posBody">
+
+                            <!-- Data will be loaded here -->
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
     
 <style>
     @media print {
@@ -147,139 +287,273 @@
     }
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-    <p>© 2025 Sagar Nilgiri Products | Maple Pro</p>
+    <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
 </footer>
-</main>
-
-    <script>
-        let allData = [];
-
-        async function loadData() {
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            const dayStr = now.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase();
-            
-            document.getElementById('headerDate').innerText = dateStr;
-            document.getElementById('headerDay').innerText = dayStr;
-            document.getElementById('printHeaderInfo').innerText = `DATE: ${dateStr} | DAY: ${dayStr}`;
-
-            try {
-                const res = await fetch('/api/reports/daily-position');
-                allData = await res.json();
-                renderTable(allData);
-            } catch (err) {
-                console.error("Failed to load report data:", err);
-            }
-        }
-
-        function renderTable(data) {
-            const tbody = document.getElementById('posBody');
-            tbody.innerHTML = '';
-
-            data.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="col-code">${item.code || '-'}</td>
-                    <td style="font-weight: 600;">${item.product_name}</td>
-                    <td class="col-closing">${item.closing}</td>
-                    <td class="col-outgoing">${item.outgoing || '-'}</td>
-                    <td class="no-print" style="text-align: center;">
-                        <button class="btn-icon" onclick="removeItem('${item.code}')" title="Remove from list" style="background: none; border: none; color: var(--danger); cursor: pointer;">
-                            <i class="fa-solid fa-trash-can"></i>
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function toggleSearch() {
-            const dropdown = document.getElementById('productSearchDropdown');
-            const isHidden = dropdown.style.display === 'none' || dropdown.style.display === '';
-            dropdown.style.display = isHidden ? 'block' : 'none';
-            if (isHidden) document.getElementById('addProdInput').focus();
-        }
-
-        let searchTimeout;
-        function searchProducts(query) {
-            clearTimeout(searchTimeout);
-            const resultsDiv = document.getElementById('searchResults');
-            if (!query) {
-                resultsDiv.innerHTML = '';
-                return;
-            }
-            searchTimeout = setTimeout(async () => {
-                try {
-                    const res = await fetch(`/api/products?q=${query}`);
-                    const products = await res.json();
-                    resultsDiv.innerHTML = '';
-                    
-                    products.forEach(p => {
-                        const div = document.createElement('div');
-                        div.className = 'search-result-item';
-                        div.innerHTML = `
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <div style="font-weight: 700; color: var(--text-main);">${p.name}</div>
-                                    <div style="font-size: 0.75rem; color: var(--text-muted);">CODE: ${p.barcode}</div>
-                                </div>
-                                <div style="font-size: 0.7rem; background: var(--primary); padding: 2px 6px; border-radius: 4px; color: white;">ADD</div>
-                            </div>
-                        `;
-                        div.onclick = () => addProductToList(p.barcode);
-                        resultsDiv.appendChild(div);
-                    });
-                    if(products.length === 0) {
-                        resultsDiv.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">No products found</div>';
-                    }
-                } catch (e) {
-                    console.error(e);
-                }
-            }, 300);
-        }
-
-        async function addProductToList(barcode) {
-            await fetch('/api/reports/daily-position/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ barcode })
-            });
-            toggleSearch();
-            document.getElementById('addProdInput').value = '';
-            document.getElementById('searchResults').innerHTML = '';
-            loadData();
-        }
-
-        async function removeItem(barcode) {
-            if (!confirm('Remove this product from the Daily Position list?')) return;
-            await fetch('/api/reports/daily-position/remove', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ barcode })
-            });
-            loadData();
-        }
-
-        function filterTable() {
-            const query = document.getElementById('tableSearch').value.toLowerCase();
-            const filtered = allData.filter(item => 
-                item.product_name.toLowerCase().includes(query) || 
-                (item.code && item.code.toLowerCase().includes(query))
-            );
-            renderTable(filtered);
-        }
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            const container = document.querySelector('.search-box-container');
-            if (container && !container.contains(e.target)) {
-                document.getElementById('productSearchDropdown').style.display = 'none';
-            }
-        });
-
-        // Initialize
-        loadData();
-    </script>
-</body>
-
-</html>
+</main>
+
+
+
+    <script>
+
+        let allData = [];
+
+
+
+        async function loadData() {
+
+            const now = new Date();
+
+            const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+            const dayStr = now.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase();
+
+            
+
+            document.getElementById('headerDate').innerText = dateStr;
+
+            document.getElementById('headerDay').innerText = dayStr;
+
+            document.getElementById('printHeaderInfo').innerText = `DATE: ${dateStr} | DAY: ${dayStr}`;
+
+
+
+            try {
+
+                const res = await fetch('/api/reports/daily-position');
+
+                allData = await res.json();
+
+                renderTable(allData);
+
+            } catch (err) {
+
+                console.error("Failed to load report data:", err);
+
+            }
+
+        }
+
+
+
+        function renderTable(data) {
+
+            const tbody = document.getElementById('posBody');
+
+            tbody.innerHTML = '';
+
+
+
+            data.forEach(item => {
+
+                const tr = document.createElement('tr');
+
+                tr.innerHTML = `
+
+                    <td class="col-code">${item.code || '-'}</td>
+
+                    <td style="font-weight: 600;">${item.product_name}</td>
+
+                    <td class="col-closing">${item.closing}</td>
+
+                    <td class="col-outgoing">${item.outgoing || '-'}</td>
+
+                    <td class="no-print" style="text-align: center;">
+
+                        <button class="btn-icon" onclick="removeItem('${item.code}')" title="Remove from list" style="background: none; border: none; color: var(--danger); cursor: pointer;">
+
+                            <i class="fa-solid fa-trash-can"></i>
+
+                        </button>
+
+                    </td>
+
+                `;
+
+                tbody.appendChild(tr);
+
+            });
+
+        }
+
+
+
+        function toggleSearch() {
+
+            const dropdown = document.getElementById('productSearchDropdown');
+
+            const isHidden = dropdown.style.display === 'none' || dropdown.style.display === '';
+
+            dropdown.style.display = isHidden ? 'block' : 'none';
+
+            if (isHidden) document.getElementById('addProdInput').focus();
+
+        }
+
+
+
+        let searchTimeout;
+
+        function searchProducts(query) {
+
+            clearTimeout(searchTimeout);
+
+            const resultsDiv = document.getElementById('searchResults');
+
+            if (!query) {
+
+                resultsDiv.innerHTML = '';
+
+                return;
+
+            }
+
+            searchTimeout = setTimeout(async () => {
+
+                try {
+
+                    const res = await fetch(`/api/products?q=${query}`);
+
+                    const products = await res.json();
+
+                    resultsDiv.innerHTML = '';
+
+                    
+
+                    products.forEach(p => {
+
+                        const div = document.createElement('div');
+
+                        div.className = 'search-result-item';
+
+                        div.innerHTML = `
+
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+
+                                <div>
+
+                                    <div style="font-weight: 700; color: var(--text-main);">${p.name}</div>
+
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">CODE: ${p.barcode}</div>
+
+                                </div>
+
+                                <div style="font-size: 0.7rem; background: var(--primary); padding: 2px 6px; border-radius: 4px; color: white;">ADD</div>
+
+                            </div>
+
+                        `;
+
+                        div.onclick = () => addProductToList(p.barcode);
+
+                        resultsDiv.appendChild(div);
+
+                    });
+
+                    if(products.length === 0) {
+
+                        resultsDiv.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">No products found</div>';
+
+                    }
+
+                } catch (e) {
+
+                    console.error(e);
+
+                }
+
+            }, 300);
+
+        }
+
+
+
+        async function addProductToList(barcode) {
+
+            await fetch('/api/reports/daily-position/add', {
+
+                method: 'POST',
+
+                headers: { 'Content-Type': 'application/json' },
+
+                body: JSON.stringify({ barcode })
+
+            });
+
+            toggleSearch();
+
+            document.getElementById('addProdInput').value = '';
+
+            document.getElementById('searchResults').innerHTML = '';
+
+            loadData();
+
+        }
+
+
+
+        async function removeItem(barcode) {
+
+            if (!confirm('Remove this product from the Daily Position list?')) return;
+
+            await fetch('/api/reports/daily-position/remove', {
+
+                method: 'POST',
+
+                headers: { 'Content-Type': 'application/json' },
+
+                body: JSON.stringify({ barcode })
+
+            });
+
+            loadData();
+
+        }
+
+
+
+        function filterTable() {
+
+            const query = document.getElementById('tableSearch').value.toLowerCase();
+
+            const filtered = allData.filter(item => 
+
+                item.product_name.toLowerCase().includes(query) || 
+
+                (item.code && item.code.toLowerCase().includes(query))
+
+            );
+
+            renderTable(filtered);
+
+        }
+
+
+
+        // Close dropdown when clicking outside
+
+        document.addEventListener('click', (e) => {
+
+            const container = document.querySelector('.search-box-container');
+
+            if (container && !container.contains(e.target)) {
+
+                document.getElementById('productSearchDropdown').style.display = 'none';
+
+            }
+
+        });
+
+
+
+        // Initialize
+
+        loadData();
+
+    </script>
+
+</body>
+
+
+
+</html>
+

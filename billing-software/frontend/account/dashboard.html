@@ -10,7 +10,7 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Accountant Dashboard - MaplePro</title>
+    <title>Accountant Dashboard - Sagar Super Maple Pro</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -448,7 +448,7 @@
 
                         <td class="ledger-label">Direct Sales</td>
 
-                        <td class="ledger-value">₹ <span contenteditable="true" id="directSales"
+                        <td class="ledger-value">&#8377; <span contenteditable="true" id="directSales"
 
                                 class="editable-field rev-input" oninput="calculateTotals()">0.00</span></td>
 
@@ -458,7 +458,7 @@
 
                         <td class="ledger-label">TOTAL REVENUE</td>
 
-                        <td class="ledger-value" style="color: var(--success);">₹ <span id="totalRevenue">0.00</span>
+                        <td class="ledger-value" style="color: var(--success);">&#8377; <span id="totalRevenue">0.00</span>
 
                         </td>
 
@@ -496,7 +496,7 @@
 
                         <td class="ledger-label">Inventory (Raw Materials)</td>
 
-                        <td class="ledger-value">₹ <span contenteditable="true" class="editable-field cogs-input"
+                        <td class="ledger-value">&#8377; <span contenteditable="true" class="editable-field cogs-input"
 
                                 oninput="calculateTotals()">0.00</span></td>
 
@@ -506,7 +506,7 @@
 
                         <td class="ledger-label">Wages (Production Labour)</td>
 
-                        <td class="ledger-value">₹ <span contenteditable="true" class="editable-field cogs-input"
+                        <td class="ledger-value">&#8377; <span contenteditable="true" class="editable-field cogs-input"
 
                                 oninput="calculateTotals()">0.00</span></td>
 
@@ -516,7 +516,7 @@
 
                         <td class="ledger-label">Freight (Incoming)</td>
 
-                        <td class="ledger-value">₹ <span contenteditable="true" class="editable-field cogs-input"
+                        <td class="ledger-value">&#8377; <span contenteditable="true" class="editable-field cogs-input"
 
                                 oninput="calculateTotals()">0.00</span></td>
 
@@ -526,7 +526,7 @@
 
                         <td class="ledger-label">Factory Rent</td>
 
-                        <td class="ledger-value">₹ <span contenteditable="true" class="editable-field cogs-input"
+                        <td class="ledger-value">&#8377; <span contenteditable="true" class="editable-field cogs-input"
 
                                 oninput="calculateTotals()">0.00</span></td>
 
@@ -536,7 +536,7 @@
 
                         <td class="ledger-label">Factory Insurance</td>
 
-                        <td class="ledger-value">₹ <span contenteditable="true" class="editable-field cogs-input"
+                        <td class="ledger-value">&#8377; <span contenteditable="true" class="editable-field cogs-input"
 
                                 oninput="calculateTotals()">0.00</span></td>
 
@@ -546,7 +546,7 @@
 
                         <td class="ledger-label">Machinery Maintenance</td>
 
-                        <td class="ledger-value">₹ <span contenteditable="true" class="editable-field cogs-input"
+                        <td class="ledger-value">&#8377; <span contenteditable="true" class="editable-field cogs-input"
 
                                 oninput="calculateTotals()">0.00</span></td>
 
@@ -556,7 +556,7 @@
 
                         <td class="ledger-label">Electricity Charges</td>
 
-                        <td class="ledger-value">₹ <span contenteditable="true" class="editable-field cogs-input"
+                        <td class="ledger-value">&#8377; <span contenteditable="true" class="editable-field cogs-input"
 
                                 oninput="calculateTotals()">0.00</span></td>
 
@@ -566,7 +566,7 @@
 
                         <td class="ledger-label">Water Bill</td>
 
-                        <td class="ledger-value">₹ <span contenteditable="true" class="editable-field cogs-input"
+                        <td class="ledger-value">&#8377; <span contenteditable="true" class="editable-field cogs-input"
 
                                 oninput="calculateTotals()">0.00</span></td>
 
@@ -576,7 +576,7 @@
 
                         <td class="ledger-label">TOTAL COGS</td>
 
-                        <td class="ledger-value" style="color: var(--danger);">₹ <span id="totalCOGS">0.00</span></td>
+                        <td class="ledger-value" style="color: var(--danger);">&#8377; <span id="totalCOGS">0.00</span></td>
 
                     </tr>
 
@@ -616,7 +616,7 @@
 
                         <td class="ledger-label">Total Revenue</td>
 
-                        <td class="ledger-value">₹ <span id="summaryRev">0.00</span></td>
+                        <td class="ledger-value">&#8377; <span id="summaryRev">0.00</span></td>
 
                     </tr>
 
@@ -624,7 +624,7 @@
 
                         <td class="ledger-label">Total Expenses (COGS) (-)</td>
 
-                        <td class="ledger-value">₹ <span id="summaryCOGS">0.00</span></td>
+                        <td class="ledger-value">&#8377; <span id="summaryCOGS">0.00</span></td>
 
                     </tr>
 
@@ -636,7 +636,7 @@
 
                             style="color: #fff; background: rgba(16, 185, 129, 0.2); border-radius: 8px; padding-right: 10px;">
 
-                            ₹ <span id="grossProfit">0.00</span></td>
+                            &#8377; <span id="grossProfit">0.00</span></td>
 
                     </tr>
 
@@ -691,7 +691,7 @@
     }
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-    <p>© 2025 Sagar Nilgiri Products | Maple Pro</p>
+    <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
 </footer>
 </main>
 
@@ -767,7 +767,7 @@
 
                     calculateTotals();
 
-                    alert(`Successfully fetched sales data: ₹${formatCurrency(totalSales)}`);
+                    alert(`Successfully fetched sales data: \u20B9${formatCurrency(totalSales)}`);
 
                 }
 
@@ -1025,11 +1025,19 @@
                 if (typeof loadData === 'function') loadData();
                 if (typeof updateDashboard === 'function') updateDashboard();
                 if (typeof refreshData === 'function') refreshData();
-                if (typeof fetchNextDocId === 'function') fetchNextDocId();
-                if (typeof loadBills === 'function') loadBills();
-                if (typeof loadRecentBills === 'function') loadRecentBills();
-                if (typeof loadReturns === 'function') loadReturns();
-                if (typeof loadExpenses === 'function') loadExpenses();
+                if (typeof loadReport === 'function') loadReport();
+                if (typeof loadStoreStatistics === 'function') loadStoreStatistics();
+                if (typeof searchBill === 'function') searchBill();
+                if (typeof loadStock === 'function') loadStock();
+                if (typeof renderList === 'function') renderList();
+                if (typeof fetchTelemetry === 'function') fetchTelemetry();
+                if (typeof fetchForecastData === 'function') fetchForecastData();
+                if (typeof loadIntel === 'function') loadIntel();
+                if (typeof loadInvoices === 'function') loadInvoices();
+                if (typeof loadCounters === 'function') loadCounters();
+                if (typeof fetchBills === 'function') fetchBills();
+                if (typeof loadClosureReport === 'function') loadClosureReport();
+                if (typeof fetchDailySales === 'function') fetchDailySales();
             });
         }
 

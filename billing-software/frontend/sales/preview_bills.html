@@ -8,7 +8,7 @@
 
     <meta charset="UTF-8">
 
-    <title>MaplePro | Preview Bills</title>
+    <title>Sagar Super Maple Pro | Preview Bills</title>
 
     <!-- Fonts & Icons -->
 
@@ -20,7 +20,7 @@
 
         /* =========================================
 
-           ADVANCED MaplePro THEME - GLASS & NEON
+           ADVANCED Sagar Super Maple Pro THEME - GLASS & NEON
 
            ========================================= */
 
@@ -608,7 +608,7 @@
 
     <nav class="sidebar">
 
-        <div class="brand"><img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> MaplePro</div>
+        <div class="brand"><img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> Sagar Super Maple Pro</div>
 
         <ul class="nav-menu">
 
@@ -771,7 +771,7 @@
     }
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-    <p>© 2025 Sagar Nilgiri Products | Maple Pro</p>
+    <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
 </footer>
 </main>
 
@@ -909,7 +909,7 @@
 
                             <td>${formattedDate}</td>
 
-                            <td style="font-weight: 700;">₹${bill.total_amount.toLocaleString('en-IN')}</td>
+                            <td style="font-weight: 700;">\u20B9${bill.total_amount.toLocaleString('en-IN')}</td>
 
                             <td><span style="color: ${statusColor}; font-weight: bold; font-size: 0.8rem;">${bill.status}</span></td>
 
@@ -1025,11 +1025,19 @@
                 if (typeof loadData === 'function') loadData();
                 if (typeof updateDashboard === 'function') updateDashboard();
                 if (typeof refreshData === 'function') refreshData();
-                if (typeof fetchNextDocId === 'function') fetchNextDocId();
-                if (typeof loadBills === 'function') loadBills();
-                if (typeof loadRecentBills === 'function') loadRecentBills();
-                if (typeof loadReturns === 'function') loadReturns();
-                if (typeof loadExpenses === 'function') loadExpenses();
+                if (typeof loadReport === 'function') loadReport();
+                if (typeof loadStoreStatistics === 'function') loadStoreStatistics();
+                if (typeof searchBill === 'function') searchBill();
+                if (typeof loadStock === 'function') loadStock();
+                if (typeof renderList === 'function') renderList();
+                if (typeof fetchTelemetry === 'function') fetchTelemetry();
+                if (typeof fetchForecastData === 'function') fetchForecastData();
+                if (typeof loadIntel === 'function') loadIntel();
+                if (typeof loadInvoices === 'function') loadInvoices();
+                if (typeof loadCounters === 'function') loadCounters();
+                if (typeof fetchBills === 'function') fetchBills();
+                if (typeof loadClosureReport === 'function') loadClosureReport();
+                if (typeof fetchDailySales === 'function') fetchDailySales();
             });
         }
 

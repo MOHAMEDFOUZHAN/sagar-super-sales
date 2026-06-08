@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Store Neural Core - MaplePro Intelligence</title>
+    <title>Store Neural Core - Sagar Super Maple Pro Intelligence</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <!DOCTYPE html>
 <html lang="en">
@@ -12,7 +12,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Store Neural Core - MaplePro Intelligence</title>
+    <title>Store Neural Core - Sagar Super Maple Pro Intelligence</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
@@ -379,7 +379,7 @@
     <!-- Preloader -->
     <div class="loading-overlay" id="loader">
         <div class="loading-ring"></div>
-        <h2 style="font-family: 'Orbitron', sans-serif; font-weight: 700; letter-spacing: 3px; font-size: 0.9rem; color: var(--hologram-cyan); text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);">CALIBRATING NEURAL LINK</h2>
+        <h2 style="font-family: 'Orbitron', sans-serif; font-weight: 700; letter-spacing: 3px; font-size: 0.9rem; color: var(--hologram-cyan); text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);">CALIBRATING AI MODELS</h2>
     </div>
 
     <!-- Sidebar navigation -->
@@ -403,30 +403,30 @@
         <div class="brain-grid">
             <!-- LEFT PANEL: Core Telemetry -->
             <div class="hud-panel">
-                <div class="hud-title"><i class="fa-solid fa-microchip"></i> Matrix Telemetry</div>
+                <div class="hud-title"><i class="fa-solid fa-microchip"></i> AI Model Status</div>
                 
                 <div class="metric-row">
-                    <span class="metric-label">Synaptic Nodes</span>
+                    <span class="metric-label">Active Connections</span>
                     <span class="metric-value cyan">2,000 Pts</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">Neural Weight</span>
+                    <span class="metric-label">Model Size (Params)</span>
                     <span class="metric-value purple" id="val-weights">8.42M params</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">Accuracy Index</span>
+                    <span class="metric-label">Prediction Accuracy</span>
                     <span class="metric-value green" id="val-accuracy">94.12%</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">Entropy Loss</span>
+                    <span class="metric-label">Prediction Error</span>
                     <span class="metric-value pink" id="val-loss">0.0824</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">Core Temperature</span>
+                    <span class="metric-label">Processor Temp</span>
                     <span class="metric-value" id="val-temp" style="color: #f59e0b;">36.4°C</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">Sync Speed</span>
+                    <span class="metric-label">Sync Frequency</span>
                     <span class="metric-value" id="val-hz">12.8 Hz</span>
                 </div>
 
@@ -449,7 +449,7 @@
                 </div>
 
                 <div style="margin-top: auto; padding: 10px; background: rgba(6, 182, 212, 0.02); border: 1px solid rgba(6, 182, 212, 0.05); border-radius: var(--radius-sm); font-size: 0.65rem; color: var(--text-muted); line-height: 1.4;">
-                    <span style="color: var(--hologram-cyan); font-weight: bold;">[SYSTEM NOTE]</span> Brain core visualizes active product weights and categories dynamically. Connect nodes to recalibrate database forecasting values.
+                    <span style="color: var(--hologram-cyan); font-weight: bold;">[SYSTEM NOTE]</span> AI Core visualizes product movements and categories in real time. Calibrate the system to update sales prediction models.
                 </div>
             </div>
 
@@ -469,10 +469,10 @@
                 <div id="brain-canvas"></div>
 
                 <!-- HUD Floating Markers -->
-                <div id="hud-frontal" class="hud-marker">FRONTAL: FORECASTING</div>
-                <div id="hud-temporal" class="hud-marker">TEMPORAL: EXPENSE AUDIT</div>
-                <div id="hud-cerebellum" class="hud-marker">CEREBELLUM: STOCK INTEL</div>
-                <div id="hud-occipital" class="hud-marker">OCCIPITAL: CATEGORY DOMINANCE</div>
+                <div id="hud-frontal" class="hud-marker">SALES FORECASTING</div>
+                <div id="hud-temporal" class="hud-marker">EXPENSE AUDIT</div>
+                <div id="hud-cerebellum" class="hud-marker">STOCK INTELLIGENCE</div>
+                <div id="hud-occipital" class="hud-marker">CATEGORY SALES</div>
 
                 <!-- Connecting lines -->
                 <svg id="hud-lines">
@@ -492,11 +492,11 @@
 
             <!-- RIGHT PANEL: Calibration & Neural Learning -->
             <div class="hud-panel">
-                <div class="hud-title"><i class="fa-solid fa-sliders"></i> Neural Calibration</div>
+                <div class="hud-title"><i class="fa-solid fa-sliders"></i> AI Calibration & Settings</div>
                 
                 <div class="control-widget">
                     <div class="control-label">
-                        <span>Brainwave Frequency</span>
+                        <span>AI Processing Speed</span>
                         <span id="lbl-frequency">1.5 Hz</span>
                     </div>
                     <input type="range" min="0.2" max="6.0" step="0.1" value="1.5" class="slider-input" id="slider-freq">
@@ -504,7 +504,7 @@
 
                 <div class="control-widget">
                     <div class="control-label">
-                        <span>Synaptic Density</span>
+                        <span>AI Connection Links</span>
                         <span id="lbl-density">200 links</span>
                     </div>
                     <input type="range" min="50" max="600" step="10" value="200" class="slider-input" id="slider-density">
@@ -512,17 +512,17 @@
 
                 <div class="control-widget">
                     <div class="control-label">
-                        <span>Cognitive Model</span>
+                        <span>AI Prediction Model</span>
                     </div>
                     <select class="hud-select" id="model-select">
-                        <option value="forecasting">Deep LSTM Sales Forecasting Model</option>
-                        <option value="inventory">Gradient-Boosted Stock Reorder optimizer</option>
-                        <option value="anomaly">Autoencoder Expense Anomaly Detector</option>
-                        <option value="crm">K-Means Customer Clustering Brain</option>
+                        <option value="forecasting">Sales Forecasting Model (LSTM)</option>
+                        <option value="inventory">Stock Reorder Optimizer (GB)</option>
+                        <option value="anomaly">Expense Anomaly Detector</option>
+                        <option value="crm">Customer Clustering Model</option>
                     </select>
                 </div>
 
-                <div class="hud-title" style="margin-top: 15px;"><i class="fa-solid fa-terminal"></i> Learning Terminal</div>
+                <div class="hud-title" style="margin-top: 15px;"><i class="fa-solid fa-terminal"></i> AI Learning Logs</div>
                 
                 <div class="terminal-box" id="terminal-console">
                     <div class="terminal-line"><span class="terminal-tag terminal-info">[INFO]</span> Store Brain Node initialized...</div>
@@ -540,13 +540,13 @@
                 </div>
 
                 <button class="btn-neural" id="btn-train">
-                    <i class="fa-solid fa-brain"></i> CALIBRATE & LEARN
+                    <i class="fa-solid fa-brain"></i> TRAIN & ADJUST MODEL
                 </button>
             </div>
         </div>
 
         <footer style="margin-top: 20px; padding: 15px 0; border-top: 1px solid rgba(255,255,255,0.05); text-align: center; color: var(--text-muted); font-size: 0.75rem;">
-            <p>© 2026 Sagar Nilgiri Products | MaplePro Cognitive Dashboard</p>
+            <p>© 2026 Sagar Nilgiri Products | Sagar Super Maple Pro Cognitive Dashboard</p>
         </footer>
     </main>
 
@@ -1018,7 +1018,7 @@
             const progressHud = document.getElementById('progress-hud');
             
             btn.disabled = false;
-            btn.innerHTML = `<i class="fa-solid fa-brain"></i> CALIBRATE & LEARN`;
+            btn.innerHTML = `<i class="fa-solid fa-brain"></i> TRAIN & ADJUST MODEL`;
             progressHud.style.display = 'none';
 
             // Pulse brain core in validation green flash

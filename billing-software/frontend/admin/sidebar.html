@@ -1,6 +1,6 @@
 <nav class="sidebar">
     <div class="brand">
-        <img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> MaplePro
+        <img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> Sagar Super Maple Pro
     </div>
     <ul class="nav-menu">
         <li>
@@ -273,6 +273,16 @@
                         if (typeof loadData === 'function') loadData();
                         if (typeof updateDashboard === 'function') updateDashboard();
                         if (typeof refreshData === 'function') refreshData();
+                        if (typeof loadReport === 'function') loadReport();
+                        if (typeof loadStoreStatistics === 'function') loadStoreStatistics();
+                        if (typeof searchBill === 'function') searchBill();
+                        if (typeof loadStock === 'function') loadStock();
+                        if (typeof renderList === 'function') renderList();
+                        if (typeof fetchTelemetry === 'function') fetchTelemetry();
+                        if (typeof fetchForecastData === 'function') fetchForecastData();
+                        if (typeof loadIntel === 'function') loadIntel();
+                        if (typeof loadInvoices === 'function') loadInvoices();
+                        if (typeof loadCounters === 'function') loadCounters();
                     });
                 }
 
@@ -289,13 +299,13 @@
 
         <div style="padding: 12px 16px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: var(--radius-md); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 12px;">
             <div style="width: 32px; height: 32px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; color: white;">
-                {{ session.username[0].upper() if session.username else 'A' }}
+                {{ session.get('username', 'A')[0].upper() if session.get('username') else 'A' }}
             </div>
             <div>
                 <div style="font-size: 0.85rem; font-weight: 600; color: white;">
-                    {% if session.username == 'admin' %}Administrator
-                    {% elif session.username.startswith('counter') %}Counter - {{ session.username[7:] }}
-                    {% else %}{{ session.username|capitalize }}{% endif %}
+                    {% if session.get('username') == 'admin' %}Administrator
+                    {% elif session.get('username') and session.get('username').startswith('counter') %}Counter - {{ session.get('username')[7:] }}
+                    {% else %}{{ session.get('username', 'User')|capitalize }}{% endif %}
                 </div>
                 <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Active Session</div>
             </div>

@@ -19,6 +19,9 @@ class Config:
     SERVER_PORT = 5004
     WAITRESS_THREADS = 50
     
+    # Billing Settings
+    SCAN_MODE = 'auto'  # 'auto' = scan adds to cart automatically, 'manual' = scan fills fields, user presses Enter
+    
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev_key_123')
 
     @classmethod
@@ -91,6 +94,7 @@ class Config:
                     cls.SERVER_HOST = data.get('SERVER_HOST', cls.SERVER_HOST)
                     cls.SERVER_PORT = int(data.get('SERVER_PORT', cls.SERVER_PORT))
                     cls.WAITRESS_THREADS = int(data.get('WAITRESS_THREADS', cls.WAITRESS_THREADS))
+                    cls.SCAN_MODE = data.get('SCAN_MODE', cls.SCAN_MODE)
                 
                 # Store the actual path used for other utilities to reference
                 cls.ACTIVE_CONFIG_PATH = found_file

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Business Twin - MaplePro</title>
+    <title>Business Twin - Sagar Super Maple Pro</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
@@ -386,7 +386,7 @@
             <div class="twin-card">
                 <i class="fa-solid fa-coins card-icon"></i>
                 <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Sales Velocity today</div>
-                <div class="stats-highlight" id="telemetrySales">₹0.00</div>
+                <div class="stats-highlight" id="telemetrySales">&#8377;0.00</div>
                 <div style="font-size: 0.75rem; color: var(--text-muted);" id="telemetryBillCount">0 Invoices generated</div>
             </div>
             <div class="twin-card">
@@ -435,7 +435,7 @@
             <div class="terminal-body" id="chatLogs">
                 <div class="message twin">
                     <p><strong>System Initialization Complete.</strong></p>
-                    <p>Welcome to the <strong>MaplePro AI Business Twin Console</strong>. I have mapped your real-time database schema, active session logs, invoice lines, and inventory parameters.</p>
+                    <p>Welcome to the <strong>Sagar Super Maple Pro AI Business Twin Console</strong>. I have mapped your real-time database schema, active session logs, invoice lines, and inventory parameters.</p>
                     <p>Click any suggestion chip above or ask me a custom operational question below to query your business state.</p>
                 </div>
             </div>
@@ -463,7 +463,7 @@
             }
         </style>
         <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-            <p>© 2025 Sagar Nilgiri Products | Maple Pro</p>
+            <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
         </footer>
     </main>
 
@@ -476,7 +476,7 @@
                 const dataStats = await resStats.json();
                 
                 if (dataStats) {
-                    document.getElementById('telemetrySales').innerText = "₹" + dataStats.daily_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                    document.getElementById('telemetrySales').innerText = "\u20B9" + dataStats.daily_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 });
                     document.getElementById('telemetryBillCount').innerText = dataStats.bill_count + " Invoices generated";
                 }
 

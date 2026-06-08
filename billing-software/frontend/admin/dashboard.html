@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Dashboard - MaplePro</title>
+    <title>Advanced Dashboard - Sagar Super Maple Pro</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -379,7 +379,7 @@
                 </div>
                 <div class="kpi-info">
                     <p>Today's Sales</p>
-                    <h3>₹<span id="kpiSales">0</span></h3>
+                    <h3>&#8377;<span id="kpiSales">0</span></h3>
                 </div>
             </div>
             <div class="kpi-card" style="border-bottom: 3px solid #10b981;">
@@ -397,7 +397,7 @@
                 </div>
                 <div class="kpi-info">
                     <p>Daily Expense</p>
-                    <h3>₹<span id="kpiExpense">0</span></h3>
+                    <h3>&#8377;<span id="kpiExpense">0</span></h3>
                 </div>
             </div>
             <div class="kpi-card" style="border-bottom: 3px solid #ec4899;">
@@ -406,7 +406,7 @@
                 </div>
                 <div class="kpi-info">
                     <p>Avg Ticket</p>
-                    <h3 id="kpiAvgBill">₹0</h3>
+                    <h3 id="kpiAvgBill">&#8377;0</h3>
                 </div>
             </div>
         </div>
@@ -528,7 +528,7 @@
     }
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-    <p>© 2025 Sagar Nilgiri Products | Maple Pro</p>
+    <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
 </footer>
 </main>
     <script>
@@ -545,7 +545,7 @@
                 document.getElementById('kpiSales').innerText = stats.daily_sales.toLocaleString();
                 document.getElementById('kpiBillCount').innerText = stats.bill_count;
                 document.getElementById('kpiExpense').innerText = stats.expenses.toLocaleString();
-                document.getElementById('kpiAvgBill').innerText = '₹' + Math.floor(stats.avg_bill_value).toLocaleString();
+                document.getElementById('kpiAvgBill').innerText = '\u20B9' + Math.floor(stats.avg_bill_value).toLocaleString();
                 
                 // Update DB Size in header
                 const dbSize = stats.db_size_kb || 160.0;
@@ -583,17 +583,24 @@
                 console.error("Dashboard Sync Error:", error);
             }
         }
+        let salesTrendChartInstance = null;
         function renderTrendChart(trend) {
             const ctx = document.getElementById('salesTrendChart').getContext('2d');
+            if (salesTrendChartInstance) {
+                salesTrendChartInstance.data.labels = trend.map(d => d.date);
+                salesTrendChartInstance.data.datasets[0].data = trend.map(d => d.amount);
+                salesTrendChartInstance.update();
+                return;
+            }
             const gradient = ctx.createLinearGradient(0, 0, 0, 300);
             gradient.addColorStop(0, 'rgba(99, 102, 241, 0.4)');
             gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
-            new Chart(ctx, {
+            salesTrendChartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: trend.map(d => d.date),
                     datasets: [{
-                        label: 'Sales (₹)',
+                        label: 'Sales (\u20B9)',
                         data: trend.map(d => d.amount),
                         borderColor: '#6366f1',
                         borderWidth: 3,
@@ -622,30 +629,37 @@
                 }
             });
         }
+        let paymentModeChartInstance = null;
         function renderPaymentChart(payments) {
             const ctx = document.getElementById('paymentModeChart').getContext('2d');
             const total = payments.reduce((acc, p) => acc + p.total, 0);
-            
-            // Generate dynamic colors for the chart slices to match the legends
             const chartColors = payments.map(p => getColor(p.payment_mode));
-            new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: payments.map(p => p.payment_mode),
-                    datasets: [{
-                        data: payments.map(p => p.total),
-                        backgroundColor: chartColors,
-                        borderWidth: 0,
-                        hoverOffset: 10
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '70%',
-                    plugins: { legend: { display: false } }
-                }
-            });
+            
+            if (paymentModeChartInstance) {
+                paymentModeChartInstance.data.labels = payments.map(p => p.payment_mode);
+                paymentModeChartInstance.data.datasets[0].data = payments.map(p => p.total);
+                paymentModeChartInstance.data.datasets[0].backgroundColor = chartColors;
+                paymentModeChartInstance.update();
+            } else {
+                paymentModeChartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: payments.map(p => p.payment_mode),
+                        datasets: [{
+                            data: payments.map(p => p.total),
+                            backgroundColor: chartColors,
+                            borderWidth: 0,
+                            hoverOffset: 10
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '70%',
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
             const statsList = document.getElementById('paymentStats');
             statsList.innerHTML = '';
             payments.forEach(p => {
@@ -681,7 +695,7 @@
                         <div class="progress-bar"><div class="progress-fill" style="width: ${perc}%"></div></div>
                     </div>
                     <div style="text-align: right; margin-left: 20px;">
-                        <span style="font-weight: 800; color: var(--success); font-size: 0.9rem;">₹${p.revenue.toLocaleString()}</span>
+                        <span style="font-weight: 800; color: var(--success); font-size: 0.9rem;">\u20B9${p.revenue.toLocaleString()}</span>
                     </div>
                 `;
                 list.appendChild(item);
@@ -823,7 +837,7 @@
                         <i class="fa-solid fa-robot"></i>
                     </div>
                     <div class="chat-title">
-                        <h4>MaplePro Copilot</h4>
+                        <h4>Sagar Super Maple Pro Copilot</h4>
                         <div class="chat-status">
                             <span class="chat-status-dot"></span>
                             <span>AI Active</span>
@@ -836,7 +850,7 @@
             
             <div class="chat-body" id="robotChatBody">
                 <div class="chat-msg bot">
-                    <p>Hello! I am your <strong>MaplePro AI Business Copilot</strong>.</p>
+                    <p>Hello! I am your <strong>Sagar Super Maple Pro AI Business Copilot</strong>.</p>
                     <p>I can help you analyze today's sales, check stock levels, and query anything in your store database. How can I help you today?</p>
                 </div>
             </div>

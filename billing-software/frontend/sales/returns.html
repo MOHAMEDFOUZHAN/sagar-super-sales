@@ -10,7 +10,7 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Returns & Voids | MaplePro</title>
+    <title>Returns & Voids | Sagar Super Maple Pro</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
@@ -354,7 +354,7 @@
 
     <nav class="sidebar">
 
-        <div class="brand"><img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> MaplePro</div>
+        <div class="brand"><img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> Sagar Super Maple Pro</div>
 
         <ul class="nav-menu">
 
@@ -432,7 +432,7 @@
 
                     / DOC ID</label>
 
-                <input id="bill_search" type="text" class="input-dark" placeholder="e.g. 00045">
+                <input id="bill_search" type="text" class="input-dark" placeholder="e.g. SS-45">
 
             </div>
 
@@ -464,7 +464,7 @@
 
                         <span style="display: block; font-size: 0.8rem; color: var(--text-muted);">TOTAL AMOUNT</span>
 
-                        <span id="display_total" style="font-size: 1.4rem; font-weight: bold;">₹ 0.00</span>
+                        <span id="display_total" style="font-size: 1.4rem; font-weight: bold;">&#8377; 0.00</span>
 
                     </div>
 
@@ -605,7 +605,7 @@
     }
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-    <p>© 2025 Sagar Nilgiri Products | Maple Pro</p>
+    <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
 </footer>
 </main>
 
@@ -657,9 +657,23 @@
 
                 const allBills = await response.json();
 
-                // Find by ID directly or by Invoice No
+                let numMatch = query.match(/\d+$/);
 
-                const bill = allBills.find(b => b.id == cleanId || b.invoice_no === query);
+                let numPart = numMatch ? numMatch[0].replace(/^0+/, '') : cleanId;
+
+
+
+                const bill = allBills.find(b => 
+
+                    b.id == cleanId || 
+
+                    b.id == numPart ||
+
+                    (b.invoice_no && b.invoice_no.toLowerCase() === query.toLowerCase()) ||
+
+                    (b.invoice_no && b.invoice_no.replace(/\D/g, '').replace(/^0+/, '') === numPart)
+
+                );
 
 
 
@@ -685,7 +699,7 @@
 
                 document.getElementById('display_bill_id').innerText = bill.invoice_no;
 
-                document.getElementById('display_total').innerText = '₹ ' + parseFloat(bill.total_amount).toFixed(2);
+                document.getElementById('display_total').innerText = '\u20B9 ' + parseFloat(bill.total_amount).toFixed(2);
 
                 document.getElementById('display_date').innerText = new Date(bill.bill_date).toLocaleString();
 
@@ -931,11 +945,19 @@
                 if (typeof loadData === 'function') loadData();
                 if (typeof updateDashboard === 'function') updateDashboard();
                 if (typeof refreshData === 'function') refreshData();
-                if (typeof fetchNextDocId === 'function') fetchNextDocId();
-                if (typeof loadBills === 'function') loadBills();
-                if (typeof loadRecentBills === 'function') loadRecentBills();
-                if (typeof loadReturns === 'function') loadReturns();
-                if (typeof loadExpenses === 'function') loadExpenses();
+                if (typeof loadReport === 'function') loadReport();
+                if (typeof loadStoreStatistics === 'function') loadStoreStatistics();
+                if (typeof searchBill === 'function') searchBill();
+                if (typeof loadStock === 'function') loadStock();
+                if (typeof renderList === 'function') renderList();
+                if (typeof fetchTelemetry === 'function') fetchTelemetry();
+                if (typeof fetchForecastData === 'function') fetchForecastData();
+                if (typeof loadIntel === 'function') loadIntel();
+                if (typeof loadInvoices === 'function') loadInvoices();
+                if (typeof loadCounters === 'function') loadCounters();
+                if (typeof fetchBills === 'function') fetchBills();
+                if (typeof loadClosureReport === 'function') loadClosureReport();
+                if (typeof fetchDailySales === 'function') fetchDailySales();
             });
         }
 

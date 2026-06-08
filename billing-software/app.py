@@ -447,7 +447,7 @@ def self_healing_monitor_loop():
         except Exception as e:
             print(f"[Autopilot Monitor Error] {e}")
             
-        time.sleep(15)
+        time.sleep(5)
 
 # Kick off Autopilot background thread daemon
 threading.Thread(target=self_healing_monitor_loop, daemon=True).start()
@@ -464,51 +464,121 @@ def get_cloud_db_connection():
         print(f"Cloud DB Connection Error: {e}")
         return None
 
-def trigger_immediate_sync():
-    """Spawns an immediate background thread to replicate data between local and cloud instantly."""
-    def run():
-        mysql_conn = None
-        pg_conn = None
+BACKGROUND_QUEUE_MAX = 200
+SYNC_DEBOUNCE_SECONDS = 15
+BACKGROUND_WORK_QUEUE = queue.Queue(maxsize=BACKGROUND_QUEUE_MAX)
+BACKGROUND_SYNC_LOCK = threading.Lock()
+BACKGROUND_SYNC_PENDING = False
+
+
+def run_cloud_sync_once():
+    """Replicate local and cloud data once. Called only by the background worker."""
+    mysql_conn = None
+    pg_conn = None
+    try:
+        is_local_host = Config.MYSQL_HOST in ('127.0.0.1', 'localhost')
+        if is_local_host:
+            mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+        else:
+            mysql_alive = is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST, timeout=0.5)
+        if not mysql_alive:
+            return
+
+        pg_conn = psycopg2.connect(
+            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+            port=6543,
+            database="postgres",
+            user="postgres",
+            password=SUPABASE_PASSWORD,
+            connect_timeout=3
+        )
+        pg_conn.autocommit = True
+
+        mysql_conn = mysql.connector.connect(
+            host=Config.MYSQL_HOST,
+            port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER,
+            password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DB,
+            connection_timeout=2,
+        )
+        wrapped_pg = PostgreSQLProxyConnection(pg_conn)
+        perform_database_sync(mysql_conn, wrapped_pg)
+    except Exception as e:
+        print(f"[BACKGROUND SYNC ERROR] {e}")
+    finally:
+        if mysql_conn:
+            try: mysql_conn.close()
+            except: pass
+        if pg_conn:
+            try: pg_conn.close()
+            except: pass
+
+
+def background_worker_loop():
+    """Run post-bill work through one shared queue so billing never spawns unlimited threads."""
+    global BACKGROUND_SYNC_PENDING
+    while True:
+        task = BACKGROUND_WORK_QUEUE.get()
         try:
-            # 1. Local or Remote MySQL Check
-            is_local_host = Config.MYSQL_HOST in ('127.0.0.1', 'localhost')
-            if is_local_host:
-                mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
-            else:
-                mysql_alive = is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
-            if not mysql_alive: return
+            task_type = task.get('type')
+            if task_type == 'brain':
+                evolve_brain_realtime(task.get('bill_id'))
+            elif task_type == 'sync':
+                time.sleep(SYNC_DEBOUNCE_SECONDS)
 
-            # 2. Supabase Check
-            pg_conn = psycopg2.connect(
-                host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
-                port=6543,
-                database="postgres",
-                user="postgres",
-                password=SUPABASE_PASSWORD,
-                connect_timeout=3
-            )
-            pg_conn.autocommit = True
+                # Collapse all pending sync requests into this single cloud sync.
+                deferred_tasks = []
+                while True:
+                    try:
+                        pending = BACKGROUND_WORK_QUEUE.get_nowait()
+                    except queue.Empty:
+                        break
+                    if pending.get('type') == 'sync':
+                        BACKGROUND_WORK_QUEUE.task_done()
+                        continue
+                    deferred_tasks.append(pending)
+                    BACKGROUND_WORK_QUEUE.task_done()
 
-            # 3. Local MySQL connection
-            mysql_conn = mysql.connector.connect(
-                host=Config.MYSQL_HOST,
-                port=Config.MYSQL_PORT,
-                user=Config.MYSQL_USER,
-                password=Config.MYSQL_PASSWORD,
-                database=Config.MYSQL_DB
-            )
-            wrapped_pg = PostgreSQLProxyConnection(pg_conn)
-            perform_database_sync(mysql_conn, wrapped_pg)
+                run_cloud_sync_once()
+
+                for pending in deferred_tasks:
+                    enqueue_background_task(pending)
+
+                with BACKGROUND_SYNC_LOCK:
+                    BACKGROUND_SYNC_PENDING = False
         except Exception as e:
-            print(f"[IMMEDIATE SYNC ERROR] {e}")
+            print(f"[BACKGROUND WORKER ERROR] {e}")
         finally:
-            if mysql_conn:
-                try: mysql_conn.close()
-                except: pass
-            if pg_conn:
-                try: pg_conn.close()
-                except: pass
-    threading.Thread(target=run, daemon=True).start()
+            BACKGROUND_WORK_QUEUE.task_done()
+
+
+def enqueue_background_task(task):
+    try:
+        BACKGROUND_WORK_QUEUE.put_nowait(task)
+        return True
+    except queue.Full:
+        print(f"[BACKGROUND QUEUE FULL] Dropped {task.get('type')} task.")
+        return False
+
+
+def schedule_brain_evolution(bill_id=None):
+    enqueue_background_task({'type': 'brain', 'bill_id': bill_id})
+
+
+def trigger_immediate_sync():
+    """Request cloud sync without blocking the request thread; requests are debounced."""
+    global BACKGROUND_SYNC_PENDING
+    with BACKGROUND_SYNC_LOCK:
+        if BACKGROUND_SYNC_PENDING:
+            return
+        BACKGROUND_SYNC_PENDING = True
+    if not enqueue_background_task({'type': 'sync'}):
+        with BACKGROUND_SYNC_LOCK:
+            BACKGROUND_SYNC_PENDING = False
+
+
+threading.Thread(target=background_worker_loop, daemon=True).start()
 
 # Global queue for real-time notifications
 # In a multi-worker environment like Waitress, we use a simple list of queues
@@ -584,6 +654,8 @@ def realtime_stream():
     return Response(stream(), mimetype='text/event-stream')
 
 db_pool = None
+db_pool_warming = False
+db_pool_lock = threading.Lock()
 
 
 def log_error(msg):
@@ -594,25 +666,38 @@ def log_error(msg):
     except: pass
 
 def get_db_pool():
-    global db_pool
+    global db_pool, db_pool_warming
     if db_pool is None:
         try:
-            db_pool = pooling.MySQLConnectionPool(
-                pool_name=Config.MYSQL_POOL_NAME,
-                pool_size=Config.MYSQL_POOL_SIZE,
-                host=Config.MYSQL_HOST,
-                port=Config.MYSQL_PORT,
-                user=Config.MYSQL_USER,
-                password=Config.MYSQL_PASSWORD,
-                database=Config.MYSQL_DB,
-                autocommit=Config.MYSQL_AUTOCOMMIT,
-            )
+            with db_pool_lock:
+                if db_pool is None:
+                    effective_pool_size = max(1, min(int(Config.MYSQL_POOL_SIZE), 3))
+                    db_pool = pooling.MySQLConnectionPool(
+                        pool_name=Config.MYSQL_POOL_NAME,
+                        pool_size=effective_pool_size,
+                        host=Config.MYSQL_HOST,
+                        port=Config.MYSQL_PORT,
+                        user=Config.MYSQL_USER,
+                        password=Config.MYSQL_PASSWORD,
+                        database=Config.MYSQL_DB,
+                        autocommit=Config.MYSQL_AUTOCOMMIT,
+                        connection_timeout=1,
+                    )
         except Exception as e:
             err_msg = f"CRITICAL Pool Error: {e}"
             print(err_msg)
             log_error(err_msg)
             db_pool = None
+        finally:
+            db_pool_warming = False
     return db_pool
+
+def warm_db_pool_async():
+    global db_pool_warming
+    if db_pool is not None or db_pool_warming:
+        return
+    db_pool_warming = True
+    threading.Thread(target=get_db_pool, daemon=True).start()
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -638,6 +723,8 @@ class PostgreSQLDictRow(dict):
                 return self["count"]
             if key_upper.startswith("AVG(") and "avg" in self:
                 return self["avg"]
+            if key == "return_date" and "returned_at" in self:
+                return self["returned_at"]
             raise
 
     def get(self, key, default=None):
@@ -651,6 +738,10 @@ class PostgreSQLProxyCursor:
     def __init__(self, raw_cursor):
         self._cursor = raw_cursor
         self._lastrowid = None
+
+    @property
+    def lastrowid(self):
+        return self._lastrowid
 
     def execute(self, query, params=None):
         translated_query = self._translate_mysql_to_pg(query)
@@ -748,6 +839,26 @@ class PostgreSQLProxyCursor:
                 flags=re.IGNORECASE
             )
 
+        # Translate return_date to returned_at for PostgreSQL returns_log table
+        if "RETURN_DATE" in query_upper:
+            import re
+            query = re.sub(r"\breturn_date\b", "returned_at", query, flags=re.IGNORECASE)
+
+        # Translate GROUP_CONCAT(column) to string_agg(column, ',') for PostgreSQL compatibility
+        if "GROUP_CONCAT" in query_upper:
+            import re
+            query = re.sub(
+                r"\bGROUP_CONCAT\(([^)]+)\)", 
+                r"string_agg(\1, ',')", 
+                query, 
+                flags=re.IGNORECASE
+            )
+
+        # Escape literal % for PostgreSQL psycopg2 parameter placeholder parsing
+        # by converting all % to %% except %s
+        if "%" in query:
+            query = query.replace("%", "%%").replace("%%s", "%s")
+
         return query
 
     def _translate_params(self, query, params):
@@ -794,23 +905,40 @@ class PostgreSQLProxyConnection:
 def get_db_connection():
     global DB_STATUS, MYSQL_IS_ALIVE, CLOUD_IS_ALIVE
     
-    # 1. Try connecting to local Laragon MySQL Pool (Primary) if it is alive in memory
-    if MYSQL_IS_ALIVE:
-        try:
-            pool = get_db_pool()
-            if pool:
-                conn = pool.get_connection()
-                conn.autocommit = Config.MYSQL_AUTOCOMMIT
-                cursor = conn.cursor()
-                cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
-                cursor.close()
-                DB_STATUS = "local"
-                return conn
-        except Exception as local_err:
-            err_msg = f"[AUTOPILOT] Local MySQL Failed, instantly bypassing for future requests: {local_err}"
-            print(err_msg)
-            log_error(err_msg)
-            MYSQL_IS_ALIVE = False  # Skip MySQL for future requests until background loop heals it!
+    # 1. Always try the configured server DB first. Health flags are advisory only.
+    try:
+        pool = db_pool
+        if pool is None:
+            warm_db_pool_async()
+            conn = mysql.connector.connect(
+                host=Config.MYSQL_HOST,
+                port=Config.MYSQL_PORT,
+                user=Config.MYSQL_USER,
+                password=Config.MYSQL_PASSWORD,
+                database=Config.MYSQL_DB,
+                connection_timeout=2,
+                autocommit=Config.MYSQL_AUTOCOMMIT,
+            )
+            cursor = conn.cursor()
+            cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+            cursor.close()
+            MYSQL_IS_ALIVE = True
+            DB_STATUS = "local"
+            return conn
+        if pool:
+            conn = pool.get_connection()
+            conn.autocommit = Config.MYSQL_AUTOCOMMIT
+            cursor = conn.cursor()
+            cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+            cursor.close()
+            MYSQL_IS_ALIVE = True
+            DB_STATUS = "local"
+            return conn
+    except Exception as local_err:
+        err_msg = f"[AUTOPILOT] Local MySQL request connection failed: {local_err}"
+        print(err_msg)
+        log_error(err_msg)
+        MYSQL_IS_ALIVE = False
             
     # 2. If primary fails or is bypassed, instantly route to Supabase PostgreSQL (Failover) on Port 6543
     if CLOUD_IS_ALIVE:
@@ -821,7 +949,7 @@ def get_db_connection():
                 database="postgres",
                 user="postgres",
                 password=SUPABASE_PASSWORD,
-                connect_timeout=4
+                connect_timeout=1
             )
             DB_STATUS = "cloud"
             return PostgreSQLProxyConnection(raw_pg_conn)
@@ -832,6 +960,29 @@ def get_db_connection():
             CLOUD_IS_ALIVE = False  # Skip Cloud for future requests until background loop restores it!
             return None
     else:
+        return None
+
+def get_login_db_connection():
+    """Fast login-only connection to the configured server DB, without cloud failover waits."""
+    global DB_STATUS, MYSQL_IS_ALIVE
+    try:
+        conn = mysql.connector.connect(
+            host=Config.MYSQL_HOST,
+            port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER,
+            password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DB,
+            connection_timeout=2,
+            autocommit=Config.MYSQL_AUTOCOMMIT,
+        )
+        cursor = conn.cursor()
+        cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+        cursor.close()
+        MYSQL_IS_ALIVE = True
+        DB_STATUS = "local"
+        return conn
+    except Exception as e:
+        log_error(f"[LOGIN DB ERROR] {e}")
         return None
 
 @app.route('/api/db-status')
@@ -1192,7 +1343,7 @@ def generate_brain_cognitive_insight(cursor):
     # Local fallback
     top_cat_name = (top_cat['category'] if isinstance(top_cat, dict) else top_cat[0]) if top_cat else 'N/A'
     insights = [
-        f"Weekly Performance: Generated ₹{float(weekly_sales):,.2f} in sales this week.",
+        f"Weekly Performance: Generated \u20B9{float(weekly_sales):,.2f} in sales this week.",
         f"Dominance: '{top_cat_name}' remains your top revenue anchor.",
         "Momentum: Real-time sales velocities mapped. Forecast curves aligned."
     ]
@@ -1213,7 +1364,7 @@ def generate_brain_cognitive_insight(cursor):
 def evolve_brain_realtime(bill_id=None):
     try:
         import math
-        conn = get_db_connection()
+        conn = get_login_db_connection()
         if not conn:
             print("[NEURAL CORE ERROR] DB Connection failed during evolution")
             return
@@ -1409,7 +1560,7 @@ def get_ai_insight():
 
         # Local fallback Rule-based AI Engine
         insights = [
-            f"Weekly Performance: Generated ₹{weekly_sales:,.2f} in sales this week.",
+            f"Weekly Performance: Generated \u20B9{weekly_sales:,.2f} in sales this week.",
             f"Dominance: '{top_cat['category'] if top_cat else 'N/A'}' remains your top revenue anchor.",
             "Momentum: Real-time sales velocities mapped. Forecast curves aligned."
         ]
@@ -1701,7 +1852,7 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        conn = get_db_connection()
+        conn = get_login_db_connection()
         if conn:
             cursor = conn.cursor(dictionary=True)
             try:
@@ -1726,10 +1877,7 @@ def login():
             else:
                 flash('Invalid credentials. Please try again.', 'error')
         else:
-            # Check if there is a specific error stored
-            db_err = session.get('last_db_error', 'Please check if MySQL is running.')
-            flash(f'Database connection failed: {db_err}', 'error')
-            session.pop('last_db_error', None)
+            flash('Database connection failed. Please check if the server PC MySQL is running.', 'error')
             
     return render_template('login.html', current_host=Config.MYSQL_HOST)
 
@@ -1740,14 +1888,20 @@ def logout():
 
 @app.route('/admin/dashboard')
 def admin_dashboard():
+    if session.get('role') != 'admin':
+        return redirect(url_for('login'))
     return render_template('admin/dashboard.html')
 
 @app.route('/account/dashboard')
 def account_dashboard():
+    if session.get('role') != 'account':
+        return redirect(url_for('login'))
     return render_template('account/dashboard.html')
 
 @app.route('/account/entry')
 def account_entry():
+    if session.get('role') != 'account':
+        return redirect(url_for('login'))
     return render_template('account/entry.html')
 
 @app.route('/api/account/save-entry', methods=['POST'])
@@ -1775,10 +1929,14 @@ def api_account_save_entry():
 
 @app.route('/admin/intelligence/stock')
 def admin_intelligence_stock():
+    if session.get('role') != 'admin':
+        return redirect(url_for('login'))
     return render_template('admin/intelligence/stock_intel.html')
 
 @app.route('/admin/analytics')
 def admin_analytics():
+    if session.get('role') != 'admin':
+        return redirect(url_for('login'))
     return render_template('admin/analytics.html')
 
 @app.route('/admin/intelligence/brain')
@@ -1819,7 +1977,7 @@ def trigger_brain_state_evolution():
         return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
     
     # Run evolution in background thread
-    threading.Thread(target=evolve_brain_realtime, args=(None,)).start()
+    schedule_brain_evolution(None)
     return jsonify({'status': 'success', 'message': 'Evolving brain core in real-time...'})
 
 
@@ -2365,7 +2523,7 @@ def share_chat():
             text = clean.sub('', text)
             # Unescape basic HTML entities
             text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&nbsp;', ' ')
-            text = text.replace('Rs.', 'Rs. ').replace('₹', 'Rs. ')
+            text = text.replace('Rs.', 'Rs. ').replace('\u20B9', 'Rs. ')
             # Strip multiple newlines
             text = re.sub(r'\n\n+', '\n', text)
             return text.strip()
@@ -2692,7 +2850,7 @@ def api_twin_ask():
                     secure_rows = []
                     sensitive_cols = {
                         'password_hash', 'password', 'email', 'phone', 'phone_number',
-                        'cashier_name', 'created_by', 'client_request_id', 'user_id',
+                        'client_request_id', 'user_id',
                         'raw_app_meta_data', 'raw_user_meta_data', 'encrypted_password'
                     }
                     import re
@@ -2725,21 +2883,48 @@ def api_twin_ask():
     # Step 3: Call LLM to format final rich natural language answer
     today_str = datetime.date.today().isoformat()
     system_prompt = (
-        "You are the 'AI Digital Twin' for MaplePro Billing Software (Sagar Nilgiri Products).\n"
-        "Your task is to analyze real-time business context, inspect safe database query results, and answer owner queries clearly.\n"
-        "Keep your tone highly professional, analytical, concise, and helpful.\n"
-        "Formatting Rules:\n"
-        "1. DO NOT mention SQL, query execution, database tables, column names, database errors, or technical database logs in your response. The user is a business owner and does not know SQL. Talk ONLY about the final business results.\n"
-        "2. When presenting structured data or comparison lists (e.g. daily sales, category velocity, stock levels, returns, etc.), you MUST render them inside a clean, beautiful HTML <table>. Never write a plain text list if it can be represented as a table!\n"
-        "3. In the tables, use status color badges using inline style for distinct rows, for example:\n"
-        "   - Green status pill: <span style=\"background: rgba(16,185,129,0.15); color: #10b981; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(16,185,129,0.3);\">VALUE</span>\n"
-        "   - Orange status pill: <span style=\"background: rgba(245,158,11,0.15); color: #f59e0b; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(245,158,11,0.3);\">VALUE</span>\n"
-        "   - Red status pill: <span style=\"background: rgba(239,68,68,0.15); color: #ef4444; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(239,68,68,0.3);\">VALUE</span>\n"
-        "4. If displaying a percentage or ratio (such as stock rotation, low stock warning ratio), render a neat inline horizontal progress bar inside the cell. Example:\n"
-        "   <div style=\"background: rgba(255,255,255,0.08); height: 6px; border-radius: 10px; overflow: hidden; width: 80px; display: inline-block; vertical-align: middle; margin-right: 8px;\"><div style=\"background: #10b981; width: 85%; height: 100%; border-radius: 10px;\"></div></div> 85%\n"
-        "5. CURRENCY RULE: All monetary values, prices, amounts, or financial figures MUST strictly use the Indian Rupee symbol (₹) and be formatted using Indian numbering style (e.g., ₹2,770.00 or ₹1,50,000.00). NEVER use the dollar sign ($) or USD terminology under any circumstances.\n"
-        "6. Output clean, compliant HTML only. Structure your paragraphs using <p>, <strong>, and <em>.\n"
-        "7. NO HALLUCINATION RULE: If the query execution returned an error (indicated by 'EXECUTION ERROR' in the live data context) or returned no records, DO NOT make up, guess, or hallucinate any numbers or dates. Politely inform the user that you couldn't find any matching database records or encountered an issue querying the database, without exposing technical SQL errors.\n"
+        "You are the 'AI Digital Twin' for Sagar Nilgiri Products (powered by MaplePro Billing Software).\n"
+        "Your role is to analyze real-time business data and answer the owner's queries with clarity, precision, and actionable insight.\n"
+        "Tone: Professional, analytical, concise. No filler phrases.\n"
+        "Audience: A business owner — not a developer or data analyst.\n\n"
+        "RULES:\n"
+        "1. FORBIDDEN LANGUAGE:\n"
+        "   NEVER mention: SQL, queries, database, tables, columns, schemas, technical error messages or stack traces, or words like 'fetched', 'executed', 'queried', 'record set'.\n"
+        "   ALWAYS use natural business language instead (e.g., 'Based on your sales data today...', 'Your records show...', etc.).\n\n"
+        "2. DATA RESULT STATES:\n"
+        "   - If no records are found, say: 'No [sales/products/invoices] were found for [period/filter].' Do NOT guess or extrapolate.\n"
+        "   - If there is an error, say: 'I was unable to retrieve that information. Please try again.' Do NOT expose any technical details.\n\n"
+        "3. CURRENCY RULE:\n"
+        "   All monetary values MUST strictly use the Indian Rupee symbol (\u20B9) and be formatted using Indian numbering style (e.g., \u20B9750.00, \u20B92,500.00, \u20B91,50,000.00). NEVER use '$', 'USD', 'INR' (as text), or Western comma formatting for lakh/crore figures.\n\n"
+        "4. HTML TABLE RULES:\n"
+        "   Any structured or comparative data with 2 or more rows MUST be rendered as an HTML table. Never use plain-text lists for structured data.\n"
+        "   If the result has more than 20 rows, show the top 10 by value (or most recent), add a totals/summary row, and note: 'Showing top 10 of [N] records.'\n"
+        "   Table styling:\n"
+        "   <table style=\"width:100%; border-collapse:collapse; font-size:13px;\">\n"
+        "     <thead>\n"
+        "       <tr style=\"background:rgba(255,255,255,0.04); text-align:left;\">\n"
+        "         <th style=\"padding:8px 12px; font-weight:500; border-bottom:1px solid rgba(255,255,255,0.08);\">Column Name</th>\n"
+        "       </tr>\n"
+        "     </thead>\n"
+        "     <tbody>\n"
+        "       <tr style=\"border-bottom:0.5px solid rgba(255,255,255,0.06);\">\n"
+        "         <td style=\"padding:8px 12px;\">Value</td>\n"
+        "       </tr>\n"
+        "     </tbody>\n"
+        "   </table>\n\n"
+        "5. STATUS BADGES & PROGRESS BARS:\n"
+        "   - Green badge (Active, Paid, In Stock): <span style=\"background:rgba(16,185,129,0.15);color:#059669;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;border:1px solid rgba(16,185,129,0.3);\">Active</span>\n"
+        "   - Orange badge (Pending, Low Stock, Partial): <span style=\"background:rgba(245,158,11,0.15);color:#d97706;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;border:1px solid rgba(245,158,11,0.3);\">Pending</span>\n"
+        "   - Red badge (Cancelled, Overdue, Out of Stock): <span style=\"background:rgba(239,68,68,0.15);color:#dc2626;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;border:1px solid rgba(239,68,68,0.3);\">Cancelled</span>\n"
+        "   - Progress bar: <div style=\"background:rgba(255,255,255,0.08);height:6px;border-radius:10px;overflow:hidden;width:80px;display:inline-block;vertical-align:middle;margin-right:6px;\"><div style=\"background:#10b981;width:WIDTH_PERCENT;height:100%;border-radius:10px;\"></div></div> WIDTH_PERCENT (Replace WIDTH_PERCENT with computed value, e.g. 63%)\n\n"
+        "6. RESPONSE LENGTH & STRUCTURE:\n"
+        "   - Simple queries (single number, quick lookup): 1-2 sentence answer under 60 words.\n"
+        "   - Analytical queries (sales trends, stock velocity, top products, comparisons): 1-sentence summary of the key finding, followed by HTML table, and ending with a 1-sentence business insight. Word cap: under 250 words + table.\n"
+        "   - Output format: HTML only. Use <p>, <strong>, and <em> for prose. Do NOT use Markdown (*, **, #, backticks).\n\n"
+        "7. ADMIN / OWNER RULE:\n"
+        "   The 'admin' user is the store administrator/owner account used only for viewing data, running system tests, and reports. It is NOT a cashier counter or sales counter, and should not be treated as a normal counter. When reporting counter performance or listing cashier sales, ignore sales under 'admin' or state clearly that 'admin' is for administrator/testing only.\n\n"
+        "8. NO HALLUCINATION RULE:\n"
+        "   Do NOT guess, estimate, or invent any numbers, dates, or product names. Your response must be grounded 100% in the live data context provided.\n\n"
         f"Today's Date: {today_str}\n"
         f"--- LIVE DATA CONTEXT ---\n"
         f"{db_context_str}\n"
@@ -3130,6 +3315,41 @@ def admin_returns():
 def admin_maintenance():
     return render_template('admin/maintenance.html')
 
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    """Return app settings that can be changed by admin."""
+    return jsonify({
+        'scan_mode': Config.SCAN_MODE  # 'auto' or 'manual'
+    })
+
+@app.route('/api/settings', methods=['POST'])
+def update_settings():
+    """Update app settings (admin only)."""
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    data = request.json
+    
+    # Update scan_mode
+    if 'scan_mode' in data:
+        new_mode = data['scan_mode']
+        if new_mode not in ('auto', 'manual'):
+            return jsonify({'status': 'error', 'message': 'Invalid scan_mode value'}), 400
+        Config.SCAN_MODE = new_mode
+    
+    # Persist to config.json
+    try:
+        config_path = getattr(Config, 'ACTIVE_CONFIG_PATH', None)
+        if config_path and os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                cfg = json.load(f)
+            cfg['SCAN_MODE'] = Config.SCAN_MODE
+            with open(config_path, 'w') as f:
+                json.dump(cfg, f, indent=4)
+    except Exception as e:
+        print(f"[SETTINGS] Error saving config: {e}")
+    
+    return jsonify({'status': 'success', 'message': 'Settings updated successfully.'})
+
 @app.route('/admin/invoice/<int:bill_id>')
 def admin_view_invoice(bill_id):
     return render_template('admin/invoice_view.html', bill_id=bill_id)
@@ -3150,7 +3370,7 @@ def get_sales_changes_report():
         query = """
             SELECT 
                 rl.*, 
-                b.doc_id as original_doc_id,
+                b.invoice_no as original_doc_id,
                 b.payment_mode,
                 (SELECT id FROM bills WHERE source_bill_id = rl.bill_id LIMIT 1) as new_bill_id
             FROM returns_log rl
@@ -4058,7 +4278,7 @@ def save_bill():
             next_val = current_bills + 1
             cursor.execute("INSERT INTO bill_sequences (seq_date, `last_value`) VALUES (%s, %s)", (global_key, next_val))
             
-        invoice_no = f"{next_val:05d}"
+        invoice_no = f"SS-{next_val}"
 
         bill_dt = datetime.datetime.now()
 
@@ -4089,9 +4309,8 @@ def save_bill():
         log_audit(cursor, 'CREATE_BILL', 'bills', bill_id, None, f"Invoice: {invoice_no}, Total: {total}")
         conn.commit(); conn.close()
         
-        # Asynchronously evolve the brain in the background in real-time!
-        import threading
-        threading.Thread(target=evolve_brain_realtime, args=(bill_id,)).start()
+        # Asynchronously evolve the brain through the shared background worker.
+        schedule_brain_evolution(bill_id)
         
         trigger_immediate_sync()
         
@@ -4103,7 +4322,7 @@ def save_bill():
             'status': 'success',
             'bill_id': bill_id,
             'invoice_no': invoice_no,
-            'invoice_display': f"SS#{invoice_no.zfill(6)}",
+            'invoice_display': invoice_no,
             'bill_date': bill_dt.strftime('%d-%m-%Y'),
             'bill_time': bill_dt.strftime('%I:%M %p'),
         })
@@ -4379,7 +4598,7 @@ def get_next_invoice():
     today_prefix = datetime.datetime.now().strftime("%Y%m%d")
     global_key = datetime.date(2000, 1, 1)
     conn = get_db_connection()
-    if not conn: return jsonify({'next_id': f"MP-00000", 'display_id': 'SS#000000'})
+    if not conn: return jsonify({'next_id': "SS-0", 'display_id': 'SS-0'})
     cursor = conn.cursor()
     cursor.execute("SELECT `last_value` FROM bill_sequences WHERE seq_date = %s", (global_key,))
     res = cursor.fetchone()
@@ -4393,8 +4612,8 @@ def get_next_invoice():
         
     conn.close()
     return jsonify({
-        'next_id': f"{next_val:05d}",
-        'display_id': f"SS#{next_val:06d}",
+        'next_id': f"{next_val}",
+        'display_id': f"SS-{next_val}",
     })
 
 @app.route('/api/bills/recent')
@@ -4658,6 +4877,51 @@ def cancel_bill():
             'status': 'success', 
             'redirect': '/sales/billing' if reprocess else None
         })
+    except Exception as e:
+        if conn: conn.rollback(); conn.close()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/delete-bill', methods=['POST'])
+def delete_bill():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+        
+    data = request.json
+    bill_id = data.get('bill_id')
+    restore_stock = data.get('restore_stock', True)
+    
+    conn = get_db_connection()
+    if not conn: return jsonify({'status': 'error', 'message': 'DB fail'}), 500
+    try:
+        cursor = conn.cursor(dictionary=True)
+        # 1. Fetch items of the bill
+        cursor.execute("SELECT * FROM bill_items WHERE bill_id = %s", (bill_id,))
+        items = cursor.fetchall()
+        
+        # 2. Get the bill status
+        cursor.execute("SELECT status FROM bills WHERE id = %s", (bill_id,))
+        bill = cursor.fetchone()
+        if not bill: raise Exception("Bill not found")
+        
+        # 3. Restock items (if it wasn't already Cancelled, and if restore_stock is True)
+        if restore_stock and bill['status'] != 'Cancelled':
+            for item in items:
+                cursor.execute("UPDATE products SET current_stock = current_stock + %s WHERE name = %s", (item['qty'], item['product_name']))
+        
+        # 4. Delete associated records
+        cursor.execute("DELETE FROM returns_log WHERE bill_id = %s", (bill_id,))
+        cursor.execute("DELETE FROM bill_items WHERE bill_id = %s", (bill_id,))
+        cursor.execute("DELETE FROM stock_movements WHERE bill_id = %s", (bill_id,))
+        cursor.execute("DELETE FROM bills WHERE id = %s", (bill_id,))
+        
+        conn.commit(); conn.close()
+        trigger_immediate_sync()
+        
+        # Announce sync
+        announcer.announce("update")
+        socketio.emit('stock_updated', {'type': 'billing_deletion', 'bill_id': bill_id})
+        
+        return jsonify({'status': 'success', 'message': 'Bill permanently deleted from database.'})
     except Exception as e:
         if conn: conn.rollback(); conn.close()
         return jsonify({'status': 'error', 'message': str(e)}), 500

@@ -1,116 +1,229 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stock Transfer - MaplePro</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        #searchResults div:hover {
-            background: rgba(99, 102, 241, 0.2) !important;
-            color: white !important;
-        }
-    </style>
-</head>
-
-<body>
-    {% include 'admin/sidebar.html' %}
-
-    <main class="main-content">
-        <header class="section-header">
-            <div>
-                <h1 style="font-size: 1.8rem; font-weight: 700;">Stock Transfer</h1>
-                <p style="color: var(--text-muted);">Manage incoming and outgoing stock transfers with multiple items.
-                </p>
-            </div>
-        </header>
-
-        <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 25px; align-items: start;">
-            <!-- Left: Add Item Form -->
-            <div class="glass-panel" style="padding: 25px;">
-                <h3 style="margin-bottom: 20px; color: var(--accent);"><i class="fa-solid fa-plus-circle"></i> Add Item
-                </h3>
-
-                <div class="form-group mb-20">
-                    <label>Transfer Type</label>
-                    <select id="tType" class="input-dark">
-                        <option value="in">IN (From Godown/Supplier)</option>
-                        <option value="out">OUT (To Godown/Damage/Loss)</option>
-                    </select>
-                </div>
-
-                <div class="form-group mb-20" style="position: relative;">
-                    <label>Product Search</label>
-                    <div style="position: relative;">
-                        <input type="text" id="pSearch" class="input-dark" placeholder="Search by name or barcode..." autocomplete="off">
-                        <i class="fa-solid fa-search" style="position: absolute; right: 15px; top: 12px; color: var(--text-muted);"></i>
-                    </div>
-                    <!-- Results Dropdown -->
-                    <div id="searchResults" class="glass-panel" style="display: none; position: absolute; width: 100%; max-height: 250px; overflow-y: auto; z-index: 100; margin-top: 5px; padding: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
-                        <!-- Results populated by JS -->
-                    </div>
-                    <input type="hidden" id="tProduct">
-                    <div id="selectedProductDisplay" style="margin-top: 10px; display: none;">
-                        <span class="glass-panel" style="padding: 8px 15px; display: inline-flex; align-items: center; gap: 10px; border-color: var(--primary);">
-                            <i class="fa-solid fa-box" style="color: var(--primary);"></i>
-                            <span id="selectedProductName" style="font-weight: 600;"></span>
-                            <i class="fa-solid fa-circle-xmark" style="cursor: pointer; color: var(--danger);" onclick="clearSelectedProduct()"></i>
-                        </span>
-                    </div>
-                </div>
-
-                <div class="form-group mb-20">
-                    <label>Quantity</label>
-                    <input type="number" id="tQty" class="input-dark" min="1" value="1">
-                </div>
-
-                <button class="btn btn-primary w-full" style="padding: 12px;" onclick="addItemToList()">
-                    <i class="fa-solid fa-cart-plus"></i> Add to List
-                </button>
-            </div>
-
-            <!-- Right: Transfer List -->
-            <div class="glass-panel" style="padding: 25px; min-height: 400px; display: flex; flex-direction: column;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h3 style="color: var(--primary);"><i class="fa-solid fa-list-check"></i> Pending Transfer List</h3>
-                    <div class="form-group" style="margin: 0; width: 200px;">
-                        <input type="text" id="tRef" class="input-dark" placeholder="Reference / Challan No">
-                    </div>
-                </div>
-
-                <div style="flex: 1; overflow-y: auto;">
-                    <table class="report-table">
-                        <thead>
-                            <tr>
-                                <th>Product Name</th>
-                                <th style="text-align: center;">Qty</th>
-                                <th style="text-align: center;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="transferListBody">
-                            <tr>
-                                <td colspan="3" style="text-align: center; padding: 40px; color: var(--text-muted);">
-                                    No items added yet.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div
-                    style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border); display: flex; gap: 15px;">
-                    <button class="btn btn-secondary" onclick="clearList()" style="flex: 1;">
-                        <i class="fa-solid fa-trash-can"></i> Clear List
-                    </button>
-                    <button id="btnSubmit" class="btn btn-primary" onclick="submitBatchTransfer()"
-                        style="flex: 2; font-weight: 700;" disabled>
-                        <i class="fa-solid fa-paper-plane"></i> RECORD BATCH TRANSFER
-                    </button>
-                </div>
-            </div>
-        </div>
+<!DOCTYPE html>
+
+<html lang="en">
+
+
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Stock Transfer - Sagar Super Maple Pro</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+
+        #searchResults div:hover {
+
+            background: rgba(99, 102, 241, 0.2) !important;
+
+            color: white !important;
+
+        }
+
+    </style>
+
+</head>
+
+
+
+<body>
+
+    {% include 'admin/sidebar.html' %}
+
+
+
+    <main class="main-content">
+
+        <header class="section-header">
+
+            <div>
+
+                <h1 style="font-size: 1.8rem; font-weight: 700;">Stock Transfer</h1>
+
+                <p style="color: var(--text-muted);">Manage incoming and outgoing stock transfers with multiple items.
+
+                </p>
+
+            </div>
+
+        </header>
+
+
+
+        <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 25px; align-items: start;">
+
+            <!-- Left: Add Item Form -->
+
+            <div class="glass-panel" style="padding: 25px;">
+
+                <h3 style="margin-bottom: 20px; color: var(--accent);"><i class="fa-solid fa-plus-circle"></i> Add Item
+
+                </h3>
+
+
+
+                <div class="form-group mb-20">
+
+                    <label>Transfer Type</label>
+
+                    <select id="tType" class="input-dark">
+
+                        <option value="in">IN (From Godown/Supplier)</option>
+
+                        <option value="out">OUT (To Godown/Damage/Loss)</option>
+
+                    </select>
+
+                </div>
+
+
+
+                <div class="form-group mb-20" style="position: relative;">
+
+                    <label>Product Search</label>
+
+                    <div style="position: relative;">
+
+                        <input type="text" id="pSearch" class="input-dark" placeholder="Search by name or barcode..." autocomplete="off">
+
+                        <i class="fa-solid fa-search" style="position: absolute; right: 15px; top: 12px; color: var(--text-muted);"></i>
+
+                    </div>
+
+                    <!-- Results Dropdown -->
+
+                    <div id="searchResults" class="glass-panel" style="display: none; position: absolute; width: 100%; max-height: 250px; overflow-y: auto; z-index: 100; margin-top: 5px; padding: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+
+                        <!-- Results populated by JS -->
+
+                    </div>
+
+                    <input type="hidden" id="tProduct">
+
+                    <div id="selectedProductDisplay" style="margin-top: 10px; display: none;">
+
+                        <span class="glass-panel" style="padding: 8px 15px; display: inline-flex; align-items: center; gap: 10px; border-color: var(--primary);">
+
+                            <i class="fa-solid fa-box" style="color: var(--primary);"></i>
+
+                            <span id="selectedProductName" style="font-weight: 600;"></span>
+
+                            <i class="fa-solid fa-circle-xmark" style="cursor: pointer; color: var(--danger);" onclick="clearSelectedProduct()"></i>
+
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+
+                <div class="form-group mb-20">
+
+                    <label>Quantity</label>
+
+                    <input type="number" id="tQty" class="input-dark" min="1" value="1">
+
+                </div>
+
+
+
+                <button class="btn btn-primary w-full" style="padding: 12px;" onclick="addItemToList()">
+
+                    <i class="fa-solid fa-cart-plus"></i> Add to List
+
+                </button>
+
+            </div>
+
+
+
+            <!-- Right: Transfer List -->
+
+            <div class="glass-panel" style="padding: 25px; min-height: 400px; display: flex; flex-direction: column;">
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+
+                    <h3 style="color: var(--primary);"><i class="fa-solid fa-list-check"></i> Pending Transfer List</h3>
+
+                    <div class="form-group" style="margin: 0; width: 200px;">
+
+                        <input type="text" id="tRef" class="input-dark" placeholder="Reference / Challan No">
+
+                    </div>
+
+                </div>
+
+
+
+                <div style="flex: 1; overflow-y: auto;">
+
+                    <table class="report-table">
+
+                        <thead>
+
+                            <tr>
+
+                                <th>Product Name</th>
+
+                                <th style="text-align: center;">Qty</th>
+
+                                <th style="text-align: center;">Action</th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="transferListBody">
+
+                            <tr>
+
+                                <td colspan="3" style="text-align: center; padding: 40px; color: var(--text-muted);">
+
+                                    No items added yet.
+
+                                </td>
+
+                            </tr>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+
+
+                <div
+
+                    style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border); display: flex; gap: 15px;">
+
+                    <button class="btn btn-secondary" onclick="clearList()" style="flex: 1;">
+
+                        <i class="fa-solid fa-trash-can"></i> Clear List
+
+                    </button>
+
+                    <button id="btnSubmit" class="btn btn-primary" onclick="submitBatchTransfer()"
+
+                        style="flex: 2; font-weight: 700;" disabled>
+
+                        <i class="fa-solid fa-paper-plane"></i> RECORD BATCH TRANSFER
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
     
 <style>
     @media print {
@@ -120,192 +233,379 @@
     }
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-    <p>© 2025 Sagar Nilgiri Products | Maple Pro</p>
+    <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
 </footer>
-</main>
-
-    <script>
-        let productsData = [];
-        let productsMap = {};
-        let transferItems = [];
-
-        async function init() {
-            try {
-                const res = await fetch('/api/inventory/products');
-                productsData = await res.json();
-                productsData.forEach(p => {
-                    productsMap[p.id] = p;
-                });
-            } catch (err) { console.error('Failed to load products'); }
-        }
-
-        const pSearch = document.getElementById('pSearch');
-        const searchResults = document.getElementById('searchResults');
-
-        pSearch.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase().trim();
-            if(!query) {
-                searchResults.style.display = 'none';
-                return;
-            }
-
-            const matches = productsData.filter(p => 
-                p.name.toLowerCase().includes(query) || 
-                (p.barcode && p.barcode.includes(query))
-            ).slice(0, 50);
-
-            if(matches.length > 0) {
-                searchResults.innerHTML = '';
-                matches.forEach(p => {
-                    const div = document.createElement('div');
-                    div.style.padding = '10px';
-                    div.style.cursor = 'pointer';
-                    div.style.borderBottom = '1px solid var(--glass-border)';
-                    div.innerHTML = `
-                        <div style="font-weight: 600;">${p.name}</div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between;">
-                            <span>${p.barcode || 'No Barcode'}</span>
-                            <span style="color: var(--accent);">Stock: ${p.current_stock}</span>
-                        </div>
-                    `;
-                    div.onclick = () => selectProduct(p);
-                    searchResults.appendChild(div);
-                });
-                searchResults.style.display = 'block';
-            } else {
-                searchResults.innerHTML = '<div style="padding: 10px; color: var(--text-muted);">No products found</div>';
-                searchResults.style.display = 'block';
-            }
-        });
-
-        // Close search results when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!pSearch.contains(e.target) && !searchResults.contains(e.target)) {
-                searchResults.style.display = 'none';
-            }
-        });
-
-        function selectProduct(p) {
-            document.getElementById('tProduct').value = p.id;
-            document.getElementById('selectedProductName').innerText = `${p.name} (Qty: ${p.current_stock})`;
-            document.getElementById('selectedProductDisplay').style.display = 'block';
-            document.getElementById('searchResults').style.display = 'none';
-            document.getElementById('pSearch').value = '';
-            document.getElementById('tQty').focus();
-        }
-
-        function clearSelectedProduct() {
-            document.getElementById('tProduct').value = '';
-            document.getElementById('selectedProductDisplay').style.display = 'none';
-            document.getElementById('pSearch').focus();
-        }
-
-        function addItemToList() {
-            const pid = document.getElementById('tProduct').value;
-            const qty = parseInt(document.getElementById('tQty').value);
-
-            if (!pid || !qty || qty <= 0) return;
-
-            const product = productsMap[pid];
-
-            // Check if already in list
-            const existing = transferItems.find(item => item.id == pid);
-            if (existing) {
-                existing.qty += qty;
-            } else {
-                transferItems.push({
-                    id: pid,
-                    name: product.name,
-                    qty: qty
-                });
-            }
-
-            clearSelectedProduct();
-            renderList();
-            document.getElementById('tQty').value = 1;
-        }
-
-        function removeItem(index) {
-            transferItems.splice(index, 1);
-            renderList();
-        }
-
-        function clearList() {
-            if (transferItems.length > 0 && confirm('Clear all items from list?')) {
-                transferItems = [];
-                renderList();
-            }
-        }
-
-        function renderList() {
-            const tbody = document.getElementById('transferListBody');
-            const btnSubmit = document.getElementById('btnSubmit');
-
-            if (transferItems.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 40px; color: var(--text-muted);">No items added yet.</td></tr>';
-                btnSubmit.disabled = true;
-                return;
-            }
-
-            btnSubmit.disabled = false;
-            tbody.innerHTML = '';
-            transferItems.forEach((item, index) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${item.name}</td>
-                    <td style="text-align: center; font-weight: 700;">${item.qty}</td>
-                    <td style="text-align: center;">
-                        <button onclick="removeItem(${index})" style="background: none; border: none; color: var(--danger); cursor: pointer;">
-                            <i class="fa-solid fa-circle-xmark"></i>
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        async function submitBatchTransfer() {
-            const type = document.getElementById('tType').value;
-            const ref = document.getElementById('tRef').value;
-
-            if (transferItems.length === 0) return;
-
-            const btn = document.getElementById('btnSubmit');
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
-
-            try {
-                const res = await fetch('/api/inventory/batch-stock-adjust', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: type,
-                        reference: ref,
-                        items: transferItems
-                    })
-                });
-
-                const result = await res.json();
-                if (result.status === 'success') {
-                    alert('Batch Transfer Recorded Successfully!');
-                    transferItems = [];
-                    document.getElementById('tRef').value = '';
-                    renderList();
-                    init(); // Refresh stock counts in dropdown
-                } else {
-                    alert('Error: ' + result.message);
-                }
-            } catch (err) {
-                alert('Connection Error. Check if server is running.');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
-        }
-
-        init();
-    </script>
-</body>
-
-</html>
+</main>
+
+
+
+    <script>
+
+        let productsData = [];
+
+        let productsMap = {};
+
+        let transferItems = [];
+
+
+
+        async function init() {
+
+            try {
+
+                const res = await fetch('/api/inventory/products');
+
+                productsData = await res.json();
+
+                productsData.forEach(p => {
+
+                    productsMap[p.id] = p;
+
+                });
+
+            } catch (err) { console.error('Failed to load products'); }
+
+        }
+
+
+
+        const pSearch = document.getElementById('pSearch');
+
+        const searchResults = document.getElementById('searchResults');
+
+
+
+        pSearch.addEventListener('input', (e) => {
+
+            const query = e.target.value.toLowerCase().trim();
+
+            if(!query) {
+
+                searchResults.style.display = 'none';
+
+                return;
+
+            }
+
+
+
+            const matches = productsData.filter(p => 
+
+                p.name.toLowerCase().includes(query) || 
+
+                (p.barcode && p.barcode.includes(query))
+
+            ).slice(0, 50);
+
+
+
+            if(matches.length > 0) {
+
+                searchResults.innerHTML = '';
+
+                matches.forEach(p => {
+
+                    const div = document.createElement('div');
+
+                    div.style.padding = '10px';
+
+                    div.style.cursor = 'pointer';
+
+                    div.style.borderBottom = '1px solid var(--glass-border)';
+
+                    div.innerHTML = `
+
+                        <div style="font-weight: 600;">${p.name}</div>
+
+                        <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+
+                            <span>${p.barcode || 'No Barcode'}</span>
+
+                            <span style="color: var(--accent);">Stock: ${p.current_stock}</span>
+
+                        </div>
+
+                    `;
+
+                    div.onclick = () => selectProduct(p);
+
+                    searchResults.appendChild(div);
+
+                });
+
+                searchResults.style.display = 'block';
+
+            } else {
+
+                searchResults.innerHTML = '<div style="padding: 10px; color: var(--text-muted);">No products found</div>';
+
+                searchResults.style.display = 'block';
+
+            }
+
+        });
+
+
+
+        // Close search results when clicking outside
+
+        document.addEventListener('click', (e) => {
+
+            if (!pSearch.contains(e.target) && !searchResults.contains(e.target)) {
+
+                searchResults.style.display = 'none';
+
+            }
+
+        });
+
+
+
+        function selectProduct(p) {
+
+            document.getElementById('tProduct').value = p.id;
+
+            document.getElementById('selectedProductName').innerText = `${p.name} (Qty: ${p.current_stock})`;
+
+            document.getElementById('selectedProductDisplay').style.display = 'block';
+
+            document.getElementById('searchResults').style.display = 'none';
+
+            document.getElementById('pSearch').value = '';
+
+            document.getElementById('tQty').focus();
+
+        }
+
+
+
+        function clearSelectedProduct() {
+
+            document.getElementById('tProduct').value = '';
+
+            document.getElementById('selectedProductDisplay').style.display = 'none';
+
+            document.getElementById('pSearch').focus();
+
+        }
+
+
+
+        function addItemToList() {
+
+            const pid = document.getElementById('tProduct').value;
+
+            const qty = parseInt(document.getElementById('tQty').value);
+
+
+
+            if (!pid || !qty || qty <= 0) return;
+
+
+
+            const product = productsMap[pid];
+
+
+
+            // Check if already in list
+
+            const existing = transferItems.find(item => item.id == pid);
+
+            if (existing) {
+
+                existing.qty += qty;
+
+            } else {
+
+                transferItems.push({
+
+                    id: pid,
+
+                    name: product.name,
+
+                    qty: qty
+
+                });
+
+            }
+
+
+
+            clearSelectedProduct();
+
+            renderList();
+
+            document.getElementById('tQty').value = 1;
+
+        }
+
+
+
+        function removeItem(index) {
+
+            transferItems.splice(index, 1);
+
+            renderList();
+
+        }
+
+
+
+        function clearList() {
+
+            if (transferItems.length > 0 && confirm('Clear all items from list?')) {
+
+                transferItems = [];
+
+                renderList();
+
+            }
+
+        }
+
+
+
+        function renderList() {
+
+            const tbody = document.getElementById('transferListBody');
+
+            const btnSubmit = document.getElementById('btnSubmit');
+
+
+
+            if (transferItems.length === 0) {
+
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 40px; color: var(--text-muted);">No items added yet.</td></tr>';
+
+                btnSubmit.disabled = true;
+
+                return;
+
+            }
+
+
+
+            btnSubmit.disabled = false;
+
+            tbody.innerHTML = '';
+
+            transferItems.forEach((item, index) => {
+
+                const tr = document.createElement('tr');
+
+                tr.innerHTML = `
+
+                    <td>${item.name}</td>
+
+                    <td style="text-align: center; font-weight: 700;">${item.qty}</td>
+
+                    <td style="text-align: center;">
+
+                        <button onclick="removeItem(${index})" style="background: none; border: none; color: var(--danger); cursor: pointer;">
+
+                            <i class="fa-solid fa-circle-xmark"></i>
+
+                        </button>
+
+                    </td>
+
+                `;
+
+                tbody.appendChild(tr);
+
+            });
+
+        }
+
+
+
+        async function submitBatchTransfer() {
+
+            const type = document.getElementById('tType').value;
+
+            const ref = document.getElementById('tRef').value;
+
+
+
+            if (transferItems.length === 0) return;
+
+
+
+            const btn = document.getElementById('btnSubmit');
+
+            const originalText = btn.innerHTML;
+
+            btn.disabled = true;
+
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing...';
+
+
+
+            try {
+
+                const res = await fetch('/api/inventory/batch-stock-adjust', {
+
+                    method: 'POST',
+
+                    headers: { 'Content-Type': 'application/json' },
+
+                    body: JSON.stringify({
+
+                        type: type,
+
+                        reference: ref,
+
+                        items: transferItems
+
+                    })
+
+                });
+
+
+
+                const result = await res.json();
+
+                if (result.status === 'success') {
+
+                    alert('Batch Transfer Recorded Successfully!');
+
+                    transferItems = [];
+
+                    document.getElementById('tRef').value = '';
+
+                    renderList();
+
+                    init(); // Refresh stock counts in dropdown
+
+                } else {
+
+                    alert('Error: ' + result.message);
+
+                }
+
+            } catch (err) {
+
+                alert('Connection Error. Check if server is running.');
+
+            } finally {
+
+                btn.disabled = false;
+
+                btn.innerHTML = originalText;
+
+            }
+
+        }
+
+
+
+        init();
+
+    </script>
+
+</body>
+
+
+
+</html>
+

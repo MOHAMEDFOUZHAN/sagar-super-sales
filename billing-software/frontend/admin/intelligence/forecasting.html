@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Demand Forecasting - MaplePro</title>
+    <title>Demand Forecasting - Sagar Super Maple Pro</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
@@ -467,7 +467,7 @@
             </div>
             <div class="kpi-card">
                 <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Estimated Procurement</div>
-                <div id="kpiProcurementCost" style="font-size: 1.8rem; font-weight: 900; color: #a855f7; font-family: monospace; margin-top: 5px;">₹0.00</div>
+                <div id="kpiProcurementCost" style="font-size: 1.8rem; font-weight: 900; color: #a855f7; font-family: monospace; margin-top: 5px;">&#8377;0.00</div>
                 <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">Restock to cover 30 days</div>
             </div>
         </div>
@@ -507,7 +507,7 @@
         </div>
 
         <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-            <p>© 2025 Sagar Nilgiri Products | Maple Pro</p>
+            <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
         </footer>
     </main>
 
@@ -909,7 +909,7 @@
             document.getElementById('kpiWatchlist').innerText = watchlistCount;
 
             const totalProcurement = pos.reduce((acc, x) => acc + x.total_cost, 0);
-            document.getElementById('kpiProcurementCost').innerText = "₹" + totalProcurement.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById('kpiProcurementCost').innerText = "\u20B9" + totalProcurement.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
         function getWhyText(item, scenario) {
@@ -1024,7 +1024,7 @@
                             + ${reorderQty} ${item.unit}
                         </div>
                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 3px; font-family: monospace;">
-                            Est. Cost: <span style="color: white; font-weight: 600;">₹${estCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            Est. Cost: <span style="color: white; font-weight: 600;">\u20B9${estCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                     </td>
                     <td>
@@ -1061,7 +1061,7 @@ Please accept this Purchase Order for the following restock requirements:
 Product Name: ${prodName}
 Barcode/SKU: ${barcode}
 Quantity: +${qty} ${unit}
-Estimated Wholesale Cost: ₹${costStr}
+Estimated Wholesale Cost: \u20B9${costStr}
 
 Please reply with the estimated delivery date and commercial invoice details.
 

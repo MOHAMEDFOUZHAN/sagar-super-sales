@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neural Network Core - MaplePro Intelligence</title>
+    <title>Neural Network Core - Sagar Super Maple Pro Intelligence</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
@@ -404,7 +404,7 @@
     <!-- Preloader -->
     <div class="loading-overlay" id="loader">
         <div class="loading-ring"></div>
-        <h2 style="font-family: 'Orbitron', sans-serif; font-weight: 700; letter-spacing: 4px; font-size: 0.9rem; color: var(--hologram-cyan); text-shadow: 0 0 10px rgba(6, 182, 212, 0.3);">LOADING HOLOGRAM CORE</h2>
+        <h2 style="font-family: 'Orbitron', sans-serif; font-weight: 700; letter-spacing: 4px; font-size: 0.9rem; color: var(--hologram-cyan); text-shadow: 0 0 10px rgba(6, 182, 212, 0.3);">LOADING STORE AI</h2>
     </div>
 
     <div class="focus-viewport">
@@ -428,30 +428,30 @@
         <!-- LEFT SIDEBAR HUD: TELEMETRY & DB INDEX -->
         <div class="hud-sidebar left-sidebar">
             <div class="hud-panel">
-                <div class="hud-title"><i class="fa-solid fa-microchip"></i> MATRIX TELEMETRY</div>
+                <div class="hud-title"><i class="fa-solid fa-microchip"></i> AI MODEL STATUS</div>
                 
                 <div class="metric-row">
-                    <span class="metric-label">Synaptic Nodes</span>
+                    <span class="metric-label">Active Connections</span>
                     <span class="metric-value cyan">5,000 Pts</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">Neural Weight</span>
+                    <span class="metric-label">Model Size (Params)</span>
                     <span class="metric-value purple">8.42M params</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">Accuracy Index</span>
+                    <span class="metric-label">Prediction Accuracy</span>
                     <span class="metric-value green" id="val-accuracy">94.12%</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">Entropy Loss</span>
+                    <span class="metric-label">Prediction Error</span>
                     <span class="metric-value pink" id="val-loss">0.0824</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">Core Temp</span>
+                    <span class="metric-label">Processor Temp</span>
                     <span class="metric-value yellow" id="val-temp">36.4°C</span>
                 </div>
                 <div class="metric-row">
-                    <span class="metric-label">Sync Speed</span>
+                    <span class="metric-label">Sync Frequency</span>
                     <span class="metric-value" id="val-hz">12.8 Hz</span>
                 </div>
 
@@ -482,19 +482,19 @@
         <!-- RIGHT SIDEBAR HUD: COGNITIVE TERMINAL & LLM RECOMMENDATIONS -->
         <div class="hud-sidebar right-sidebar">
             <div class="hud-panel">
-                <div class="hud-title"><i class="fa-solid fa-terminal"></i> COGNITIVE LOGS</div>
+                <div class="hud-title"><i class="fa-solid fa-terminal"></i> AI SYSTEM LOGS</div>
                 <div class="terminal-box" id="terminal-console">
                     <!-- Logs stream -->
                 </div>
 
-                <div class="hud-title" style="margin-top: 15px;"><i class="fa-solid fa-lightbulb"></i> LLM STRATEGIST</div>
+                <div class="hud-title" style="margin-top: 15px;"><i class="fa-solid fa-lightbulb"></i> AI ADVISOR</div>
                 <div class="ai-insight-box">
-                    <div class="ai-insight-title" id="ai-insight-tag">Neural Thought Feed</div>
-                    <div class="ai-insight-text" id="ai-advice-container">Calibrating synaptic connection insights...</div>
+                    <div class="ai-insight-title" id="ai-insight-tag">AI Insights Feed</div>
+                    <div class="ai-insight-text" id="ai-advice-container">Loading AI business insights...</div>
                 </div>
 
                 <button class="btn-neural" id="btn-trigger-evolve" style="margin-top: 20px;">
-                    <i class="fa-solid fa-bolt"></i> FORCE EVOLUTION CYCLE
+                    <i class="fa-solid fa-bolt"></i> RECALIBRATE FORECAST MODEL
                 </button>
             </div>
         </div>
@@ -503,10 +503,10 @@
         <div id="brain-canvas"></div>
 
         <!-- 3D projections labels -->
-        <div id="lbl-frontal" class="neural-label">[LOBE::FRONTAL - TODAY SALES: ₹0.00]</div>
-        <div id="lbl-temporal" class="neural-label">[LOBE::TEMPORAL - MONTH EXPENSES: ₹0.00]</div>
-        <div id="lbl-cerebellum" class="neural-label">[LOBE::CEREBELLUM - STOCK ALERTS: 0]</div>
-        <div id="lbl-occipital" class="neural-label">[LOBE::OCCIPITAL - REGISTERED PRODUCTS: 0]</div>
+        <div id="lbl-frontal" class="neural-label">[FORECASTING - TODAY SALES: &#8377;0.00]</div>
+        <div id="lbl-temporal" class="neural-label">[EXPENSES - MONTH EXPENSES: &#8377;0.00]</div>
+        <div id="lbl-cerebellum" class="neural-label">[STOCK ALERTS - STOCK ALERTS: 0]</div>
+        <div id="lbl-occipital" class="neural-label">[PRODUCTS - REGISTERED PRODUCTS: 0]</div>
 
         <!-- Connecting lines -->
         <svg id="hud-lines">
@@ -1123,11 +1123,11 @@
             document.getElementById('val-temp').innerText = tempVal + '°C';
             document.getElementById('val-hz').innerText = speedVal + ' Hz';
 
-            // Fill 3D Projected Lobe Labels
-            document.getElementById('lbl-frontal').innerText = `[LOBE::FRONTAL - TODAY SALES: ₹${stats.today_sales.toLocaleString('en-IN', {minimumFractionDigits: 2})}]`;
-            document.getElementById('lbl-temporal').innerText = `[LOBE::TEMPORAL - MONTH EXPENSES: ₹${stats.monthly_expenses.toLocaleString('en-IN', {minimumFractionDigits: 2})}]`;
-            document.getElementById('lbl-cerebellum').innerText = `[LOBE::CEREBELLUM - STOCK ALERTS: ${stats.low_stock_count}]`;
-            document.getElementById('lbl-occipital').innerText = `[LOBE::OCCIPITAL - REGISTERED PRODUCTS: ${stats.products_count}]`;
+            // Fill 3D Projected Labels
+            document.getElementById('lbl-frontal').innerText = `[FORECASTING - TODAY SALES: \u20B9${stats.today_sales.toLocaleString('en-IN', {minimumFractionDigits: 2})}]`;
+            document.getElementById('lbl-temporal').innerText = `[EXPENSES - MONTH EXPENSES: \u20B9${stats.monthly_expenses.toLocaleString('en-IN', {minimumFractionDigits: 2})}]`;
+            document.getElementById('lbl-cerebellum').innerText = `[STOCK ALERTS - STOCK ALERTS: ${stats.low_stock_count}]`;
+            document.getElementById('lbl-occipital').innerText = `[PRODUCTS - REGISTERED PRODUCTS: ${stats.products_count}]`;
 
             // Reset and load terminal logs
             const consoleEl = document.getElementById('terminal-console');
@@ -1153,10 +1153,10 @@
             const container = document.getElementById('ai-advice-container');
             const insightTag = document.getElementById('ai-insight-tag');
             if (insights && insights.advice && insights.advice.length > 0) {
-                insightTag.innerText = "Neural Thought Feed";
+                insightTag.innerText = "AI Insights Feed";
                 typeWriterEffect(container, insights.advice[0]);
             } else if (insights && insights.analysis && insights.analysis.length > 0) {
-                insightTag.innerText = "Heuristics Stream";
+                insightTag.innerText = "AI Analysis Feed";
                 typeWriterEffect(container, insights.analysis[0]);
             }
         }
@@ -1201,10 +1201,10 @@
                     updateUIState(data);
                     appendTerminalLine('SUCCESS', 'Cognitive state successfully synchronized and calibration saved.');
                     
-                    // Re-enable force evolution button
+                    // Re-enable recalibration button
                     const btn = document.getElementById('btn-trigger-evolve');
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fa-solid fa-bolt"></i> FORCE EVOLUTION CYCLE';
+                    btn.innerHTML = '<i class="fa-solid fa-bolt"></i> RECALIBRATE FORECAST MODEL';
                 }
             });
         }
@@ -1240,7 +1240,7 @@
         function triggerHUDNotification(invoiceNo) {
             const notifyEl = document.getElementById('live-notification');
             if (notifyEl) {
-                notifyEl.innerHTML = `<i class="fa-solid fa-bolt" style="color:var(--hologram-cyan); margin-right:6px;"></i> [SALE COMMITTED]: INVOICE SS#${invoiceNo} PROCESSED. TRAINING PIPELINE RUNNING...`;
+                notifyEl.innerHTML = `<i class="fa-solid fa-bolt" style="color:var(--hologram-cyan); margin-right:6px;"></i> [SALE COMMITTED]: INVOICE SS-${invoiceNo} PROCESSED. TRAINING PIPELINE RUNNING...`;
                 notifyEl.style.display = 'block';
                 gsap.fromTo(notifyEl, { y: -20, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power2.out" });
                 
@@ -1303,12 +1303,12 @@
                 } else {
                     appendTerminalLine('ERROR', 'Calibration request rejected: ' + data.message);
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fa-solid fa-bolt"></i> FORCE EVOLUTION CYCLE';
+                    btn.innerHTML = '<i class="fa-solid fa-bolt"></i> RECALIBRATE FORECAST MODEL';
                 }
             } catch (err) {
                 appendTerminalLine('ERROR', 'Calibration request dispatch failure: ' + err);
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-bolt"></i> FORCE EVOLUTION CYCLE';
+                btn.innerHTML = '<i class="fa-solid fa-bolt"></i> RECALIBRATE FORECAST MODEL';
             }
         });
     </script>

@@ -21,7 +21,7 @@ FULL_CUT = GS + b"V\x00"
 ENCODING = "cp1252"
 FEED_LINES_BEFORE_CUT = 4
 
-SHOP_NAME_LINES = ("SAGAR", "NILGIRI PRODUCTS", "SUPER")
+SHOP_NAME_LINES = ("SAGAR NILGIRI PRODUCTS", "SUPER")
 SHOP_ADDRESS_LINES = ("36 COMMERCIAL ROAD, NEXT TO A2B RESTAURANT,", "OOTY - 643001")
 SHOP_PHONE = "Ph: 9363596124"
 SHOP_GSTIN = "GSTIN: 33ACMPC6407B1Z7"
@@ -35,7 +35,7 @@ SHOP_FOOTER_LINES = (
 
 def clean_text(text: str) -> str:
     if not text: return ""
-    return str(text).replace("₹", "Rs.")
+    return str(text).replace("\u20B9", "Rs.")
 
 def get_printer_name() -> str:
     if not HAS_PRINTER_SUPPORT:

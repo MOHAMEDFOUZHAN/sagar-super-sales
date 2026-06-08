@@ -47,7 +47,7 @@ def reserve_invoice_number(cursor, bill_time):
             else fallback_row[0]
         )
 
-    return f"{sequence_value:05d}"
+    return f"SS-{sequence_value}"
 
 
 def create_bill(conn, payload, username, audit_logger):
