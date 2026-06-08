@@ -27,6 +27,13 @@
                 <i class="fa-solid fa-clone"></i> Business Twin
             </a>
         </li>
+        <li>
+            <a href="/admin/intelligence/forecasting"
+                class="nav-link {{ 'active' if request.path == '/admin/intelligence/forecasting' else '' }}">
+                <i class="fa-solid fa-chart-line"></i> Demand Forecasting
+            </a>
+        </li>
+
 
         <li
             style="margin-top: 10px; padding-left: 16px; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
@@ -246,6 +253,37 @@
                 updateDbStatus();
                 // Check database status dynamically every 3 seconds for real-time live responsiveness!
                 setInterval(updateDbStatus, 3000);
+
+                // --- UNIVERSAL REAL-TIME SOCKET SYNC ---
+                function initSocketIO() {
+                    const socket = io();
+                    socket.on('connect', () => {
+                        console.log('Connected to universal Socket.IO sync server');
+                    });
+                    socket.on('stock_updated', (data) => {
+                        console.log('Universal Stock Update received:', data);
+                        // Trigger any active page data-loading/rendering functions dynamically!
+                        if (typeof initDashboard === 'function') initDashboard();
+                        if (typeof loadInventory === 'function') loadInventory();
+                        if (typeof loadProducts === 'function') loadProducts();
+                        if (typeof loadCategories === 'function') loadCategories();
+                        if (typeof loadUsers === 'function') loadUsers();
+                        if (typeof fetchStats === 'function') fetchStats();
+                        if (typeof fetchSales === 'function') fetchSales();
+                        if (typeof loadData === 'function') loadData();
+                        if (typeof updateDashboard === 'function') updateDashboard();
+                        if (typeof refreshData === 'function') refreshData();
+                    });
+                }
+
+                if (typeof io === 'undefined') {
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
+                    script.onload = initSocketIO;
+                    document.head.appendChild(script);
+                } else {
+                    initSocketIO();
+                }
             });
         </script>
 

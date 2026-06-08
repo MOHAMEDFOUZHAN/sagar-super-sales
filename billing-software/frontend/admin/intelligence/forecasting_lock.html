@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forecast Lock - MaplePro</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main Style Sheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        :root {
+            --bg-darker: #020617;
+            --bg-dark: #0f172a;
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --secondary: #a855f7;
+            --accent: #06b6d4;
+            --glass-bg: rgba(30, 41, 59, 0.45);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --radius-lg: 24px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-darker);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Ambient Animated Blobs */
+        .bg-blobs {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            overflow: hidden;
+            filter: blur(100px);
+            pointer-events: none;
+        }
+
+        .blob {
+            position: absolute;
+            width: 450px;
+            height: 450px;
+            border-radius: 50%;
+            opacity: 0.25;
+            animation: float 20s infinite alternate;
+        }
+
+        .blob-1 {
+            background: var(--primary);
+            top: -100px;
+            left: -100px;
+            animation-duration: 15s;
+        }
+
+        .blob-2 {
+            background: var(--secondary);
+            bottom: -150px;
+            right: -100px;
+            animation-duration: 18s;
+            animation-delay: -2s;
+        }
+
+        .blob-3 {
+            background: var(--accent);
+            top: 35%;
+            left: 50%;
+            width: 350px;
+            height: 350px;
+            animation-duration: 14s;
+            animation-delay: -5s;
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(60px, 80px) scale(1.15); }
+            100% { transform: translate(-30px, 40px) scale(0.9); }
+        }
+
+        /* Lock Screen Container */
+        .lock-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .lock-card {
+            width: 100%;
+            max-width: 440px;
+            padding: 40px 35px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Header UI */
+        .lock-header {
+            text-align: center;
+            margin-bottom: 25px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .lock-icon-wrapper {
+            width: 70px;
+            height: 70px;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.25);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.2rem;
+            color: var(--primary);
+            margin-bottom: 18px;
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.2);
+            position: relative;
+        }
+
+        .lock-header h2 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .lock-header p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            line-height: 1.4;
+            max-width: 320px;
+        }
+
+        /* Input Controls */
+        .pin-display-container {
+            width: 100%;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .pin-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .pin-control {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 14px 45px 14px 18px;
+            border-radius: var(--radius-md);
+            font-size: 1.25rem;
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 0.5em;
+            transition: all 0.3s var(--ease-out);
+            outline: none;
+        }
+
+        .pin-control:focus {
+            border-color: var(--primary);
+            background: rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .toggle-visibility {
+            position: absolute;
+            right: 16px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: color 0.2s;
+            font-size: 1.1rem;
+        }
+
+        .toggle-visibility:hover {
+            color: white;
+        }
+
+        .feedback-message {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #ef4444;
+            margin-top: 8px;
+            min-height: 1.2rem;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .feedback-message.active {
+            opacity: 1;
+        }
+
+        /* Premium Numeric Keyboard */
+        .numpad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            width: 100%;
+            margin-bottom: 25px;
+        }
+
+        .numpad-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 700;
+            padding: 15px 0;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+
+        .numpad-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .numpad-btn:active {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: var(--primary);
+            transform: scale(0.96);
+        }
+
+        .numpad-btn.action {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .numpad-btn.action:hover {
+            color: white;
+        }
+
+        /* Submit Buttons & Back Links */
+        .btn-unlock {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, var(--primary), #4338ca);
+            border: none;
+            border-radius: var(--radius-md);
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.4);
+            margin-bottom: 20px;
+        }
+
+        .btn-unlock:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px -5px rgba(99, 102, 241, 0.6);
+        }
+
+        .btn-unlock:active {
+            transform: translateY(0);
+        }
+
+        .back-link {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .back-link:hover {
+            color: white;
+            text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Ambient Blobs -->
+    <div class="bg-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <div class="lock-container">
+        <div class="lock-card" id="lockCard">
+            <div class="lock-header">
+                <div class="lock-icon-wrapper" id="lockIcon">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <h2>Demand Forecasting Lock</h2>
+                <p>This workspace contains sensitive business projections. Enter the lock PIN to grant access.</p>
+            </div>
+
+            <!-- PIN Display -->
+            <div class="pin-display-container">
+                <div class="pin-input-wrapper">
+                    <input type="password" class="pin-control" id="pinDisplay" placeholder="••••" maxlength="12" readonly>
+                    <i class="fa-solid fa-eye-slash toggle-visibility" id="visibilityToggle" onclick="togglePinVisibility()"></i>
+                </div>
+                <div class="feedback-message" id="feedbackMsg"></div>
+            </div>
+
+            <!-- Interactive Numpad -->
+            <div class="numpad">
+                <button class="numpad-btn" onclick="pressKey('1')">1</button>
+                <button class="numpad-btn" onclick="pressKey('2')">2</button>
+                <button class="numpad-btn" onclick="pressKey('3')">3</button>
+                <button class="numpad-btn" onclick="pressKey('4')">4</button>
+                <button class="numpad-btn" onclick="pressKey('5')">5</button>
+                <button class="numpad-btn" onclick="pressKey('6')">6</button>
+                <button class="numpad-btn" onclick="pressKey('7')">7</button>
+                <button class="numpad-btn" onclick="pressKey('8')">8</button>
+                <button class="numpad-btn" onclick="pressKey('9')">9</button>
+                <button class="numpad-btn action" onclick="pressClear()">CLEAR</button>
+                <button class="numpad-btn" onclick="pressKey('0')">0</button>
+                <button class="numpad-btn action" onclick="pressBackspace()"><i class="fa-solid fa-delete-left" style="font-size: 1.2rem;"></i></button>
+            </div>
+
+            <button class="btn-unlock" onclick="submitPIN()" id="unlockBtn">
+                <span>UNLOCK WORKSPACE</span>
+                <i class="fa-solid fa-unlock-keyhole"></i>
+            </button>
+
+            <a href="/admin/dashboard" class="back-link">
+                <i class="fa-solid fa-arrow-left"></i> Return to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // GSAP Entrance Animations
+        window.addEventListener('DOMContentLoaded', () => {
+            gsap.from("#lockCard", {
+                opacity: 0,
+                y: 30,
+                duration: 0.8,
+                ease: "power3.out"
+            });
+            gsap.from("#lockIcon", {
+                scale: 0.8,
+                rotation: -10,
+                opacity: 0,
+                delay: 0.2,
+                duration: 0.6,
+                ease: "back.out(1.7)"
+            });
+            gsap.from(".numpad-btn", {
+                opacity: 0,
+                y: 10,
+                stagger: 0.03,
+                delay: 0.3,
+                duration: 0.4,
+                ease: "power2.out"
+            });
+        });
+
+        const pinDisplay = document.getElementById('pinDisplay');
+        const feedbackMsg = document.getElementById('feedbackMsg');
+        let currentPinVal = "";
+
+        function updateDisplay() {
+            pinDisplay.value = currentPinVal;
+        }
+
+        function pressKey(num) {
+            if (currentPinVal.length >= 12) return;
+            currentPinVal += num;
+            updateDisplay();
+            clearFeedback();
+        }
+
+        function pressBackspace() {
+            currentPinVal = currentPinVal.slice(0, -1);
+            updateDisplay();
+            clearFeedback();
+        }
+
+        function pressClear() {
+            currentPinVal = "";
+            updateDisplay();
+            clearFeedback();
+        }
+
+        function togglePinVisibility() {
+            const toggle = document.getElementById('visibilityToggle');
+            if (pinDisplay.type === "password") {
+                pinDisplay.type = "text";
+                toggle.className = "fa-solid fa-eye toggle-visibility";
+            } else {
+                pinDisplay.type = "password";
+                toggle.className = "fa-solid fa-eye-slash toggle-visibility";
+            }
+        }
+
+        function showFeedback(text) {
+            feedbackMsg.innerText = text;
+            feedbackMsg.classList.add('active');
+            // Shake card animation
+            gsap.to("#lockCard", {
+                x: 10,
+                duration: 0.05,
+                repeat: 5,
+                yoyo: true,
+                onComplete: () => {
+                    gsap.set("#lockCard", { x: 0 });
+                }
+            });
+        }
+
+        function clearFeedback() {
+            feedbackMsg.classList.remove('active');
+        }
+
+        // Handle physical keyboard input
+        document.addEventListener('keydown', (e) => {
+            if (e.key >= '0' && e.key <= '9') {
+                pressKey(e.key);
+            } else if (e.key === 'Backspace') {
+                pressBackspace();
+            } else if (e.key === 'Escape') {
+                pressClear();
+            } else if (e.key === 'Enter') {
+                submitPIN();
+            }
+        });
+
+        async function submitPIN() {
+            if (!currentPinVal) {
+                showFeedback("Please enter a PIN");
+                return;
+            }
+
+            const unlockBtn = document.getElementById('unlockBtn');
+            const origContent = unlockBtn.innerHTML;
+            
+            unlockBtn.disabled = true;
+            unlockBtn.innerHTML = '<span>VERIFYING...</span> <i class="fa-solid fa-spinner fa-spin"></i>';
+
+            try {
+                const res = await fetch('/api/admin/intelligence/forecasting/verify-lock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: currentPinVal })
+                });
+
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    // Success animation
+                    gsap.to("#lockIcon", {
+                        scale: 1.15,
+                        color: "#10b981",
+                        backgroundColor: "rgba(16, 185, 129, 0.1)",
+                        borderColor: "rgba(16, 185, 129, 0.3)",
+                        duration: 0.3
+                    });
+                    document.getElementById('lockIcon').innerHTML = '<i class="fa-solid fa-lock-open"></i>';
+                    
+                    gsap.to("#lockCard", {
+                        opacity: 0,
+                        y: -30,
+                        duration: 0.5,
+                        delay: 0.3,
+                        ease: "power3.in",
+                        onComplete: () => {
+                            window.location.reload();
+                        }
+                    });
+                } else {
+                    showFeedback(data.message || "Incorrect PIN. Please try again.");
+                    unlockBtn.disabled = false;
+                    unlockBtn.innerHTML = origContent;
+                    pressClear();
+                }
+            } catch (err) {
+                showFeedback("Connection error. Could not verify PIN.");
+                unlockBtn.disabled = false;
+                unlockBtn.innerHTML = origContent;
+                console.error(err);
+            }
+        }
+    </script>
+</body>
+
+</html>

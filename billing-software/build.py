@@ -19,6 +19,9 @@ PyInstaller.__main__.run([
     '--icon', 'frontend/images/app_icon.ico',
     '--add-data', 'frontend;frontend',
     '--add-data', 'database;database',
+    '--hidden-import', 'engineio.async_drivers.threading',
+    '--hidden-import', 'simple_websocket',
+    '--hidden-import', 'wsproto',
     '--name', 'SagarBilling',
     '--noupx',
     'app.py'

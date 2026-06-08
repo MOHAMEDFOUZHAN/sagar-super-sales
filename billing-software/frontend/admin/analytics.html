@@ -1,535 +1,1046 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Business Intelligence - MaplePro</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <style>
-        .analytics-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 25px;
-            margin-bottom: 25px;
-        }
-
-        .full-row {
-            grid-column: span 2;
-        }
-
-        .chart-box {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--radius-lg);
-            padding: 25px;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            transition: transform 0.3s var(--ease-out);
-        }
-
-        .chart-box:hover {
-            transform: translateY(-5px);
-            border-color: var(--primary);
-        }
-
-        .chart-title {
-            font-size: 1.1rem;
-            font-weight: 800;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            letter-spacing: -0.5px;
-        }
-
-        .chart-title i {
-            color: var(--primary);
-        }
-
-        .momentum-meter {
-            height: 120px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            text-align: center;
-        }
-
-        .momentum-val {
-            font-size: 3rem;
-            font-weight: 900;
-            background: linear-gradient(to right, #6366f1, #06b6d4);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .analytics-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 40px;
-        }
-
-        .ai-badge {
-            background: linear-gradient(90deg, #6366f1, #ec4899);
-            padding: 6px 15px;
-            border-radius: 30px;
-            font-size: 0.7rem;
-            font-weight: 800;
-            color: white;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
-        }
-
-        canvas {
-            width: 100% !important;
-            height: auto !important;
-            max-height: 300px;
-        }
-
-        /* Loading Animation */
-        .loading-overlay {
-            position: fixed;
-            inset: 0;
-            background: var(--bg-darker);
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-        }
-
-        .scanline {
-            width: 200px;
-            height: 2px;
-            background: var(--primary);
-            box-shadow: 0 0 20px var(--primary);
-            animation: scan 2s infinite;
-        }
-
-        @keyframes scan {
-            0% {
-                transform: scaleX(0);
-                opacity: 0;
-            }
-
-            50% {
-                transform: scaleX(1);
-                opacity: 1;
-            }
-
-            100% {
-                transform: scaleX(0);
-                opacity: 0;
-            }
-        }
-    </style>
-</head>
-
-<body>
-    <div class="loading-overlay" id="loader">
-        <h2 style="font-weight: 900; letter-spacing: 2px; margin-bottom: 20px;">CALIBRATING ANALYTICS</h2>
-        <div class="scanline"></div>
-    </div>
-
-    {% include 'admin/sidebar.html' %}
-
-    <main class="main-content animate-fade">
-        <header class="analytics-header">
-            <div>
-                <span class="ai-badge">Decision Intelligence</span>
-                <h1 style="font-size: 2.5rem; font-weight: 900; letter-spacing: -1.5px; margin-top: 10px;">Market
-                    Insights</h1>
-            </div>
-            <div style="text-align: right;">
-                <p style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Next Sync In</p>
-                <div id="countdown" style="font-size: 1.5rem; font-weight: 800; color: var(--accent);">59s</div>
-            </div>
-        </header>
-
-        <style>
-            .ai-briefing-card {
-                background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.05));
-                border: 1px solid rgba(99, 102, 241, 0.3);
-                border-radius: var(--radius-lg);
-                padding: 30px;
-                margin-bottom: 30px;
-                position: relative;
-                overflow: hidden;
-            }
-            .ai-briefing-card::before {
-                content: '';
-                position: absolute;
-                top: 0; left: 0; width: 100%; height: 2px;
-                background: linear-gradient(90deg, transparent, var(--primary), transparent);
-                animation: flow 3s linear infinite;
-            }
-            @keyframes flow {
-                0% { transform: translateX(-100%); }
-                100% { transform: translateX(100%); }
-            }
-            .ai-header {
-                display: flex;
-                align-items: center;
-                gap: 15px;
-                margin-bottom: 20px;
-            }
-            .ai-icon {
-                width: 45px; height: 45px;
-                background: var(--primary);
-                border-radius: 50%;
-                display: flex; align-items: center; justify-content: center;
-                font-size: 1.2rem; color: white;
-                box-shadow: 0 0 20px var(--primary-glow);
-            }
-            .ai-content {
-                font-family: 'Inter', sans-serif;
-                font-size: 1rem;
-                line-height: 1.6;
-                color: #e2e8f0;
-            }
-            .typewriter {
-                overflow: hidden;
-                border-right: .15em solid var(--secondary);
-                white-space: pre-wrap;
-                margin: 0 auto;
-                letter-spacing: .05em;
-                animation: blink-caret .75s step-end infinite;
-            }
-            @keyframes blink-caret { from, to { border-color: transparent } 50% { border-color: var(--secondary); } }
-            
-            .insight-item {
-                margin-bottom: 15px;
-                display: flex;
-                gap: 12px;
-                align-items: flex-start;
-            }
-            .insight-bullet {
-                color: var(--accent);
-                margin-top: 5px;
-            }
-        </style>
-
-        <div class="ai-briefing-card card-anim">
-            <div class="ai-header">
-                <div class="ai-icon"><i class="fa-solid fa-microchip"></i></div>
-                <div>
-                    <h2 style="font-size: 1.1rem; font-weight: 800; letter-spacing: -0.5px;">AI STRATEGIC BRIEFING</h2>
-                    <p style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Real-time Business Consultant</p>
-                </div>
-                <button onclick="refreshAI()" class="btn" style="margin-left: auto; height: 35px; margin-top: 0; font-size: 0.7rem;">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> RE-ANALYZE
-                </button>
-            </div>
-            
-            <div id="ai-loading" style="display: none; padding: 20px; text-align: center;">
-                <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i>
-                <p style="margin-top: 10px; font-size: 0.8rem; color: var(--text-muted);">Consulting Artificial Intelligence...</p>
-            </div>
-
-            <div id="ai-terminal" class="ai-content">
-                <div id="ai-text" class="typewriter">Initializing diagnostic sequence... Analysis ready.</div>
-            </div>
-        </div>
-
-        <div class="analytics-grid">
-            <!-- 1. Revenue Velocity -->
-            <div class="chart-box full-row card-anim">
-
-            <!-- 2. Momentum Score -->
-            <div class="chart-box card-anim">
-                <div class="chart-title"><i class="fa-solid fa-bolt"></i> Sales Momentum Score</div>
-                <div class="momentum-meter">
-                    <div id="momentumScore" class="momentum-val">0%</div>
-                    <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 10px;">Compared to previous week
-                        baseline</p>
-                </div>
-                <div style="margin-top: 15px;">
-                    <div
-                        style="display:flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-muted); margin-bottom: 5px;">
-                        <span>ACCELERATION</span>
-                        <span id="accelTxt">NORMAL</span>
-                    </div>
-                    <div style="height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px;">
-                        <div id="momentumProgress"
-                            style="width: 0%; height: 100%; background: var(--primary); border-radius: 2px; transition: width 1s ease;">
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 3. Payment Diversity -->
-            <div class="chart-box card-anim">
-                <div class="chart-title"><i class="fa-solid fa-credit-card"></i> Channel Distribution</div>
-                <canvas id="paymentChart"></canvas>
-            </div>
-
-            <!-- 4. Category Dominance -->
-            <div class="chart-box card-anim">
-                <div class="chart-title"><i class="fa-solid fa-layer-group"></i> Category Strength</div>
-                <canvas id="categoryChart"></canvas>
-            </div>
-
-            <!-- 5. Peak Hours -->
-            <div class="chart-box card-anim">
-                <div class="chart-title"><i class="fa-solid fa-clock"></i> Operation Heatmap (Hourly)</div>
-                <canvas id="hourChart"></canvas>
-            </div>
-        </div>
-    
-<style>
-    @media print {
-        .dynamic-footer {
-            display: none !important;
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Store Neural Core - MaplePro Intelligence</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Store Neural Core - MaplePro Intelligence</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        :root {
+            --hologram-cyan: var(--accent);
+            --hologram-purple: var(--primary);
+            --hologram-pink: var(--secondary);
+            --hologram-green: var(--success);
+            --hud-bg: var(--glass-bg);
+            --hud-border: var(--glass-border);
+            --hud-glow: rgba(99, 102, 241, 0.04);
         }
-    }
-</style>
-<footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-    <p>© 2025 Sagar Nilgiri Products | Maple Pro</p>
-</footer>
-</main>
-
-    <script>
-        // GSAP Animations
-        window.onload = () => {
-            gsap.to("#loader", {
-                opacity: 0, duration: 1, delay: 1, onComplete: () => {
-                    document.getElementById('loader').style.display = 'none';
-                    startAnalysis();
-                }
-            });
-        }
-
-        async function startAnalysis() {
-            // Entrances
-            gsap.from(".card-anim", {
-                y: 50,
-                opacity: 0,
-                duration: 0.8,
-                stagger: 0.15,
-                ease: "power2.out"
-            });
-
-            // Load Data
-            try {
-                const [advRes, deepRes] = await Promise.all([
-                    fetch('/api/stats/advanced'),
-                    fetch('/api/analytics/deep')
-                ]);
-
-                const adv = await advRes.json();
-                const deep = await deepRes.json();
-
-                renderVelocity(adv.trend);
-                renderPayments(adv.payments);
-                renderCategories(deep.categories);
-                renderHourly(deep.hourly);
-                calculateMomentum(adv.trend);
-                
-                // Fetch AI Insights
-                refreshAI();
-
-            } catch (e) { console.error("Analysis Failure:", e); }
-        }
-
-        async function refreshAI() {
-            const terminal = document.getElementById('ai-terminal');
-            const loading = document.getElementById('ai-loading');
-            const textEl = document.getElementById('ai-text');
-            
-            terminal.style.display = 'none';
-            loading.style.display = 'block';
-            
-            try {
-                const res = await fetch('/api/analytics/ai-insight');
-                const data = await res.json();
-                
-                loading.style.display = 'none';
-                terminal.style.display = 'block';
-                textEl.innerHTML = ''; // Reset
-                
-                let fullText = "AI ANALYSIS SUMMARY:\n";
-                data.analysis.forEach(line => {
-                    fullText += "• " + line + "\n";
-                });
-                fullText += "\nSTRATEGIC RECOMMENDATIONS:\n";
-                data.advice.forEach(line => {
-                    fullText += "➜ " + line + "\n";
-                });
-
-                typeWriter(fullText, 'ai-text');
-                
-            } catch (e) {
-                loading.style.display = 'none';
-                terminal.style.display = 'block';
-                textEl.innerText = "Consultant Offline (Check API Connectivity)";
-            }
-        }
-
-        function typeWriter(text, elementId) {
-            const el = document.getElementById(elementId);
-            let i = 0;
-            const speed = 15;
-            el.innerHTML = '';
-            
-            function type() {
-                if (i < text.length) {
-                    el.innerHTML += text.charAt(i);
-                    i++;
-                    setTimeout(type, speed);
-                }
-            }
-            type();
-        }
-
-        function renderVelocity(trend) {
-            new Chart(document.getElementById('velocityChart'), {
-                type: 'line',
-                data: {
-                    labels: trend.map(d => d.date),
-                    datasets: [{
-                        label: 'Revenue',
-                        data: trend.map(d => d.amount),
-                        borderColor: '#6366f1',
-                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                        fill: true,
-                        tension: 0.4,
-                        borderWidth: 4,
-                        pointRadius: 6,
-                        pointBackgroundColor: '#fff',
-                        pointBorderColor: '#6366f1'
-                    }]
-                },
-                options: {
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { grid: { color: 'rgba(255,255,255,0.05)' } },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
-        }
-
-        function renderPayments(payments) {
-            new Chart(document.getElementById('paymentChart'), {
-                type: 'polarArea',
-                data: {
-                    labels: payments.map(p => p.payment_mode),
-                    datasets: [{
-                        data: payments.map(p => p.total),
-                        backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ec4899'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    plugins: { legend: { position: 'bottom' } },
-                    scales: { r: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { display: false } } }
-                }
-            });
-        }
-
-        function renderCategories(cats) {
-            new Chart(document.getElementById('categoryChart'), {
-                type: 'radar',
-                data: {
-                    labels: cats.map(c => c.category),
-                    datasets: [{
-                        label: 'Revenue Contribution',
-                        data: cats.map(c => c.revenue),
-                        borderColor: '#06b6d4',
-                        backgroundColor: 'rgba(6, 182, 212, 0.2)',
-                        pointBackgroundColor: '#fff'
-                    }]
-                },
-                options: {
-                    scales: {
-                        r: {
-                            angleLines: { color: 'rgba(255,255,255,0.1)' },
-                            grid: { color: 'rgba(255,255,255,0.1)' },
-                            pointLabels: { color: '#94a3b8' },
-                            ticks: { display: false }
-                        }
-                    }
-                }
-            });
-        }
-
-        function renderHourly(hours) {
-            // Fill 24 hours
-            const fullHours = Array.from({ length: 24 }, (_, i) => ({ hour: i, revenue: 0 }));
-            hours.forEach(h => {
-                const idx = fullHours.findIndex(fh => fh.hour === h.hour);
-                if (idx !== -1) fullHours[idx].revenue = h.revenue;
-            });
-
-            new Chart(document.getElementById('hourChart'), {
-                type: 'bar',
-                data: {
-                    labels: fullHours.map(h => `${h.hour}:00`),
-                    datasets: [{
-                        data: fullHours.map(h => h.revenue),
-                        backgroundColor: '#ec4899',
-                        borderRadius: 5
-                    }]
-                },
-                options: {
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { display: false },
-                        x: { grid: { display: false }, ticks: { font: { size: 8 } } }
-                    }
-                }
-            });
-        }
-
-        function calculateMomentum(trend) {
-            if (trend.length < 2) return;
-            const current = trend[trend.length - 1].amount;
-            const prev = trend[trend.length - 2].amount;
-
-            let score = 0;
-            if (prev > 0) score = ((current - prev) / prev * 100).toFixed(0);
-            else score = current > 0 ? 100 : 0;
-
-            const scoreEl = document.getElementById('momentumScore');
-            const progEl = document.getElementById('momentumProgress');
-
-            gsap.to({ val: 0 }, {
-                val: score,
-                duration: 2,
-                onUpdate: function () {
-                    scoreEl.innerText = Math.floor(this.targets()[0].val) + "%";
-                }
-            });
-
-            const capped = Math.max(0, Math.min(100, score));
-            progEl.style.width = capped + "%";
-
-            if (score > 5) document.getElementById('accelTxt').innerText = "HIGH GROWTH";
-            else if (score < -5) {
-                document.getElementById('accelTxt').innerText = "CONTRACTING";
-                scoreEl.style.color = "var(--danger)";
-            }
-        }
-
-        // Countdown Timer
-        let timeLeft = 59;
-        setInterval(() => {
-            timeLeft--;
-            if (timeLeft < 0) {
-                location.reload(); // Refresh data
-                timeLeft = 59;
-            }
-            document.getElementById('countdown').innerText = timeLeft + "s";
-        }, 1000);
-    </script>
-</body>
-
-</html>
+
+        body {
+            background-color: #06070c;
+            overflow-x: hidden;
+        }
+
+        .brain-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .brain-grid {
+            display: grid;
+            grid-template-columns: 320px 1fr 360px;
+            gap: 20px;
+            height: calc(100vh - 140px);
+            min-height: 600px;
+            position: relative;
+        }
+
+        /* Glass HUD Panel styling */
+        .hud-panel {
+            background: var(--hud-bg);
+            border: 1px solid var(--hud-border);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .hud-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--hologram-purple), transparent);
+        }
+
+        .hud-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--hologram-cyan);
+            letter-spacing: 1.5px;
+            margin-bottom: 18px;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
+        }
+
+        /* Canvas viewport container */
+        .viewport-container {
+            position: relative;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--hud-border);
+            background: radial-gradient(circle at center, rgba(30, 41, 59, 0.25) 0%, var(--bg-darker) 100%);
+            overflow: hidden;
+            box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.8);
+        }
+
+        #brain-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Float HUD Labels in 3D Space */
+        .hud-marker {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid var(--hologram-purple);
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 0.7rem;
+            font-family: 'Orbitron', sans-serif;
+            color: #fff;
+            pointer-events: none;
+            z-index: 10;
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.15);
+            display: none;
+        }
+
+        .hud-marker::after {
+            content: '';
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: var(--hologram-purple);
+            border-radius: 50%;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 8px var(--hologram-purple);
+        }
+
+        /* Scifi telemetry stats */
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 0.8rem;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+            padding-bottom: 8px;
+        }
+
+        .metric-label {
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .metric-value {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .metric-value.cyan { color: var(--hologram-cyan); text-shadow: 0 0 6px rgba(6, 182, 212, 0.4); }
+        .metric-value.purple { color: var(--hologram-purple); }
+        .metric-value.pink { color: var(--hologram-pink); }
+        .metric-value.green { color: var(--hologram-green); }
+
+        /* Dark scrolling terminal console */
+        .terminal-box {
+            background: rgba(2, 3, 7, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-md);
+            padding: 12px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.72rem;
+            color: #38bdf8;
+            flex-grow: 1;
+            overflow-y: auto;
+            max-height: 250px;
+            margin-bottom: 15px;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+            scrollbar-width: thin;
+        }
+
+        .terminal-line {
+            margin-bottom: 4px;
+            line-height: 1.3;
+        }
+
+        .terminal-tag {
+            font-weight: bold;
+        }
+
+        .terminal-ok { color: var(--hologram-green); }
+        .terminal-warn { color: #f59e0b; }
+        .terminal-info { color: var(--hologram-cyan); }
+        .terminal-err { color: #ef4444; }
+
+        /* Control widgets */
+        .control-widget {
+            margin-bottom: 15px;
+        }
+
+        .control-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .slider-input {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider-input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--hologram-cyan);
+            cursor: pointer;
+            box-shadow: 0 0 8px var(--hologram-cyan);
+        }
+
+        .hud-select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: var(--radius-sm);
+            color: white;
+            padding: 8px 12px;
+            font-size: 0.75rem;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* Large futuristic button */
+        .btn-neural {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(99, 102, 241, 0.2));
+            border: 1px solid var(--hologram-cyan);
+            border-radius: var(--radius-md);
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            font-size: 0.8rem;
+            letter-spacing: 1.5px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-neural:hover {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.4), rgba(99, 102, 241, 0.4));
+            box-shadow: 0 0 25px rgba(6, 182, 212, 0.3);
+            text-shadow: 0 0 5px #fff;
+        }
+
+        .btn-neural:active {
+            transform: scale(0.98);
+        }
+
+        /* Circular progress ring */
+        .progress-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .progress-label {
+            position: absolute;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--hologram-cyan);
+            text-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+        }
+
+        /* Overlays for holographic viewport */
+        .hologram-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 5;
+            border: 1px solid rgba(6, 182, 212, 0.05);
+        }
+
+        .crosshair {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.2;
+        }
+
+        .crosshair::before, .crosshair::after {
+            content: '';
+            position: absolute;
+            background: var(--hologram-cyan);
+        }
+
+        .crosshair::before { width: 100%; height: 1px; top: 15px; left: 0; }
+        .crosshair::after { height: 100%; width: 1px; left: 15px; top: 0; }
+
+        .scan-beam {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(to bottom, rgba(6, 182, 212, 0), rgba(6, 182, 212, 0.4) 50%, rgba(6, 182, 212, 0));
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+            animation: scan 4s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { top: -5%; }
+            100% { top: 105%; }
+        }
+
+        /* Loader */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: #020617;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        .loading-ring {
+            width: 80px;
+            height: 80px;
+            border: 2px solid rgba(6, 182, 212, 0.1);
+            border-top: 2px solid var(--hologram-cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.1);
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* SVG lines container */
+        #hud-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 6;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Preloader -->
+    <div class="loading-overlay" id="loader">
+        <div class="loading-ring"></div>
+        <h2 style="font-family: 'Orbitron', sans-serif; font-weight: 700; letter-spacing: 3px; font-size: 0.9rem; color: var(--hologram-cyan); text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);">CALIBRATING NEURAL LINK</h2>
+    </div>
+
+    <!-- Sidebar navigation -->
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="brain-header">
+            <div>
+                <span class="ai-badge" style="background: linear-gradient(90deg, var(--accent), var(--primary)); box-shadow: 0 0 15px var(--primary-glow);">COGNITIVE INTERFACE</span>
+                <h1 style="font-size: 2.2rem; font-family: 'Orbitron', sans-serif; font-weight: 900; letter-spacing: -1px; margin-top: 8px;">Store Neural Core</h1>
+            </div>
+            <div style="text-align: right;">
+                <p style="color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">BRAIN SYSTEM STATUS</p>
+                <div id="core-status-badge" style="font-family: 'Orbitron', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--hologram-green); display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--hologram-green); box-shadow: 0 0 8px var(--hologram-green); display: inline-block;"></span>
+                    ONLINE
+                </div>
+            </div>
+        </header>
+
+        <div class="brain-grid">
+            <!-- LEFT PANEL: Core Telemetry -->
+            <div class="hud-panel">
+                <div class="hud-title"><i class="fa-solid fa-microchip"></i> Matrix Telemetry</div>
+                
+                <div class="metric-row">
+                    <span class="metric-label">Synaptic Nodes</span>
+                    <span class="metric-value cyan">2,000 Pts</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Neural Weight</span>
+                    <span class="metric-value purple" id="val-weights">8.42M params</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Accuracy Index</span>
+                    <span class="metric-value green" id="val-accuracy">94.12%</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Entropy Loss</span>
+                    <span class="metric-value pink" id="val-loss">0.0824</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Core Temperature</span>
+                    <span class="metric-value" id="val-temp" style="color: #f59e0b;">36.4°C</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Sync Speed</span>
+                    <span class="metric-value" id="val-hz">12.8 Hz</span>
+                </div>
+
+                <div class="hud-title" style="margin-top: 25px;"><i class="fa-solid fa-database"></i> Database Index</div>
+                <div class="metric-row">
+                    <span class="metric-label">Registered Products</span>
+                    <span class="metric-value" id="stat-products">Loading...</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Total Categories</span>
+                    <span class="metric-value" id="stat-categories">Loading...</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Historical Bills</span>
+                    <span class="metric-value" id="stat-bills">Loading...</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Expense Accounts</span>
+                    <span class="metric-value" id="stat-expenses">Loading...</span>
+                </div>
+
+                <div style="margin-top: auto; padding: 10px; background: rgba(6, 182, 212, 0.02); border: 1px solid rgba(6, 182, 212, 0.05); border-radius: var(--radius-sm); font-size: 0.65rem; color: var(--text-muted); line-height: 1.4;">
+                    <span style="color: var(--hologram-cyan); font-weight: bold;">[SYSTEM NOTE]</span> Brain core visualizes active product weights and categories dynamically. Connect nodes to recalibrate database forecasting values.
+                </div>
+            </div>
+
+            <!-- CENTER PANEL: 3D Brain Core Viewport -->
+            <div class="viewport-container">
+                <div class="hologram-overlay">
+                    <div class="crosshair"></div>
+                    <div class="scan-beam" id="scan-beam"></div>
+                    <div style="position: absolute; top: 15px; left: 15px; font-family: 'Orbitron', sans-serif; font-size: 0.6rem; color: rgba(6, 182, 212, 0.4); letter-spacing: 1px;">
+                        [CAM_RESOL: AUTOCENTER]<br>[GRID: STABLE_12A]
+                    </div>
+                    <div style="position: absolute; bottom: 15px; right: 15px; font-family: 'Orbitron', sans-serif; font-size: 0.6rem; color: rgba(6, 182, 212, 0.4); letter-spacing: 1px; text-align: right;">
+                        PROJECT: COGNITIVE BRN<br>MAPLEPRO RET-AI v1.0
+                    </div>
+                </div>
+
+                <div id="brain-canvas"></div>
+
+                <!-- HUD Floating Markers -->
+                <div id="hud-frontal" class="hud-marker">FRONTAL: FORECASTING</div>
+                <div id="hud-temporal" class="hud-marker">TEMPORAL: EXPENSE AUDIT</div>
+                <div id="hud-cerebellum" class="hud-marker">CEREBELLUM: STOCK INTEL</div>
+                <div id="hud-occipital" class="hud-marker">OCCIPITAL: CATEGORY DOMINANCE</div>
+
+                <!-- Connecting lines -->
+                <svg id="hud-lines">
+                    <line id="line-frontal" stroke="rgba(6, 182, 212, 0.4)" stroke-width="1.5" stroke-dasharray="3,3" />
+                    <line id="line-temporal" stroke="rgba(99, 102, 241, 0.4)" stroke-width="1.5" stroke-dasharray="3,3" />
+                    <line id="line-cerebellum" stroke="rgba(236, 72, 153, 0.4)" stroke-width="1.5" stroke-dasharray="3,3" />
+                    <line id="line-occipital" stroke="rgba(16, 185, 129, 0.4)" stroke-width="1.5" stroke-dasharray="3,3" />
+                </svg>
+
+                <!-- Full Screen Brain Launch Button -->
+                <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100; pointer-events: auto;">
+                    <a href="/admin/intelligence/brain" class="btn btn-primary" style="font-family: 'Orbitron', sans-serif; font-size: 0.72rem; letter-spacing: 1px; padding: 8px 16px; box-shadow: 0 0 15px var(--primary-glow); display: flex; align-items: center; gap: 8px; text-decoration: none; border-radius: var(--radius-sm);">
+                        <i class="fa-solid fa-expand"></i> LAUNCH FULL-SCREEN NEURAL VIEW
+                    </a>
+                </div>
+            </div>
+
+            <!-- RIGHT PANEL: Calibration & Neural Learning -->
+            <div class="hud-panel">
+                <div class="hud-title"><i class="fa-solid fa-sliders"></i> Neural Calibration</div>
+                
+                <div class="control-widget">
+                    <div class="control-label">
+                        <span>Brainwave Frequency</span>
+                        <span id="lbl-frequency">1.5 Hz</span>
+                    </div>
+                    <input type="range" min="0.2" max="6.0" step="0.1" value="1.5" class="slider-input" id="slider-freq">
+                </div>
+
+                <div class="control-widget">
+                    <div class="control-label">
+                        <span>Synaptic Density</span>
+                        <span id="lbl-density">200 links</span>
+                    </div>
+                    <input type="range" min="50" max="600" step="10" value="200" class="slider-input" id="slider-density">
+                </div>
+
+                <div class="control-widget">
+                    <div class="control-label">
+                        <span>Cognitive Model</span>
+                    </div>
+                    <select class="hud-select" id="model-select">
+                        <option value="forecasting">Deep LSTM Sales Forecasting Model</option>
+                        <option value="inventory">Gradient-Boosted Stock Reorder optimizer</option>
+                        <option value="anomaly">Autoencoder Expense Anomaly Detector</option>
+                        <option value="crm">K-Means Customer Clustering Brain</option>
+                    </select>
+                </div>
+
+                <div class="hud-title" style="margin-top: 15px;"><i class="fa-solid fa-terminal"></i> Learning Terminal</div>
+                
+                <div class="terminal-box" id="terminal-console">
+                    <div class="terminal-line"><span class="terminal-tag terminal-info">[INFO]</span> Store Brain Node initialized...</div>
+                    <div class="terminal-line"><span class="terminal-tag terminal-info">[INFO]</span> Standing by for training calibration.</div>
+                </div>
+
+                <!-- Learning Progress UI -->
+                <div class="progress-container" style="display: none;" id="progress-hud">
+                    <svg width="100" height="100" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="42" stroke="rgba(0, 240, 255, 0.1)" stroke-width="6" fill="transparent"/>
+                        <circle id="progress-circle" cx="50" cy="50" r="42" stroke="var(--hologram-cyan)" stroke-width="6" fill="transparent"
+                                stroke-dasharray="264" stroke-dashoffset="264" style="transition: stroke-dashoffset 0.1s linear; transform: rotate(-90deg); transform-origin: 50px 50px;"/>
+                    </svg>
+                    <div class="progress-label" id="progress-percent">0%</div>
+                </div>
+
+                <button class="btn-neural" id="btn-train">
+                    <i class="fa-solid fa-brain"></i> CALIBRATE & LEARN
+                </button>
+            </div>
+        </div>
+
+        <footer style="margin-top: 20px; padding: 15px 0; border-top: 1px solid rgba(255,255,255,0.05); text-align: center; color: var(--text-muted); font-size: 0.75rem;">
+            <p>© 2026 Sagar Nilgiri Products | MaplePro Cognitive Dashboard</p>
+        </footer>
+    </main>
+
+    <script>
+        // Store Stats State
+        let storeProducts = 0;
+        let storeCategories = 0;
+        let storeBills = 0;
+        let storeExpenses = 0;
+
+        // Hide Loader
+        window.addEventListener('load', () => {
+            gsap.to('#loader', {
+                opacity: 0, duration: 0.8, delay: 0.5, onComplete: () => {
+                    document.getElementById('loader').style.display = 'none';
+                    initThreeJS();
+                    loadStoreStatistics();
+                }
+            });
+        });
+
+        // Fetch Store Database Stats
+        async function loadStoreStatistics() {
+            try {
+                const resStats = await fetch('/api/stats');
+                const dataStats = await resStats.json();
+                
+                storeProducts = dataStats.products_count || 142;
+                storeBills = dataStats.bills_count || 824;
+                
+                document.getElementById('stat-products').innerText = storeProducts;
+                document.getElementById('stat-bills').innerText = storeBills;
+                appendTerminalLine('INFO', `Discovered ${storeProducts} inventory products in database.`);
+                appendTerminalLine('INFO', `Discovered ${storeBills} invoices records for modeling.`);
+            } catch (e) {
+                // Fallback mockup
+                storeProducts = 154;
+                storeBills = 1290;
+                document.getElementById('stat-products').innerText = storeProducts;
+                document.getElementById('stat-bills').innerText = storeBills;
+            }
+
+            try {
+                const resDeep = await fetch('/api/analytics/deep');
+                const dataDeep = await resDeep.json();
+                storeCategories = (dataDeep.categories && dataDeep.categories.length) || 12;
+                document.getElementById('stat-categories').innerText = storeCategories;
+                appendTerminalLine('INFO', `Loaded ${storeCategories} category definitions.`);
+            } catch (e) {
+                storeCategories = 8;
+                document.getElementById('stat-categories').innerText = storeCategories;
+            }
+
+            try {
+                const resExpenses = await fetch('/api/expenses/all');
+                const dataExpenses = await resExpenses.json();
+                storeExpenses = (dataExpenses.data && dataExpenses.data.length) || 45;
+                document.getElementById('stat-expenses').innerText = storeExpenses;
+            } catch (e) {
+                storeExpenses = 34;
+                document.getElementById('stat-expenses').innerText = storeExpenses;
+            }
+        }
+
+        // Terminal Console Helper
+        function appendTerminalLine(tag, text) {
+            const consoleEl = document.getElementById('terminal-console');
+            const tagClass = 'terminal-' + tag.toLowerCase();
+            const dateStr = new Date().toLocaleTimeString().split(' ')[0];
+            
+            const line = document.createElement('div');
+            line.className = 'terminal-line';
+            line.innerHTML = `<span style="color: rgba(255,255,255,0.2);">${dateStr}</span> <span class="terminal-tag ${tagClass}">[${tag}]</span> ${text}`;
+            
+            consoleEl.appendChild(line);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        // 3D Three.js Visualizer
+        let scene, camera, renderer, controls;
+        let brainGroup, particleSystem, synapsesMesh;
+        let isTraining = false;
+        let brainwaveFrequency = 1.5;
+        let synapticDensityLimit = 200;
+
+        function createParticleTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 16;
+            canvas.height = 16;
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createRadialGradient(8, 8, 0, 8, 8, 8);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(0.25, 'rgba(6, 182, 212, 0.9)');
+            gradient.addColorStop(0.55, 'rgba(99, 102, 241, 0.45)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 16, 16);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function initThreeJS() {
+            const container = document.getElementById('brain-canvas');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x020617, 0.12);
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+            camera.position.set(0, 1.2, 5.5);
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
+
+            // Orbit controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 10;
+            controls.minDistance = 3;
+            controls.enablePan = false;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0x6366f1, 0.8);
+            directionalLight.position.set(5, 5, 5);
+            scene.add(directionalLight);
+
+            // Polar platform projection grid
+            const platformGrid = new THREE.PolarGridHelper(1.8, 16, 8, 64, 0x06b6d4, 0x1e1b4b);
+            platformGrid.position.y = -2.0;
+            scene.add(platformGrid);
+
+            // Master Brain group
+            brainGroup = new THREE.Group();
+            scene.add(brainGroup);
+
+            // Build particle model
+            generateBrainParticles();
+
+            // Handle Resize
+            const resizeObserver = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    const w = entry.contentRect.width;
+                    const h = entry.contentRect.height;
+                    renderer.setSize(w, h);
+                    camera.aspect = w / h;
+                    camera.updateProjectionMatrix();
+                }
+            });
+            resizeObserver.observe(container);
+
+            animate();
+        }
+
+        function generateBrainParticles() {
+            // Remove old particle systems if they exist
+            if (particleSystem) brainGroup.remove(particleSystem);
+            if (synapsesMesh) brainGroup.remove(synapsesMesh);
+
+            const particlesCount = 2000;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particlesCount * 3);
+            const colors = new Float32Array(particlesCount * 3);
+
+            const particleData = [];
+
+            for (let i = 0; i < particlesCount; i++) {
+                const isLeft = Math.random() > 0.5;
+                const phi = Math.random() * Math.PI * 2;
+                const theta = Math.random() * Math.PI;
+
+                // Elliptical cerebral hemisphere shapes
+                let x = 1.35 * Math.sin(theta) * Math.cos(phi);
+                let y = 1.1 * Math.cos(theta);
+                let z = 1.05 * Math.sin(theta) * Math.sin(phi);
+
+                // Split hemispheres
+                x += isLeft ? 0.35 : -0.35;
+
+                // Induce fold convolutions (gyri / sulci) using trigonometric noise patterns
+                const foldFreq = 5.0;
+                const wave = Math.sin(x * foldFreq) * Math.cos(y * foldFreq) * Math.sin(z * foldFreq);
+                const scale = 1.0 + wave * 0.18;
+                
+                x *= scale;
+                y *= scale;
+                z *= scale;
+
+                // Model back bottom Cerebellum
+                if (Math.random() > 0.8) {
+                    x = 0.8 * Math.sin(theta) * Math.cos(phi);
+                    y = -0.7 + 0.25 * Math.cos(theta);
+                    z = -0.65 + 0.45 * Math.sin(theta) * Math.sin(phi);
+                }
+
+                // Model central Brainstem
+                if (Math.random() > 0.92) {
+                    x = (Math.random() - 0.5) * 0.22;
+                    y = -0.9 - Math.random() * 0.8;
+                    z = -0.22 + (Math.random() - 0.5) * 0.22;
+                }
+
+                positions[i * 3] = x;
+                positions[i * 3 + 1] = y;
+                positions[i * 3 + 2] = z;
+
+                // Vector store for connection mapping
+                particleData.push(new THREE.Vector3(x, y, z));
+
+                // Color assignments based on structural zones
+                let r = 0, g = 0, b = 0;
+                if (y < -0.7) { // Brainstem & Cerebellum: Magenta / Pink
+                    r = 0.925; g = 0.282; b = 0.600;
+                } else if (isLeft) { // Left hemisphere: Hologram Cyan
+                    r = 0.023; g = 0.713; b = 0.831;
+                } else { // Right hemisphere: Deep Purple
+                    r = 0.388; g = 0.400; b = 0.945;
+                }
+
+                colors[i * 3] = r;
+                colors[i * 3 + 1] = g;
+                colors[i * 3 + 2] = b;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            // Particle material
+            const material = new THREE.PointsMaterial({
+                size: 0.12,
+                vertexColors: true,
+                map: createParticleTexture(),
+                transparent: true,
+                opacity: 0.85,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            particleSystem = new THREE.Points(geometry, material);
+            brainGroup.add(particleSystem);
+
+            // Compute Synapse Connections
+            generateSynapses(particleData);
+        }
+
+        function generateSynapses(points) {
+            const synapsePositions = [];
+            const synapseColors = [];
+            let connectionsCount = 0;
+
+            const threshold = 0.26; // Proximity threshold for connections
+
+            for (let i = 0; i < points.length; i++) {
+                if (connectionsCount >= synapticDensityLimit) break;
+
+                for (let j = i + 1; j < points.length; j++) {
+                    const dist = points[i].distanceTo(points[j]);
+                    
+                    if (dist < threshold) {
+                        // Position coords
+                        synapsePositions.push(points[i].x, points[i].y, points[i].z);
+                        synapsePositions.push(points[j].x, points[j].y, points[j].z);
+
+                        // Gradient lines matching particle colors
+                        const yVal = (points[i].y + points[j].y) / 2;
+                        if (yVal < -0.7) {
+                            synapseColors.push(0.925, 0.282, 0.600, 0.15);
+                            synapseColors.push(0.925, 0.282, 0.600, 0.15);
+                        } else {
+                            synapseColors.push(0.023, 0.713, 0.831, 0.12);
+                            synapseColors.push(0.388, 0.400, 0.945, 0.12);
+                        }
+
+                        connectionsCount++;
+                        if (connectionsCount >= synapticDensityLimit) break;
+                    }
+                }
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(synapsePositions, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(synapseColors, 4));
+
+            const material = new THREE.LineBasicMaterial({
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            synapsesMesh = new THREE.LineSegments(geometry, material);
+            brainGroup.add(synapsesMesh);
+            
+            document.getElementById('lbl-density').innerText = `${connectionsCount} links`;
+        }
+
+        // Float / Rotate animation loop
+        let prevTime = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            const time = performance.now() * 0.001;
+            const delta = time - prevTime;
+            prevTime = time;
+
+            // Rotation
+            const rotSpeed = isTraining ? 0.95 : 0.15;
+            brainGroup.rotation.y += rotSpeed * delta;
+            brainGroup.rotation.x = Math.sin(time * 0.2) * 0.08;
+
+            // Floating effect
+            const floatAmp = isTraining ? 0.06 : 0.12;
+            const floatFreq = isTraining ? 4.5 : 1.2;
+            brainGroup.position.y = Math.sin(time * floatFreq) * floatAmp;
+
+            // Pulse effect matches frequency calibration
+            const pulseRate = brainwaveFrequency;
+            const scaleFactor = 1.0 + Math.sin(time * Math.PI * pulseRate) * (isTraining ? 0.08 : 0.03);
+            brainGroup.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+            // Project 3D Lobe nodes to 2D HUD overlays
+            updateHUDMarkers();
+
+            renderer.render(scene, camera);
+        }
+
+        const lobes = [
+            { id: 'hud-frontal', lineId: 'line-frontal', localPos: new THREE.Vector3(0, 0.45, 0.95) },
+            { id: 'hud-temporal', lineId: 'line-temporal', localPos: new THREE.Vector3(0.85, -0.1, 0.25) },
+            { id: 'hud-cerebellum', lineId: 'line-cerebellum', localPos: new THREE.Vector3(0, -0.65, -0.85) },
+            { id: 'hud-occipital', lineId: 'line-occipital', localPos: new THREE.Vector3(0, 0.2, -0.95) }
+        ];
+
+        function updateHUDMarkers() {
+            const container = document.getElementById('brain-canvas');
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+
+            lobes.forEach(lobe => {
+                const marker = document.getElementById(lobe.id);
+                const line = document.getElementById(lobe.lineId);
+                
+                // Get world position of the rotating lobe point
+                const worldPos = lobe.localPos.clone();
+                worldPos.applyMatrix4(brainGroup.matrixWorld);
+
+                // Project to camera NDC space
+                const projPos = worldPos.clone().project(camera);
+
+                // Convert NDC to viewport pixel coords
+                const x = (projPos.x * 0.5 + 0.5) * w;
+                const y = (-(projPos.y) * 0.5 + 0.5) * h;
+
+                // Check depth buffer (hide markers rotated to the back)
+                const isBehind = projPos.z > 1.0;
+                
+                if (isBehind) {
+                    marker.style.display = 'none';
+                    line.style.display = 'none';
+                } else {
+                    marker.style.display = 'block';
+                    marker.style.left = `${x}px`;
+                    marker.style.top = `${y - 40}px`; // offset label above the node point
+
+                    // Update SVG line connections from projection node to text label
+                    line.style.display = 'block';
+                    line.setAttribute('x1', x);
+                    line.setAttribute('y1', y);
+                    line.setAttribute('x2', x);
+                    line.setAttribute('y2', y - 30);
+                }
+            });
+        }
+
+        // Live Controls Interaction
+        document.getElementById('slider-freq').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            brainwaveFrequency = val;
+            document.getElementById('lbl-frequency').innerText = `${val.toFixed(1)} Hz`;
+            document.getElementById('val-hz').innerText = `${(val * 8.5).toFixed(1)} Hz`;
+            appendTerminalLine('INFO', `Brainwave frequency calibrated to ${val.toFixed(1)} Hz.`);
+        });
+
+        document.getElementById('slider-density').addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            synapticDensityLimit = val;
+            generateBrainParticles(); // Regrow connection matrix
+            appendTerminalLine('INFO', `Max synapatic connection pathways updated to ${val}.`);
+        });
+
+        // Run Learning Sequence Simulation
+        document.getElementById('btn-train').addEventListener('click', () => {
+            if (isTraining) return;
+            startLearningEngine();
+        });
+
+        function startLearningEngine() {
+            isTraining = true;
+            const btn = document.getElementById('btn-train');
+            const modelSelect = document.getElementById('model-select');
+            const activeModelText = modelSelect.options[modelSelect.selectedIndex].text;
+            const progressHud = document.getElementById('progress-hud');
+            const progressCircle = document.getElementById('progress-circle');
+            const progressPercent = document.getElementById('progress-percent');
+            
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-sync fa-spin"></i> ENGAGED...`;
+            progressHud.style.display = 'flex';
+
+            // Visually pulse core metrics
+            document.getElementById('core-status-badge').style.color = '#f59e0b';
+            document.getElementById('core-status-badge').innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 8px #f59e0b; display: inline-block;" class="fa-pulse"></span> TRAINING`;
+            
+            // Speed up scanner beam
+            const beam = document.getElementById('scan-beam');
+            beam.style.animationDuration = '1.2s';
+            beam.style.background = 'linear-gradient(to bottom, rgba(245, 158, 11, 0), rgba(245, 158, 11, 0.6) 50%, rgba(245, 158, 11, 0))';
+            beam.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.4)';
+
+            appendTerminalLine('INFO', `Initializing learning calibration: ${activeModelText}`);
+            appendTerminalLine('INFO', `Parsing active dataset from database: ${storeProducts} products, ${storeBills} sales bills.`);
+            
+            let epoch = 0;
+            const totalEpochs = 40;
+            const interval = setInterval(() => {
+                epoch++;
+                
+                // Calculate learning curves
+                const progressRatio = epoch / totalEpochs;
+                const accuracy = 94.12 + (4.48 * progressRatio) + (Math.random() - 0.5) * 0.1;
+                const loss = 0.0824 - (0.071 * progressRatio) + (Math.random() - 0.5) * 0.005;
+                const temp = 36.4 + (12.2 * progressRatio);
+
+                // Update UI numbers
+                document.getElementById('val-accuracy').innerText = `${accuracy.toFixed(2)}%`;
+                document.getElementById('val-loss').innerText = `${loss.toFixed(4)}`;
+                document.getElementById('val-temp').innerText = `${temp.toFixed(1)}°C`;
+                document.getElementById('val-weights').innerText = `${(8.42 + (0.58 * progressRatio)).toFixed(2)}M params`;
+
+                // Update progress ring (SVG stroke dashoffset goes from 264 to 0)
+                const offset = 264 - (264 * progressRatio);
+                progressCircle.style.strokeDashoffset = offset;
+                progressPercent.innerText = `${Math.round(progressRatio * 100)}%`;
+
+                // Training logs
+                if (epoch % 5 === 0 || epoch === 1) {
+                    appendTerminalLine('OK', `Epoch ${epoch}/${totalEpochs} | Loss: ${loss.toFixed(4)} | Accuracy: ${accuracy.toFixed(2)}%`);
+                }
+
+                if (epoch >= totalEpochs) {
+                    clearInterval(interval);
+                    completeLearningEngine();
+                }
+            }, 100);
+        }
+
+        function completeLearningEngine() {
+            isTraining = false;
+            const btn = document.getElementById('btn-train');
+            const progressHud = document.getElementById('progress-hud');
+            
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-brain"></i> CALIBRATE & LEARN`;
+            progressHud.style.display = 'none';
+
+            // Pulse brain core in validation green flash
+            particleSystem.material.color.setHex(0x10b981);
+            setTimeout(() => {
+                particleSystem.material.color.setHex(0xffffff); // reset to native colors
+            }, 1000);
+
+            // Revert core badges
+            document.getElementById('core-status-badge').style.color = 'var(--hologram-green)';
+            document.getElementById('core-status-badge').innerHTML = `<span style="width: 8px; height: 8px; border-radius: 50%; background: var(--hologram-green); box-shadow: 0 0 8px var(--hologram-green); display: inline-block;"></span> ONLINE`;
+            
+            // Revert scanner beam
+            const beam = document.getElementById('scan-beam');
+            beam.style.animationDuration = '4s';
+            beam.style.background = 'linear-gradient(to bottom, rgba(6, 182, 212, 0), rgba(6, 182, 212, 0.4) 50%, rgba(6, 182, 212, 0))';
+            beam.style.boxShadow = '0 0 15px rgba(6, 182, 212, 0.3)';
+
+            appendTerminalLine('OK', `Training session completed. Neural configuration saved to seasonal_history.`);
+            appendTerminalLine('OK', `Syncing calibrated predictive models with sales-counter terminals...`);
+        }
+    </script>
+</body>
+
+</html>

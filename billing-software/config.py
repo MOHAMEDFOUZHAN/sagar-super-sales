@@ -12,6 +12,7 @@ class Config:
     MYSQL_POOL_NAME = 'maple_pool'
     MYSQL_POOL_SIZE = 32
     MYSQL_AUTOCOMMIT = False
+    AUTO_START_LARAGON = False
     
     # Server Connection Configuration
     SERVER_HOST = '0.0.0.0' # Listen on all interfaces so client PCs can connect
@@ -66,6 +67,7 @@ class Config:
                     "MYSQL_PORT": cls.MYSQL_PORT,
                     "MYSQL_POOL_NAME": cls.MYSQL_POOL_NAME,
                     "MYSQL_POOL_SIZE": cls.MYSQL_POOL_SIZE,
+                    "AUTO_START_LARAGON": cls.AUTO_START_LARAGON,
                     "SERVER_HOST": cls.SERVER_HOST,
                     "SERVER_PORT": cls.SERVER_PORT,
                     "WAITRESS_THREADS": cls.WAITRESS_THREADS
@@ -85,6 +87,7 @@ class Config:
                     cls.MYSQL_PORT = int(data.get('MYSQL_PORT', cls.MYSQL_PORT))
                     cls.MYSQL_POOL_NAME = data.get('MYSQL_POOL_NAME', cls.MYSQL_POOL_NAME)
                     cls.MYSQL_POOL_SIZE = int(data.get('MYSQL_POOL_SIZE', cls.MYSQL_POOL_SIZE))
+                    cls.AUTO_START_LARAGON = bool(data.get('AUTO_START_LARAGON', cls.AUTO_START_LARAGON))
                     cls.SERVER_HOST = data.get('SERVER_HOST', cls.SERVER_HOST)
                     cls.SERVER_PORT = int(data.get('SERVER_PORT', cls.SERVER_PORT))
                     cls.WAITRESS_THREADS = int(data.get('WAITRESS_THREADS', cls.WAITRESS_THREADS))

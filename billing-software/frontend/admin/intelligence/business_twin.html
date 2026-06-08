@@ -363,11 +363,17 @@
                 <h1>Business Twin</h1>
                 <p style="color: var(--text-muted);">Real-time replication, operational analytics & LLM reasoning engine.</p>
             </div>
-            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); padding: 8px 16px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 8px;">
-                <span class="status-dot green"></span>
-                <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted);">Twin Sync Active</span>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <a href="/admin/intelligence/forecasting" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; padding: 10px 18px; border-radius: var(--radius-md); font-weight: 700; font-size: 0.85rem; box-shadow: 0 4px 15px var(--primary-glow); transform: translateY(0); transition: all 0.2s ease;">
+                    <i class="fa-solid fa-chart-line"></i> Demand Forecasting
+                </a>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); padding: 10px 16px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 8px; height: 100%;">
+                    <span class="status-dot green"></span>
+                    <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: var(--text-muted);">Twin Sync Active</span>
+                </div>
             </div>
         </header>
+
 
         <!-- Live Replica Telemetry Grid -->
         <div class="twin-grid">
@@ -422,6 +428,7 @@
                     <div class="terminal-dot green"></div>
                 </div>
                 <div class="terminal-title"><i class="fa-solid fa-terminal"></i> AI REASONING WORKSTATION</div>
+                <button class="btn" style="padding: 4px 10px; font-size: 0.7rem; background: rgba(99, 102, 241, 0.2); margin-left: 10px;" onclick="promptShareEmail()"><i class="fa-solid fa-share-nodes"></i> SHARE EMAIL</button>
                 <div style="font-size: 0.7rem; color: var(--text-muted);">MODEL: LLAMA-3.3-70B</div>
             </div>
 
@@ -585,7 +592,50 @@
         fetchTelemetry();
         // Update telemetry every 15 seconds to simulate dynamic real-time operations
         setInterval(fetchTelemetry, 15000);
-    </script>
+    
+        async function promptShareEmail() {
+            if (chatHistory.length === 0) {
+                alert("The chat log is empty. Please start a conversation before sharing.");
+                return;
+            }
+            const email = prompt("Enter the email address to receive the PDF report:");
+            if (!email) return;
+
+            // Validate email
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!re.test(email)) {
+                alert("Please enter a valid email address.");
+                return;
+            }
+
+            try {
+                const shareBtn = document.querySelector('[onclick="promptShareEmail()"]');
+                const origHTML = shareBtn.innerHTML;
+                shareBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> SENDING...';
+                shareBtn.disabled = true;
+
+                const res = await fetch('/api/admin/intelligence/share-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, history: chatHistory })
+                });
+                const data = await res.json();
+                
+                shareBtn.innerHTML = origHTML;
+                shareBtn.disabled = false;
+
+                if (data.status === 'success') {
+                    alert("Chat transcript PDF sent successfully!");
+                } else {
+                    alert("Error: " + data.message);
+                }
+            } catch (err) {
+                alert("Network error, could not send report.");
+                console.error(err);
+            }
+        }
+
+</script>
 </body>
 
 </html>

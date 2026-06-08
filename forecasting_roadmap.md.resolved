@@ -1,0 +1,30 @@
+# Sagar Super: AI Demand Forecasting Roadmap
+
+This roadmap details key enhancements that can be integrated next into the AI Demand Forecasting module to further optimize supply chain efficiency and inventory control.
+
+---
+
+## 1. Automated Purchase Order Export (PDF & Excel)
+* **Goal**: Provide the ability to download recommendations instantly.
+* **Details**: Add an "Export PO" button next to "Print Purchase Orders" to generate professional, formatted PDFs or Excel sheets containing quantities, barcodes, preferred supplier details, and estimated wholesale prices.
+* **Value**: Cuts administrative work by letting the manager directly send the PO file to suppliers via WhatsApp or email.
+
+## 2. Supplier Directory & Product Mapping
+* **Goal**: Group order suggestions by the actual supplier.
+* **Details**: Create a `suppliers` database table and map each product to its preferred primary supplier. The forecasting engine can then auto-generate separate PO recommendations for each supplier, pre-filling their contact info.
+* **Value**: Saves time by eliminating the manual task of sorting which products go to which distributors.
+
+## 3. Direct Stock Inflow Sync (One-Click Restock)
+* **Goal**: Streamline stock registration when items arrive.
+* **Details**: Add a "Mark as Ordered" button which flags the recommendation as pending. Once items arrive, clicking "Approve Stock Inward" automatically adds the suggested quantities to the active product inventory table in one go.
+* **Value**: Avoids double-data entry by automatically updating the billing system's stock counts.
+
+## 4. WhatsApp & Email Integration for Supplier Dispatch
+* **Goal**: Direct supplier communication.
+* **Details**: Integrate the WhatsApp Web API (or a Twilio gateway) so clicking "Send to Supplier" immediately launches a pre-filled WhatsApp message with the draft PO details to the mapped distributor's phone number.
+* **Value**: Speeds up the procurement loop to minutes.
+
+## 5. Visual Trends & Historical Demand Charts
+* **Goal**: High-fidelity data visualization.
+* **Details**: Integrate a lightweight charting library (e.g., Chart.js) next to the recommendations to display a monthly trend graph of sales velocity for the selected category.
+* **Value**: Builds confidence in AI decisions by showing historical baseline spikes (e.g., how sales of Spices spike during festival months).

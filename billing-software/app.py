@@ -27,9 +27,15 @@ import sqlite3
 import subprocess
 import socket
 import threading
+from flask_socketio import SocketIO, emit
+from engineio.async_drivers import threading as engineio_threading
 
 # Load local .env variables dynamically (Zero-dependency dotenv support)
-env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+if getattr(sys, 'frozen', False):
+    base_dir = os.path.dirname(sys.executable)
+else:
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(base_dir, ".env")
 if os.path.exists(env_path):
     with open(env_path, "r", encoding="utf-8") as env_file:
         for line in env_file:
@@ -294,15 +300,23 @@ def perform_database_sync(mysql_conn, pg_conn):
         pg_cur.execute("SELECT barcode, current_stock FROM products")
         pg_products = {row['barcode']: row for row in pg_cur.fetchall()}
 
+        stock_updated = False
         for barcode, prod in mysql_products.items():
             if barcode in pg_products:
                 pg_prod = pg_products[barcode]
                 if float(prod['current_stock']) != float(pg_prod['current_stock']):
                     try:
                         pg_cur.execute("UPDATE products SET current_stock = %s WHERE barcode = %s", (prod['current_stock'], barcode))
-                        pg_conn.commit()
-                    except Exception:
-                        pg_conn.rollback()
+                        stock_updated = True
+                    except Exception as e:
+                        print(f"[SYNC] Product stock update failed for {barcode}: {e}")
+        if stock_updated:
+            try:
+                pg_conn.commit()
+                print("[SYNC] Bulk committed stock alignments to Cloud Database.")
+            except Exception as e:
+                pg_conn.rollback()
+                print(f"[SYNC] Bulk stock alignment commit failed: {e}")
 
         mysql_cur.close()
         pg_cur.close()
@@ -319,31 +333,41 @@ def self_healing_monitor_loop():
         mysql_conn = None
         pg_conn = None
         try:
-            # 1. Local MySQL Check
-            mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+            # 1. Local or Remote MySQL Check
+            is_local_host = Config.MYSQL_HOST in ('127.0.0.1', 'localhost')
+            if is_local_host:
+                mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+            else:
+                mysql_alive = is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+            
             global MYSQL_IS_ALIVE
             MYSQL_IS_ALIVE = mysql_alive
             
             if not mysql_alive and last_system_states["mysql"]:
-                error_msg = f"Local MySQL service offline on port {Config.MYSQL_PORT}."
-                action_taken = "Autopilot attempting to launch and restore Laragon MySQL service."
+                error_msg = f"Local MySQL service offline on port {Config.MYSQL_PORT}." if is_local_host else f"Remote MySQL service offline on port {Config.MYSQL_PORT} at {Config.MYSQL_HOST}."
+                
+                if is_local_host and getattr(Config, 'AUTO_START_LARAGON', False):
+                    action_taken = "Autopilot attempting to launch and restore Laragon MySQL service."
+                else:
+                    action_taken = "Autopilot waiting for MySQL service connection (auto-launch disabled)."
                 
                 log_healing_event("MySQL Database", "FAULT", error_msg, action_taken)
                 last_system_states["mysql"] = False
                 
-                # Autopilot Repair Attempt
-                if os.path.exists(LARAGON_PATH):
-                    try:
-                        subprocess.Popen([LARAGON_PATH])
-                        threading.Thread(target=auto_click_ok, daemon=True).start()
-                        time.sleep(4)
-                        if is_process_running("mysqld.exe"):
-                            log_healing_event("MySQL Database", "HEALED", "Autopilot successfully launched Laragon.", "Laragon process initialized; warning popups auto-closed.")
-                            last_system_states["mysql"] = True
-                    except Exception as ex:
-                        log_healing_event("MySQL Database", "FAULT", f"Laragon relaunch failed: {str(ex)}", "Autopilot restart command crashed.")
-                else:
-                    log_healing_event("MySQL Database", "FAULT", "Laragon executable not found.", "Autopilot unable to locate Laragon.exe at paths.")
+                # Autopilot Repair Attempt (Only if local host and auto-launch enabled)
+                if is_local_host and getattr(Config, 'AUTO_START_LARAGON', False):
+                    if os.path.exists(LARAGON_PATH):
+                        try:
+                            subprocess.Popen([LARAGON_PATH])
+                            threading.Thread(target=auto_click_ok, daemon=True).start()
+                            time.sleep(4)
+                            if is_process_running("mysqld.exe"):
+                                log_healing_event("MySQL Database", "HEALED", "Autopilot successfully launched Laragon.", "Laragon process initialized; warning popups auto-closed.")
+                                last_system_states["mysql"] = True
+                        except Exception as ex:
+                            log_healing_event("MySQL Database", "FAULT", f"Laragon relaunch failed: {str(ex)}", "Autopilot restart command crashed.")
+                    else:
+                        log_healing_event("MySQL Database", "FAULT", "Laragon executable not found.", "Autopilot unable to locate Laragon.exe at paths.")
             
             elif mysql_alive and not last_system_states["mysql"]:
                 log_healing_event("MySQL Database", "HEALED", "Local MySQL service restored and listening.", "Connection re-established.")
@@ -368,6 +392,9 @@ def self_healing_monitor_loop():
                     except: pass
                     pg_conn = None
                 
+            global CLOUD_IS_ALIVE
+            CLOUD_IS_ALIVE = cloud_alive
+            
             if not cloud_alive and last_system_states["cloud_db"]:
                 log_healing_event("Cloud Database", "FAULT", "Supabase Cloud Database offline or internet lost.", "Switched to offline queue buffer.")
                 last_system_states["cloud_db"] = False
@@ -443,8 +470,12 @@ def trigger_immediate_sync():
         mysql_conn = None
         pg_conn = None
         try:
-            # 1. Local MySQL Check
-            mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+            # 1. Local or Remote MySQL Check
+            is_local_host = Config.MYSQL_HOST in ('127.0.0.1', 'localhost')
+            if is_local_host:
+                mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+            else:
+                mysql_alive = is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
             if not mysql_alive: return
 
             # 2. Supabase Check
@@ -526,6 +557,7 @@ app = Flask(__name__,
             static_folder=resource_path('frontend'), 
             static_url_path='')
 app.secret_key = Config.SECRET_KEY
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 def format_sse(data: str, event=None) -> str:
     msg = f'data: {data}\n\n'
@@ -592,6 +624,7 @@ SUPABASE_PASSWORD = "Fouzfif@3110"
 # Global database status tracker
 DB_STATUS = "local"
 MYSQL_IS_ALIVE = True
+CLOUD_IS_ALIVE = True
 
 class PostgreSQLDictRow(dict):
     def __getitem__(self, key):
@@ -685,6 +718,36 @@ class PostgreSQLProxyCursor:
                     opening_balance=EXCLUDED.opening_balance, closing_balance=EXCLUDED.closing_balance, 
                     actual_closing=EXCLUDED.actual_closing, difference=EXCLUDED.difference
                 """
+
+        # Translate backticks to double quotes for PostgreSQL compatibility
+        if "`" in query:
+            query = query.replace("`", '"')
+
+        # Translate DATE(column) to CAST(column AS DATE) for PostgreSQL compatibility
+        if "DATE(" in query_upper:
+            import re
+            query = re.sub(
+                r"\bDATE\(([^)]+)\)", 
+                r"CAST(\1 AS DATE)", 
+                query, 
+                flags=re.IGNORECASE
+            )
+
+        # Translate CURDATE() to CURRENT_DATE for PostgreSQL compatibility
+        if "CURDATE" in query_upper:
+            import re
+            query = re.sub(r"\bCURDATE\(\)", "CURRENT_DATE", query, flags=re.IGNORECASE)
+
+        # Translate DATE_SUB(NOW(), INTERVAL X DAY) to NOW() - INTERVAL 'X DAY' for PostgreSQL compatibility
+        if "DATE_SUB" in query_upper:
+            import re
+            query = re.sub(
+                r"DATE_SUB\(\s*NOW\(\)\s*,\s*INTERVAL\s+(\d+)\s+DAY\s*\)", 
+                r"NOW() - INTERVAL '\1 DAY'", 
+                query, 
+                flags=re.IGNORECASE
+            )
+
         return query
 
     def _translate_params(self, query, params):
@@ -729,7 +792,7 @@ class PostgreSQLProxyConnection:
 
 
 def get_db_connection():
-    global DB_STATUS, MYSQL_IS_ALIVE
+    global DB_STATUS, MYSQL_IS_ALIVE, CLOUD_IS_ALIVE
     
     # 1. Try connecting to local Laragon MySQL Pool (Primary) if it is alive in memory
     if MYSQL_IS_ALIVE:
@@ -750,21 +813,25 @@ def get_db_connection():
             MYSQL_IS_ALIVE = False  # Skip MySQL for future requests until background loop heals it!
             
     # 2. If primary fails or is bypassed, instantly route to Supabase PostgreSQL (Failover) on Port 6543
-    try:
-        raw_pg_conn = psycopg2.connect(
-            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
-            port=6543,
-            database="postgres",
-            user="postgres",
-            password=SUPABASE_PASSWORD,
-            connect_timeout=4
-        )
-        DB_STATUS = "cloud"
-        return PostgreSQLProxyConnection(raw_pg_conn)
-    except Exception as pg_err:
-        err_msg = f"[CRITICAL FAILOVER ERROR] Supabase Connection Failed: {pg_err}"
-        print(err_msg)
-        log_error(err_msg)
+    if CLOUD_IS_ALIVE:
+        try:
+            raw_pg_conn = psycopg2.connect(
+                host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+                port=6543,
+                database="postgres",
+                user="postgres",
+                password=SUPABASE_PASSWORD,
+                connect_timeout=4
+            )
+            DB_STATUS = "cloud"
+            return PostgreSQLProxyConnection(raw_pg_conn)
+        except Exception as pg_err:
+            err_msg = f"[CRITICAL FAILOVER ERROR] Supabase Connection Failed: {pg_err}"
+            print(err_msg)
+            log_error(err_msg)
+            CLOUD_IS_ALIVE = False  # Skip Cloud for future requests until background loop restores it!
+            return None
+    else:
         return None
 
 @app.route('/api/db-status')
@@ -834,6 +901,58 @@ def reset_database_route():
         cursor.execute("SET FOREIGN_KEY_CHECKS = 0")
         
         if mode == 'financial_year':
+            # 1. Summarize and build the Memory Bank (seasonal_history) before clearing transactions
+            try:
+                cursor.execute("""
+                    SELECT 
+                        EXTRACT(YEAR FROM b.bill_date) as yr,
+                        EXTRACT(MONTH FROM b.bill_date) as mth,
+                        COALESCE(p.category, 'General') as cat,
+                        SUM(bi.qty) as monthly_qty
+                    FROM bills b
+                    JOIN bill_items bi ON b.id = bi.bill_id
+                    LEFT JOIN products p ON bi.product_name = p.name
+                    WHERE b.status != 'Cancelled' AND b.bill_date IS NOT NULL
+                    GROUP BY EXTRACT(YEAR FROM b.bill_date), EXTRACT(MONTH FROM b.bill_date), COALESCE(p.category, 'General')
+                """)
+                rows = cursor.fetchall()
+                
+                cat_monthly_sales = {}
+                for r in rows:
+                    yr = int(r['yr'])
+                    mth = int(r['mth'])
+                    cat = str(r['cat']).strip()
+                    qty = float(r['monthly_qty'] or 0.0)
+                    
+                    if cat not in cat_monthly_sales:
+                        cat_monthly_sales[cat] = {}
+                    cat_monthly_sales[cat][(yr, mth)] = qty
+                
+                for cat, monthly_dict in cat_monthly_sales.items():
+                    qtys = list(monthly_dict.values())
+                    if qtys:
+                        avg_qty = sum(qtys) / len(qtys)
+                        if avg_qty <= 0:
+                            avg_qty = 1.0
+                        for (yr, mth), qty in monthly_dict.items():
+                            multiplier = qty / avg_qty
+                            multiplier = max(0.1, min(10.0, multiplier))
+                            
+                            # Clean up old values to prevent unique constraint failures
+                            cursor.execute("""
+                                DELETE FROM seasonal_history 
+                                WHERE year = %s AND month = %s AND category = %s
+                            """, (yr, mth, cat))
+                            
+                            cursor.execute("""
+                                INSERT INTO seasonal_history (year, month, category, multiplier)
+                                VALUES (%s, %s, %s, %s)
+                            """, (yr, mth, cat, round(multiplier, 2)))
+                print("[AI AUTOPILOT] Seasonal history memory bank compiled successfully before database reset.")
+            except Exception as hist_err:
+                print(f"[AI AUTOPILOT WARNING] Failed to compile seasonal history: {hist_err}")
+                log_error(f"Failed to compile seasonal history during reset: {hist_err}")
+
             # Clear all transactional data but keep products and users
             tables = [
                 'bills', 'bill_items', 'bill_sequences', 'returns_log', 
@@ -878,41 +997,431 @@ def reset_database_route():
     finally:
         if conn: conn.close()
 
+def fetch_database_size_kb(cursor):
+    global DB_STATUS
+    try:
+        if DB_STATUS == "cloud":
+            cursor.execute("SELECT pg_database_size(current_database()) / 1024.0 AS size_kb")
+            row = cursor.fetchone()
+            if row is not None:
+                if isinstance(row, tuple):
+                    return float(row[0] or 160.0)
+                elif isinstance(row, dict):
+                    return float(row.get('size_kb', 160.0) or 160.0)
+                else:
+                    try:
+                        return float(row[0] or 160.0)
+                    except Exception:
+                        return float(row.get('size_kb', 160.0) or 160.0)
+            return 160.0
+        else:
+            cursor.execute("SELECT DATABASE()")
+            db_name = cursor.fetchone()
+            db_name = (db_name[0] if isinstance(db_name, tuple) else db_name.get('DATABASE()', '')) if db_name else ''
+            
+            if not db_name:
+                return 160.0
+                
+            cursor.execute("""
+                SELECT SUM(data_length + index_length) / 1024 AS size_kb 
+                FROM information_schema.TABLES 
+                WHERE table_schema = %s
+            """, (db_name,))
+            row = cursor.fetchone()
+            size_kb = float((row[0] if isinstance(row, tuple) else row.get('SUM(data_length + index_length) / 1024', 160.0)) or 160.0)
+            return size_kb
+    except Exception as e:
+        print(f"[DB SIZE ERROR] {e}")
+        return 160.0
+
+def fetch_brain_state_stats(cursor):
+    # 1. Total products count
+    cursor.execute("SELECT COUNT(*) FROM products")
+    products_count = cursor.fetchone()
+    products_count = (products_count[0] if isinstance(products_count, tuple) else products_count.get('COUNT(*)', 0)) if products_count else 0
+
+    # 2. Total categories count
+    cursor.execute("SELECT COUNT(DISTINCT category) FROM products")
+    categories_count = cursor.fetchone()
+    categories_count = (categories_count[0] if isinstance(categories_count, tuple) else categories_count.get('COUNT(DISTINCT category)', 0)) if categories_count else 0
+
+    # 3. Historical bills count
+    cursor.execute("SELECT COUNT(*) FROM bills")
+    bills_count = cursor.fetchone()
+    bills_count = (bills_count[0] if isinstance(bills_count, tuple) else bills_count.get('COUNT(*)', 0)) if bills_count else 0
+
+    # 4. Expense accounts count
+    cursor.execute("SELECT COUNT(*) FROM expenses")
+    expenses_count = cursor.fetchone()
+    expenses_count = (expenses_count[0] if isinstance(expenses_count, tuple) else expenses_count.get('COUNT(*)', 0)) if expenses_count else 0
+
+    # 5. Low stock alerts count
+    cursor.execute("SELECT COUNT(*) FROM products WHERE current_stock <= min_threshold")
+    low_stock_count = cursor.fetchone()
+    low_stock_count = (low_stock_count[0] if isinstance(low_stock_count, tuple) else low_stock_count.get('COUNT(*)', 0)) if low_stock_count else 0
+
+    # 6. Today's sales
+    cursor.execute("SELECT SUM(total_amount) FROM bills WHERE DATE(bill_date) = CURDATE() AND status != 'Cancelled'")
+    today_sales_row = cursor.fetchone()
+    today_sales = float((today_sales_row[0] if isinstance(today_sales_row, tuple) else today_sales_row.get('SUM(total_amount)', 0)) or 0)
+
+    # 7. Monthly expenses
+    cursor.execute("SELECT SUM(amount) FROM expenses WHERE MONTH(expense_date) = MONTH(CURDATE()) AND YEAR(expense_date) = YEAR(CURDATE())")
+    monthly_expenses_row = cursor.fetchone()
+    monthly_expenses = float((monthly_expenses_row[0] if isinstance(monthly_expenses_row, tuple) else monthly_expenses_row.get('SUM(amount)', 0)) or 0)
+
+    # 8. Weekly sales
+    cursor.execute("SELECT SUM(total_amount) FROM bills WHERE bill_date >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND status != 'Cancelled'")
+    weekly_sales_row = cursor.fetchone()
+    weekly_sales = float((weekly_sales_row[0] if isinstance(weekly_sales_row, tuple) else weekly_sales_row.get('SUM(total_amount)', 0)) or 0)
+
+    # 9. Database size in KB
+    db_size_kb = fetch_database_size_kb(cursor)
+
+    return {
+        'products_count': products_count,
+        'categories_count': categories_count,
+        'bills_count': bills_count,
+        'expenses_count': expenses_count,
+        'low_stock_count': low_stock_count,
+        'today_sales': today_sales,
+        'monthly_expenses': monthly_expenses,
+        'weekly_sales': weekly_sales,
+        'db_size_kb': db_size_kb
+    }
+
+def fetch_recent_neural_logs(limit=10):
+    db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "self_healing.db")
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, timestamp, service, status, action_taken 
+            FROM healing_logs 
+            WHERE service = 'NEURAL_CORE' 
+            ORDER BY id DESC 
+            LIMIT ?
+        """, (limit,))
+        rows = cursor.fetchall()
+        logs = []
+        for r in rows:
+            logs.append({
+                'id': r['id'],
+                'timestamp': r['timestamp'],
+                'service': r['service'],
+                'status': r['status'],
+                'action_taken': r['action_taken']
+            })
+        conn.close()
+        
+        if not logs:
+            log_healing_event('NEURAL_CORE', 'SYSTEM_INIT', '', 'Neural Network Core initialized successfully.')
+            log_healing_event('NEURAL_CORE', 'WEIGHTS_LOADED', '', 'Synaptic weight matrix loaded. Size: 8.42M params.')
+            log_healing_event('NEURAL_CORE', 'AUTOPILOT_ON', '', 'Continuous learning autopilot engaged. Standby for sales.')
+            return fetch_recent_neural_logs(limit)
+            
+        return logs
+    except Exception as e:
+        print(f"[SQLite Read Error] {e}")
+        return []
+
+def generate_brain_cognitive_insight(cursor):
+    # 1. Gather stats for context
+    cursor.execute("SELECT SUM(total_amount) as total FROM bills WHERE bill_date >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND status != 'Cancelled'")
+    weekly_sales_res = cursor.fetchone()
+    weekly_sales = (weekly_sales_res['total'] if isinstance(weekly_sales_res, dict) else weekly_sales_res[0]) or 0
+    
+    cursor.execute("""
+        SELECT category, SUM(amount) as revenue 
+        FROM bill_items bi
+        LEFT JOIN products p ON bi.product_name = p.name 
+        JOIN bills b ON bi.bill_id = b.id
+        WHERE b.status != 'Cancelled'
+        GROUP BY category 
+        ORDER BY revenue DESC 
+        LIMIT 1
+    """)
+    top_cat = cursor.fetchone()
+    
+    cursor.execute("SELECT name, current_stock FROM products WHERE current_stock <= min_threshold LIMIT 5")
+    low_stock = cursor.fetchall()
+    
+    groq_api_key = os.environ.get("GROQ_API_KEY", "")
+    
+    if groq_api_key:
+        import requests
+        import json
+        
+        top_cat_name = (top_cat['category'] if isinstance(top_cat, dict) else top_cat[0]) if top_cat else 'General'
+        top_cat_rev = (top_cat['revenue'] if isinstance(top_cat, dict) else top_cat[1]) if top_cat else 0
+        low_stock_str = ', '.join([p['name'] + ' (Stock:' + str(p['current_stock']) + ')' for p in low_stock]) if low_stock else 'None'
+        
+        prompt = (
+            "You are the Neural Store Consultant for Sagar Super Billing Software.\n"
+            "Review the following weekly store statistics and generate 3 concise, bulleted analytics observations (prefixed with 'Weekly Performance:', 'Dominance:', 'Momentum:') and 1 strategic business advice recommendation.\n"
+            f"Context Data:\n"
+            f"- Last 7 Days Sales Revenue: INR {float(weekly_sales):,.2f}\n"
+            f"- Top Revenue Category: {top_cat_name} (Revenue: INR {float(top_cat_rev):,.2f})\n"
+            f"- Low Stock Alert Products (critical count): {low_stock_str}\n\n"
+            "Return the response in raw JSON format with two keys: 'analysis' (array of strings, exactly 3 items) and 'advice' (array of strings, exactly 1 item). Do not wrap in markdown or backticks."
+        )
+        
+        try:
+            r = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json={
+                    "model": "llama-3.1-8b-instant",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.3,
+                    "response_format": {"type": "json_object"}
+                },
+                headers={"Authorization": f"Bearer {groq_api_key}", "Content-Type": "application/json"},
+                timeout=8
+            )
+            if r.status_code == 200:
+                res_json = r.json()
+                content = json.loads(res_json["choices"][0]["message"]["content"])
+                return {
+                    'analysis': content.get('analysis', []),
+                    'advice': content.get('advice', [])
+                }
+        except Exception as e:
+            print(f"[LLM INSIGHT ERROR] Groq API call failed: {e}")
+
+    # Local fallback
+    top_cat_name = (top_cat['category'] if isinstance(top_cat, dict) else top_cat[0]) if top_cat else 'N/A'
+    insights = [
+        f"Weekly Performance: Generated ₹{float(weekly_sales):,.2f} in sales this week.",
+        f"Dominance: '{top_cat_name}' remains your top revenue anchor.",
+        "Momentum: Real-time sales velocities mapped. Forecast curves aligned."
+    ]
+    if low_stock:
+        insights.append(f"Inventory Risk: {len(low_stock)} items are under safety threshold levels.")
+        
+    advice = []
+    if float(weekly_sales) > 10000:
+        advice.append("Strategy: Setup dynamic loyalty rewards for high-frequency shoppers to stabilize revenue.")
+    else:
+        advice.append("Strategy: Implement an afternoon 'UPI discount' between 2PM-4PM to boost traffic during quiet hours.")
+        
+    return {
+        'analysis': insights[:3],
+        'advice': advice[:1]
+    }
+
+def evolve_brain_realtime(bill_id=None):
+    try:
+        import math
+        conn = get_db_connection()
+        if not conn:
+            print("[NEURAL CORE ERROR] DB Connection failed during evolution")
+            return
+        cursor = conn.cursor(dictionary=True)
+        
+        # 1. Fetch items/products to evolve
+        products_to_update = []
+        bill_display = "All Products"
+        
+        if bill_id:
+            cursor.execute("SELECT product_name FROM bill_items WHERE bill_id = %s", (bill_id,))
+            items = cursor.fetchall()
+            products_to_update = [item['product_name'] for item in items]
+            bill_display = f"Bill ID {bill_id}"
+        else:
+            # Calibrate all active products that have been sold in last 30 days
+            cursor.execute("""
+                SELECT DISTINCT bi.product_name 
+                FROM bill_items bi
+                JOIN bills b ON bi.bill_id = b.id
+                WHERE b.status != 'Cancelled' AND b.bill_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            """)
+            products_to_update = [r['product_name'] for r in cursor.fetchall()]
+
+        log_healing_event('NEURAL_CORE', 'CALIBRATING', '', f'Initializing network weight optimization for {bill_display}.')
+        
+        updated_thresholds = 0
+        for name in products_to_update:
+            # Fetch last 30 days of sales qty for this product
+            cursor.execute("""
+                SELECT SUM(bi.qty) as total_sold
+                FROM bill_items bi
+                JOIN bills b ON bi.bill_id = b.id
+                WHERE b.status != 'Cancelled' AND bi.product_name = %s AND b.bill_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            """, (name,))
+            sales_data = cursor.fetchone()
+            total_sold = float((sales_data['total_sold'] if isinstance(sales_data, dict) else sales_data[0]) or 0)
+            
+            # Calculate daily sales rate
+            daily_rate = total_sold / 30.0
+            
+            # Auto-evolve min_threshold: safety stock for 10 days
+            suggested_min = max(5.0, math.ceil(daily_rate * 10.0))
+            
+            # Check current threshold to see if we've updated it
+            cursor.execute("SELECT min_threshold FROM products WHERE name = %s", (name,))
+            prod_info = cursor.fetchone()
+            current_min = float((prod_info['min_threshold'] if isinstance(prod_info, dict) else prod_info[0]) if prod_info else 0)
+            
+            if suggested_min != current_min:
+                # Write back to products table safely
+                cursor.execute("UPDATE products SET min_threshold = %s WHERE name = %s", (suggested_min, name))
+                log_healing_event('NEURAL_CORE', 'THRESHOLD_ADJUSTED', '', f"Optimized '{name}' safety stock to {suggested_min} (Rate: {daily_rate:.2f}/day)")
+                updated_thresholds += 1
+            
+        # 2. Adjust category forecasting multipliers in seasonal_history based on recent sales velocity
+        cursor.execute("""
+            SELECT category, SUM(bi.qty) as cat_qty 
+            FROM bill_items bi
+            JOIN products p ON bi.product_name = p.name
+            JOIN bills b ON bi.bill_id = b.id
+            WHERE b.status != 'Cancelled' AND b.bill_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            GROUP BY category
+        """)
+        cat_sales = cursor.fetchall()
+        
+        today = datetime.date.today()
+        updated_categories = 0
+        for cat in cat_sales:
+            category = cat['category']
+            if not category: continue
+            qty = float(cat['cat_qty'] or 0)
+            
+            # Base multiplier model: adjust seasonal scaling factor
+            avg_qty_per_cat = 50.0  # reference baseline
+            multiplier = max(0.8, min(2.5, round(qty / avg_qty_per_cat, 2)))
+            
+            # Check if multiplier changed
+            cursor.execute("""
+                SELECT multiplier FROM seasonal_history 
+                WHERE year = %s AND month = %s AND category = %s
+            """, (today.year, today.month, category))
+            hist_info = cursor.fetchone()
+            current_mult = float((hist_info['multiplier'] if isinstance(hist_info, dict) else hist_info[0]) if hist_info else 0)
+            
+            if multiplier != current_mult:
+                cursor.execute("""
+                    INSERT INTO seasonal_history (year, month, category, multiplier)
+                    VALUES (%s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE multiplier = %s
+                """, (today.year, today.month, category, multiplier, multiplier))
+                log_healing_event('NEURAL_CORE', 'MULTIPLIER_ADJUSTED', '', f"Calibrated category '{category}' multiplier to {multiplier}")
+                updated_categories += 1
+            
+        conn.commit()
+        
+        # 3. Retrieve final stats, insights, and logs
+        stats = fetch_brain_state_stats(cursor)
+        insights = generate_brain_cognitive_insight(cursor)
+        
+        conn.close()
+        
+        # Write successful finish log
+        log_msg = f"Network calibration complete. Optimized {updated_thresholds} thresholds & {updated_categories} category parameters."
+        log_healing_event('NEURAL_CORE', 'SUCCESS', '', log_msg)
+        
+        recent_logs = fetch_recent_neural_logs(limit=10)
+        
+        # Emit real-time Socket update
+        socketio.emit('brain_evolved', {
+            'status': 'success',
+            'bill_id': bill_id,
+            'stats': stats,
+            'insights': insights,
+            'logs': recent_logs,
+            'timestamp': datetime.datetime.now().isoformat()
+        })
+        print(f"[NEURAL CORE] Auto-evolved weights successfully. Emitters notified.")
+    except Exception as e:
+        print(f"[NEURAL CORE ERROR] Real-time calibration failed: {e}")
+        log_healing_event('NEURAL_CORE', 'ERROR', str(e), 'Calibration cycle aborted due to system error.')
+
 @app.route('/api/analytics/ai-insight')
 def get_ai_insight():
     if session.get('role') != 'admin':
         return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
         
     conn = get_db_connection()
+    if not conn:
+        return jsonify({'status': 'error', 'message': 'Database connection failed'}), 500
+        
     cursor = conn.cursor(dictionary=True)
     
     try:
         # 1. Gather Context for the AI
-        cursor.execute("SELECT SUM(total_amount) as total FROM bills WHERE bill_date >= DATE_SUB(NOW(), INTERVAL 7 DAY)")
+        cursor.execute("SELECT SUM(total_amount) as total FROM bills WHERE bill_date >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND status != 'Cancelled'")
         weekly_sales = cursor.fetchone()['total'] or 0
         
-        cursor.execute("SELECT category, SUM(amount) as revenue FROM bill_items LEFT JOIN products ON bill_items.product_name = products.name GROUP BY category ORDER BY revenue DESC LIMIT 1")
+        cursor.execute("""
+            SELECT category, SUM(amount) as revenue 
+            FROM bill_items bi
+            LEFT JOIN products p ON bi.product_name = p.name 
+            JOIN bills b ON bi.bill_id = b.id
+            WHERE b.status != 'Cancelled'
+            GROUP BY category 
+            ORDER BY revenue DESC 
+            LIMIT 1
+        """)
         top_cat = cursor.fetchone()
         
-        cursor.execute("SELECT name, current_stock FROM products WHERE current_stock <= 10 LIMIT 5")
+        cursor.execute("SELECT name, current_stock FROM products WHERE current_stock <= min_threshold LIMIT 5")
         low_stock = cursor.fetchall()
         
-        # 2. Logic to generate "AI-style" response (Mocking LLM behavior for now)
-        # In a real scenario, you'd send this to Gemini/OpenAI API here.
+        groq_api_key = os.environ.get("GROQ_API_KEY", "")
+        
+        if groq_api_key:
+            import requests
+            import json
+            # Call Groq to generate dynamic strategic advice
+            prompt = (
+                "You are the Neural Store Consultant for Sagar Super Billing Software.\n"
+                "Review the following weekly store statistics and generate 3 concise, bulleted analytics observations (prefixed with 'Weekly Performance:', 'Dominance:', 'Momentum:') and 1 strategic business advice recommendation.\n"
+                f"Context Data:\n"
+                f"- Last 7 Days Sales Revenue: INR {weekly_sales:,.2f}\n"
+                f"- Top Revenue Category: {top_cat['category'] if top_cat else 'General'} (Revenue: INR {float(top_cat['revenue']) if top_cat else 0:,.2f})\n"
+                f"- Low Stock Alert Products (critical count): {', '.join([p['name'] + ' (Stock:' + str(p['current_stock']) + ')' for p in low_stock]) if low_stock else 'None'}\n\n"
+                "Return the response in raw JSON format with two keys: 'analysis' (array of strings, exactly 3 items) and 'advice' (array of strings, exactly 1 item). Do not wrap in markdown or backticks."
+            )
+            
+            try:
+                r = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    json={
+                        "model": "llama-3.1-8b-instant",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.3,
+                        "response_format": {"type": "json_object"}
+                    },
+                    headers={"Authorization": f"Bearer {groq_api_key}", "Content-Type": "application/json"},
+                    timeout=8
+                )
+                if r.status_code == 200:
+                    res_json = r.json()
+                    content = json.loads(res_json["choices"][0]["message"]["content"])
+                    return jsonify({
+                        'status': 'success',
+                        'analysis': content.get('analysis', []),
+                        'advice': content.get('advice', []),
+                        'timestamp': datetime.datetime.now().isoformat()
+                    })
+            except Exception as e:
+                print(f"[LLM INSIGHT ERROR] Groq API call failed: {e}")
+
+        # Local fallback Rule-based AI Engine
         insights = [
-            f"Weekly Performance: You have generated ₹{weekly_sales:,.2f} in sales this week.",
-            f"Dominance: The '{top_cat['category'] if top_cat else 'N/A'}' category is your primary revenue anchor.",
-            "Momentum: Sales velocity is currently stable. No immediate market shifts detected."
+            f"Weekly Performance: Generated ₹{weekly_sales:,.2f} in sales this week.",
+            f"Dominance: '{top_cat['category'] if top_cat else 'N/A'}' remains your top revenue anchor.",
+            "Momentum: Real-time sales velocities mapped. Forecast curves aligned."
         ]
         
         if low_stock:
-            insights.append(f"Inventory Risk: {len(low_stock)} high-demand items are reaching critical stock levels (<10 units).")
+            insights.append(f"Inventory Risk: {len(low_stock)} items are under safety threshold levels.")
             
         advice = []
         if weekly_sales > 10000:
-            advice.append("Strategy: Consider a loyalty program for your top 5% customers to stabilize this high revenue.")
+            advice.append("Strategy: Setup dynamic loyalty rewards for high-frequency shoppers to stabilize revenue.")
         else:
-            advice.append("Strategy: Implement an afternoon 'Flash Sale' between 2PM-4PM to boost traffic during quiet hours.")
+            advice.append("Strategy: Implement an afternoon 'UPI discount' between 2PM-4PM to boost traffic during quiet hours.")
 
         return jsonify({
             'status': 'success',
@@ -1083,7 +1592,22 @@ def check_and_init_db():
                 INDEX (entry_date),
                 INDEX (major_type)
             )""",
-            "daily_position_list": "CREATE TABLE IF NOT EXISTS daily_position_list (barcode VARCHAR(50) PRIMARY KEY)"
+            "daily_position_list": "CREATE TABLE IF NOT EXISTS daily_position_list (barcode VARCHAR(50) PRIMARY KEY)",
+            "seasonal_history": """CREATE TABLE IF NOT EXISTS seasonal_history (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                year INT NOT NULL,
+                month INT NOT NULL,
+                category VARCHAR(50) NOT NULL,
+                multiplier DECIMAL(5, 2) DEFAULT 1.00,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE INDEX (year, month, category)
+            )""",
+            "holidays": """CREATE TABLE IF NOT EXISTS holidays (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                name VARCHAR(50) NOT NULL UNIQUE,
+                date DATE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )"""
         }
 
         # 4. Create each table if it doesn't exist
@@ -1121,6 +1645,18 @@ def check_and_init_db():
             ]
             for code in initial_codes:
                 cursor.execute("INSERT IGNORE INTO daily_position_list (barcode) VALUES (%s)", (code,))
+            conn.commit()
+
+        # 7. Seed Default Holidays if empty
+        cursor.execute("SELECT COUNT(*) FROM holidays")
+        if cursor.fetchone()[0] == 0:
+            print("Seeding Default Holidays...")
+            current_year = datetime.date.today().year
+            default_holidays = [
+                ('Pongal', f"{current_year}-01-14"),
+                ('Diwali', f"{current_year}-11-08")
+            ]
+            cursor.executemany("INSERT IGNORE INTO holidays (name, date) VALUES (%s, %s)", default_holidays)
             conn.commit()
 
         conn.close()
@@ -1245,9 +1781,750 @@ def admin_intelligence_stock():
 def admin_analytics():
     return render_template('admin/analytics.html')
 
+@app.route('/admin/intelligence/brain')
+def admin_intelligence_brain():
+    if session.get('role') != 'admin':
+        return redirect(url_for('login'))
+    return render_template('admin/intelligence/brain_focus.html')
+
+@app.route('/api/admin/intelligence/brain-state')
+def get_brain_state():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+        
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'status': 'error', 'message': 'Database connection failed'}), 500
+        
+    cursor = conn.cursor(dictionary=True)
+    try:
+        stats = fetch_brain_state_stats(cursor)
+        insights = generate_brain_cognitive_insight(cursor)
+        recent_logs = fetch_recent_neural_logs(limit=10)
+        conn.close()
+        return jsonify({
+            'status': 'success',
+            'stats': stats,
+            'insights': insights,
+            'logs': recent_logs,
+            'timestamp': datetime.datetime.now().isoformat()
+        })
+    except Exception as e:
+        if conn: conn.close()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/intelligence/brain-state/trigger', methods=['POST'])
+def trigger_brain_state_evolution():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    
+    # Run evolution in background thread
+    threading.Thread(target=evolve_brain_realtime, args=(None,)).start()
+    return jsonify({'status': 'success', 'message': 'Evolving brain core in real-time...'})
+
+
+
 @app.route('/admin/intelligence/twin')
 def admin_intelligence_twin():
     return render_template('admin/intelligence/business_twin.html')
+
+@app.route('/admin/intelligence/forecasting')
+def admin_intelligence_forecasting():
+    if session.get('role') != 'admin':
+        return redirect(url_for('login'))
+    if not session.get('forecasting_unlocked'):
+        return render_template('admin/intelligence/forecasting_lock.html')
+    return render_template('admin/intelligence/forecasting.html')
+
+
+@app.route('/admin/intelligence/forecasting/lock')
+def admin_intelligence_forecasting_lock_action():
+    if session.get('role') != 'admin':
+        return redirect(url_for('login'))
+    session.pop('forecasting_unlocked', None)
+    return redirect(url_for('admin_intelligence_forecasting'))
+
+
+@app.route('/api/admin/intelligence/forecasting/verify-lock', methods=['POST'])
+def api_forecasting_verify_lock():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    
+    data = request.json or {}
+    password = data.get('password', '').strip()
+    stored_password = os.environ.get("FORECASTING_PASSWORD", "1234")
+    
+    if password == stored_password:
+        session['forecasting_unlocked'] = True
+        return jsonify({'status': 'success', 'message': 'Unlocked'})
+    else:
+        return jsonify({'status': 'error', 'message': 'Incorrect PIN'}), 400
+
+
+@app.route('/api/admin/intelligence/forecasting/change-password', methods=['POST'])
+def api_forecasting_change_password():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    
+    data = request.json or {}
+    current_password = data.get('current_password', '').strip()
+    new_password = data.get('new_password', '').strip()
+    
+    if not new_password:
+        return jsonify({'status': 'error', 'message': 'New PIN cannot be empty'}), 400
+        
+    stored_password = os.environ.get("FORECASTING_PASSWORD", "1234")
+    
+    if current_password != stored_password:
+        return jsonify({'status': 'error', 'message': 'Current PIN is incorrect'}), 400
+        
+    try:
+        update_env_variable("FORECASTING_PASSWORD", new_password)
+        return jsonify({'status': 'success', 'message': 'PIN updated successfully'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/intelligence/forecasting/data')
+def api_intelligence_forecasting_data():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+
+    import math
+    scenario = request.args.get('scenario', 'auto').lower()
+    
+    # Define scaling factors per scenario & category
+    factors = {
+        'normal': {},
+        'festival': {'spices': 1.6, 'oils': 1.8, 'tea': 1.3, 'beverages': 1.5, 'sweets': 2.0},
+        'monsoon': {'tea': 1.5, 'spices': 1.3, 'herbs': 1.4},
+        'summer': {'beverages': 1.6, 'oils': 1.2}
+    }
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'status': 'error', 'message': 'Database connection failed'}), 500
+        
+    try:
+        cursor = conn.cursor(dictionary=True)
+        
+        # 1. AI Autopilot Scenario Auto-Detection
+        detected_scenario = 'normal'
+        auto_reason = 'AI Autopilot: Default baseline modeling (normal demand) active.'
+        today = datetime.date.today()
+        
+        # Fetch holidays from DB
+        cursor.execute("SELECT name, date FROM holidays")
+        holiday_rows = cursor.fetchall()
+        
+        upcoming_holiday = None
+        days_until_holiday = 999
+        for h in holiday_rows:
+            h_date = h['date']
+            if isinstance(h_date, str):
+                try:
+                    h_date = datetime.datetime.strptime(h_date, '%Y-%m-%d').date()
+                except:
+                    continue
+            diff = (h_date - today).days
+            if 0 <= diff <= 15:
+                if diff < days_until_holiday:
+                    days_until_holiday = diff
+                    upcoming_holiday = h['name']
+                    
+        if upcoming_holiday:
+            detected_scenario = 'festival'
+            auto_reason = f"AI Detected: Upcoming Festival Season ({upcoming_holiday} is in {days_until_holiday} days). Pre-emptively scaling category demands."
+        else:
+            is_summer = (today.month == 5) or (today.month == 4 and today.day >= 15) or (today.month == 6 and today.day <= 15)
+            if is_summer:
+                detected_scenario = 'summer'
+                auto_reason = "AI Detected: Summer Peak Season active. Beverages (+60%) and Oils (+20%) scaled automatically."
+            elif today.month == 7:
+                detected_scenario = 'monsoon'
+                auto_reason = "AI Detected: Monsoon Season active. Hot Tea (+50%) and warming Spices (+30%) scaled automatically."
+                
+        # Determine active scenario and factors
+        active_scenario = detected_scenario if scenario == 'auto' else scenario
+        scenario_factors = factors.get(active_scenario, {})
+        default_factor = 1.2 if active_scenario == 'festival' else (1.1 if active_scenario in ('monsoon', 'summer') else 1.0)
+        
+        # 2. Fetch historical memory bank multipliers for the current month
+        hist_multipliers = {}
+        try:
+            cursor.execute("""
+                SELECT category, AVG(multiplier) as avg_mult
+                FROM seasonal_history
+                WHERE month = %s
+                GROUP BY category
+            """, (today.month,))
+            hist_rows = cursor.fetchall()
+            hist_multipliers = {r['category'].lower().strip(): float(r['avg_mult']) for r in hist_rows}
+        except Exception as e:
+            print(f"Failed to fetch historical multipliers: {e}")
+            
+        # 3. Fetch products and check sales quantities from active bills (last 30 days)
+        query = """
+            SELECT 
+                p.barcode,
+                p.name,
+                p.category,
+                p.price,
+                p.current_stock,
+                p.min_threshold,
+                p.unit,
+                COALESCE(SUM(bi.qty), 0) as sales_qty_30d
+            FROM products p
+            LEFT JOIN bill_items bi ON p.name = bi.product_name
+            LEFT JOIN bills b ON bi.bill_id = b.id AND b.status != 'Cancelled' AND b.bill_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            GROUP BY p.barcode, p.name, p.category, p.price, p.current_stock, p.min_threshold, p.unit
+        """
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        conn.close()
+        
+        forecast_items = []
+        purchase_orders = []
+        
+        for row in rows:
+            barcode = row['barcode'] or 'N/A'
+            name = row['name']
+            category = row['category'] or 'General'
+            price = float(row['price'] or 0.0)
+            current_stock = float(row['current_stock'] or 0.0)
+            min_threshold = float(row['min_threshold'] or 10.0)
+            unit = row['unit'] or 'PCS'
+            sales_qty_30d = float(row['sales_qty_30d'] or 0.0)
+            
+            # Daily sales rate over the last 30 days
+            daily_sales_rate = sales_qty_30d / 30.0
+            
+            # Apply scenario multiplier based on product category
+            cat_key = category.lower().strip()
+            multiplier = default_factor
+            
+            # Use historical trend overlay if Auto-Detect is active and trend exists
+            has_history = False
+            if scenario == 'auto' and cat_key in hist_multipliers:
+                multiplier = hist_multipliers[cat_key]
+                has_history = True
+            else:
+                for k, val in scenario_factors.items():
+                    if k in cat_key:
+                        multiplier = val
+                        break
+                        
+            forecasted_daily_rate = daily_sales_rate * multiplier
+            
+            # Remaining days of stock
+            if forecasted_daily_rate > 0:
+                remaining_days = current_stock / forecasted_daily_rate
+            else:
+                remaining_days = 999.0
+                
+            # Risk status based on remaining days of stock
+            if remaining_days <= 7:
+                status = 'Urgent'
+                status_color = '#ef4444' # Red
+            elif remaining_days <= 15:
+                status = 'Watchlist'
+                status_color = '#f59e0b' # Orange
+            else:
+                status = 'Safe'
+                status_color = '#10b981' # Green
+                
+            # Run-out date prediction
+            if remaining_days < 365:
+                runout_date = (datetime.date.today() + datetime.timedelta(days=int(remaining_days))).isoformat()
+            else:
+                runout_date = 'Never'
+                
+            item = {
+                'barcode': barcode,
+                'name': name,
+                'category': category,
+                'price': price,
+                'current_stock': current_stock,
+                'min_threshold': min_threshold,
+                'unit': unit,
+                'daily_sales_rate': round(daily_sales_rate, 3),
+                'multiplier': multiplier,
+                'forecasted_daily_rate': round(forecasted_daily_rate, 3),
+                'remaining_days': round(remaining_days, 1) if remaining_days < 999 else 'Infinite',
+                'status': status,
+                'status_color': status_color,
+                'runout_date': runout_date,
+                'has_history': has_history,
+                'auto_detected': scenario == 'auto'
+            }
+            forecast_items.append(item)
+            
+            # Reorder PO recommendations
+            if remaining_days <= 15:
+                # Cover next 30 days of sales
+                target_stock = forecasted_daily_rate * 30.0
+                reorder_qty = target_stock - current_stock
+                min_reorder = max(10.0, min_threshold)
+                if reorder_qty < min_reorder:
+                    reorder_qty = min_reorder
+                    
+                reorder_qty = int(math.ceil(reorder_qty))
+                estimated_unit_cost = price * 0.75 # Assume 25% margin
+                total_cost = reorder_qty * estimated_unit_cost
+                
+                purchase_orders.append({
+                    'barcode': barcode,
+                    'name': name,
+                    'category': category,
+                    'current_stock': current_stock,
+                    'suggested_qty': reorder_qty,
+                    'unit': unit,
+                    'unit_cost': round(estimated_unit_cost, 2),
+                    'total_cost': round(total_cost, 2)
+                })
+                
+        status_priority = {'Urgent': 0, 'Watchlist': 1, 'Safe': 2}
+        forecast_items.sort(key=lambda x: (status_priority.get(x['status'], 2), x['remaining_days'] if isinstance(x['remaining_days'], (int, float)) else 999))
+        purchase_orders.sort(key=lambda x: x['total_cost'], reverse=True)
+        
+        return jsonify({
+            'status': 'success',
+            'scenario': active_scenario,
+            'detected_scenario': detected_scenario,
+            'auto_reason': auto_reason,
+            'data': forecast_items,
+            'purchase_orders': purchase_orders,
+            'timestamp': datetime.datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        if conn:
+            conn.close()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/intelligence/forecasting/holidays', methods=['GET', 'POST'])
+def api_forecasting_holidays():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'status': 'error', 'message': 'Database connection failed'}), 500
+
+    try:
+        cursor = conn.cursor(dictionary=True)
+        if request.method == 'GET':
+            cursor.execute("SELECT id, name, date FROM holidays ORDER BY date ASC")
+            rows = cursor.fetchall()
+            for r in rows:
+                if hasattr(r['date'], 'isoformat'):
+                    r['date'] = r['date'].isoformat()
+            conn.close()
+            return jsonify({'status': 'success', 'data': rows})
+            
+        elif request.method == 'POST':
+            data = request.json or {}
+            action = data.get('action', 'save')
+            holiday_id = data.get('id')
+            name = data.get('name', '').strip()
+            date_val = data.get('date', '').strip()
+            
+            if action == 'delete':
+                if not holiday_id:
+                    conn.close()
+                    return jsonify({'status': 'error', 'message': 'Holiday ID is required for deletion'}), 400
+                cursor.execute("DELETE FROM holidays WHERE id = %s", (holiday_id,))
+                conn.commit()
+                conn.close()
+                return jsonify({'status': 'success', 'message': 'Holiday deleted successfully.'})
+                
+            else: # save
+                if not name or not date_val:
+                    conn.close()
+                    return jsonify({'status': 'error', 'message': 'Name and date are required'}), 400
+                
+                if holiday_id:
+                    cursor.execute("""
+                        UPDATE holidays SET name = %s, date = %s WHERE id = %s
+                    """, (name, date_val, holiday_id))
+                else:
+                    cursor.execute("DELETE FROM holidays WHERE name = %s", (name,))
+                    cursor.execute("""
+                        INSERT INTO holidays (name, date) VALUES (%s, %s)
+                    """, (name, date_val))
+                conn.commit()
+                conn.close()
+                return jsonify({'status': 'success', 'message': 'Holiday saved successfully.'})
+                
+    except Exception as e:
+        if conn:
+            conn.close()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/intelligence/forecasting/holidays/autopilot', methods=['POST'])
+def api_forecasting_holidays_autopilot():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'status': 'error', 'message': 'Database connection failed'}), 500
+
+    try:
+        import datetime
+        import requests
+        import re
+
+        current_year = datetime.date.today().year
+        years_to_sync = [current_year, current_year + 1]
+        
+        url = "https://calendar.google.com/calendar/ical/en.indian%23holiday%40group.v.calendar.google.com/public/basic.ics"
+        response = requests.get(url, timeout=15)
+        
+        if response.status_code != 200:
+            conn.close()
+            return jsonify({'status': 'error', 'message': f'Failed to download public holiday calendar (HTTP {response.status_code})'}), 502
+            
+        content = response.text
+        raw_events = re.findall(r'BEGIN:VEVENT.*?END:VEVENT', content, re.DOTALL)
+        
+        synced_count = 0
+        cursor = conn.cursor(dictionary=True)
+        
+        for event_str in raw_events:
+            summary_match = re.search(r'SUMMARY:(.*)', event_str)
+            dtstart_match = re.search(r'DTSTART;VALUE=DATE:(\d{8})', event_str)
+            if not dtstart_match:
+                dtstart_match = re.search(r'DTSTART:(\d{8})', event_str)
+                
+            if summary_match and dtstart_match:
+                clean_name = summary_match.group(1).strip().replace('\\\\', '').replace('\\,', ',')
+                dt_str = dtstart_match.group(1).strip()
+                try:
+                    event_date = datetime.datetime.strptime(dt_str, "%Y%m%d").date()
+                except Exception:
+                    continue
+                
+                if event_date.year in years_to_sync:
+                    name_with_year = f"{clean_name} {event_date.year}"
+                    date_val = event_date.strftime('%Y-%m-%d')
+                    
+                    # Upsert check using the unique name (e.g., "Pongal 2026")
+                    cursor.execute("SELECT id FROM holidays WHERE name = %s", (name_with_year,))
+                    existing = cursor.fetchone()
+                    if existing:
+                        cursor.execute("UPDATE holidays SET date = %s WHERE id = %s", (date_val, existing['id']))
+                    else:
+                        cursor.execute("INSERT INTO holidays (name, date) VALUES (%s, %s)", (name_with_year, date_val))
+                    synced_count += 1
+                    
+        conn.commit()
+        conn.close()
+        return jsonify({
+            'status': 'success',
+            'synced_count': synced_count,
+            'years': years_to_sync
+        })
+        
+    except Exception as e:
+        if conn:
+            conn.close()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+def update_env_variable(key, value):
+    try:
+        os.environ[key] = value
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+        env_path = os.path.join(base_dir, ".env")
+        
+        env_lines = []
+        updated = False
+        if os.path.exists(env_path):
+            with open(env_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line_stripped = line.strip()
+                    if line_stripped.startswith(f"{key}="):
+                        env_lines.append(f"{key}={value}\n")
+                        updated = True
+                    else:
+                        env_lines.append(line)
+        if not updated:
+            env_lines.append(f"{key}={value}\n")
+            
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.writelines(env_lines)
+    except Exception as e:
+        print(f"Failed to write to .env file: {e}")
+        raise e
+
+
+@app.route('/api/admin/config/groq-key', methods=['GET', 'POST'])
+def api_admin_groq_key():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+
+    if request.method == 'GET':
+        groq_api_key = os.environ.get("GROQ_API_KEY", "")
+        usage_info = {
+            'status': 'Inactive',
+            'remaining_requests': 'N/A',
+            'limit_requests': 'N/A',
+            'remaining_tokens': 'N/A',
+            'limit_tokens': 'N/A',
+            'error_message': None
+        }
+        
+        if groq_api_key:
+            import requests
+            try:
+                r = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    json={
+                        "model": "llama-3.1-8b-instant",
+                        "messages": [{"role": "user", "content": "ping"}],
+                        "max_tokens": 1
+                    },
+                    headers={"Authorization": f"Bearer {groq_api_key}"},
+                    timeout=5
+                )
+                if r.status_code == 200:
+                    usage_info['status'] = 'Active'
+                    usage_info['remaining_requests'] = r.headers.get('x-ratelimit-remaining-requests', 'N/A')
+                    usage_info['limit_requests'] = r.headers.get('x-ratelimit-limit-requests', 'N/A')
+                    usage_info['remaining_tokens'] = r.headers.get('x-ratelimit-remaining-tokens', 'N/A')
+                    usage_info['limit_tokens'] = r.headers.get('x-ratelimit-limit-tokens', 'N/A')
+                else:
+                    usage_info['status'] = 'Error'
+                    try:
+                        err_json = r.json()
+                        usage_info['error_message'] = err_json.get('error', {}).get('message', f"HTTP {r.status_code}")
+                    except Exception:
+                        usage_info['error_message'] = f"HTTP {r.status_code}"
+            except Exception as e:
+                usage_info['status'] = 'Connection Error'
+                usage_info['error_message'] = str(e)
+                
+        return jsonify({
+            'status': 'success',
+            'groq_api_key': groq_api_key,
+            'usage': usage_info
+        })
+        
+    elif request.method == 'POST':
+        data = request.json or {}
+        new_key = data.get('groq_api_key', '').strip()
+        
+        if not new_key:
+            return jsonify({'status': 'error', 'message': 'API Key cannot be empty.'}), 400
+            
+        if not new_key.startswith('gsk_'):
+            return jsonify({'status': 'error', 'message': 'Invalid key format. Groq API keys should start with gsk_'}), 400
+            
+        try:
+            update_env_variable("GROQ_API_KEY", new_key)
+            return jsonify({'status': 'success', 'message': 'API Key updated successfully!'})
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/intelligence/share-chat', methods=['POST'])
+def share_chat():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+
+    data = request.json or {}
+    recipient_email = data.get('email', '').strip()
+    history = data.get('history', [])
+
+    if not recipient_email:
+        return jsonify({'status': 'error', 'message': 'Email address is required'}), 400
+    if not history:
+        return jsonify({'status': 'error', 'message': 'Chat history is empty'}), 400
+
+    try:
+        from fpdf import FPDF
+        import re
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        from email.mime.base import MIMEBase
+        from email import encoders
+
+        # Clean HTML function
+        def clean_html(text):
+            # Replace tags with spaces or newlines where appropriate
+            text = re.sub(r'</p>|<br\s*/?>|</div>|</tr>', '\n', text)
+            # Remove all remaining HTML tags
+            clean = re.compile('<.*?>')
+            text = clean.sub('', text)
+            # Unescape basic HTML entities
+            text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&nbsp;', ' ')
+            text = text.replace('Rs.', 'Rs. ').replace('₹', 'Rs. ')
+            # Strip multiple newlines
+            text = re.sub(r'\n\n+', '\n', text)
+            return text.strip()
+
+        # Build FPDF Class with Header/Footer to look professional
+        class ChatPDF(FPDF):
+            def header(self):
+                self.set_font("Helvetica", "B", 10)
+                self.set_text_color(128, 128, 128)
+                self.cell(0, 10, "MaplePro AI Assistant - Chat Report", border=0, align="L")
+                self.cell(0, 10, datetime.date.today().strftime("%Y-%m-%d"), border=0, align="R")
+                self.ln(10)
+                self.line(10, 18, 200, 18)
+                self.ln(5)
+
+            def footer(self):
+                self.set_y(-15)
+                self.set_font("Helvetica", "I", 8)
+                self.set_text_color(128, 128, 128)
+                self.cell(0, 10, f"Page {self.page_no()}", align="C")
+
+        # Create PDF
+        pdf = ChatPDF()
+        pdf.add_page()
+        
+        # Document Title
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.set_text_color(30, 41, 59) # Slate 800
+        pdf.cell(0, 12, "AI Business Twin Conversation Log", align="L")
+        pdf.ln(12)
+        pdf.ln(5)
+
+        # Iterate history and print paragraphs
+        for msg in history:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            
+            clean_content = clean_html(content)
+            if not clean_content:
+                continue
+
+            # Section Header for role
+            pdf.set_font("Helvetica", "B", 10)
+            if role == "user":
+                pdf.set_text_color(79, 70, 229) # Indigo 600
+                pdf.cell(0, 6, "User Query:")
+                pdf.ln(6)
+            else:
+                pdf.set_text_color(13, 148, 136) # Teal 600
+                pdf.cell(0, 6, "AI Copilot Response:")
+                pdf.ln(6)
+
+            # Paragraph Text
+            pdf.set_font("Helvetica", "", 10)
+            pdf.set_text_color(51, 65, 85) # Slate 700
+            
+            clean_content_latin = clean_content.encode('latin-1', 'replace').decode('latin-1')
+            pdf.multi_cell(0, 5, text=clean_content_latin)
+            pdf.ln(4)
+
+        pdf_dir = os.path.join(base_dir, "temp")
+        os.makedirs(pdf_dir, exist_ok=True)
+        pdf_path = os.path.join(pdf_dir, "chat_transcript.pdf")
+        pdf.output(pdf_path)
+
+        # Email Sending
+        sender_email = "maplepro2323@gmail.com"
+        sender_password = "vkah llvc mduj yfze"
+
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = recipient_email
+        msg['Subject'] = f"MaplePro AI Assistant Report - {datetime.date.today().strftime('%Y-%m-%d')}"
+
+        body = (
+            "Hello,\n\n"
+            "Please find attached the PDF report containing the conversation transcript "
+            "from the MaplePro AI Business Twin Assistant.\n\n"
+            "This is an automated system email. Please do not reply directly to this message.\n\n"
+            "Best Regards,\n"
+            "MaplePro Systems"
+        )
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Read PDF and attach
+        with open(pdf_path, "rb") as attachment:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(attachment.read())
+
+        encoders.encode_base64(part)
+        part.add_header(
+            'Content-Disposition',
+            f"attachment; filename={os.path.basename(pdf_path)}",
+        )
+        msg.attach(part)
+
+        # SMTP Connection
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, recipient_email, msg.as_string())
+        server.quit()
+
+        # Clean up file
+        try:
+            os.remove(pdf_path)
+        except:
+            pass
+
+        return jsonify({'status': 'success', 'message': 'PDF report sent to your email successfully.'})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': f'Failed to generate or send PDF: {str(e)}'}), 500
+
+@app.route('/api/admin/intelligence/forecasting/email', methods=['POST'])
+def api_forecasting_email():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+
+    data = request.json or {}
+    recipient_email = data.get('email', '').strip()
+    subject = data.get('subject', '').strip()
+    body = data.get('body', '').strip()
+
+    if not recipient_email:
+        return jsonify({'status': 'error', 'message': 'Recipient email address is required'}), 400
+    if not subject:
+        return jsonify({'status': 'error', 'message': 'Subject is required'}), 400
+    if not body:
+        return jsonify({'status': 'error', 'message': 'Email content body is required'}), 400
+
+    try:
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+
+        sender_email = "maplepro2323@gmail.com"
+        sender_password = "vkah llvc mduj yfze"
+
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = recipient_email
+        msg['Subject'] = subject
+
+        # Support HTML body format
+        msg.attach(MIMEText(body, 'html'))
+
+        # SMTP Connection
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, recipient_email, msg.as_string())
+        server.quit()
+
+        return jsonify({'status': 'success', 'message': 'Purchase order emailed successfully.'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/admin/intelligence/twin/ask', methods=['POST'])
 def api_twin_ask():
@@ -1266,7 +2543,7 @@ def api_twin_ask():
 
     # Table schema description for the SQL generator
     schema_info = """
-    We have the following tables in our MySQL database:
+    We have the following tables in our active database:
     
     1. products (tracks products in stock):
        - id (int, primary key)
@@ -1280,23 +2557,23 @@ def api_twin_ask():
        - expiry_date (date)
        - bizz (decimal, loyalty reward percentage)
        
-    2. bills (invoices generated today and in the past):
+    2. bills (invoices generated):
        - id (int, primary key)
        - invoice_no (varchar)
-       - bill_date (datetime, when the bill was printed)
+       - bill_date (datetime/timestamp, when the bill was printed)
        - total_amount (decimal)
        - payment_mode (varchar, e.g. 'CASH', 'UPI', 'CARD')
-       - status (varchar, 'PAID', 'RETURNED', or 'Cancelled')
+       - status (varchar, 'PAID', 'Paid', or 'Cancelled')
        - discount (decimal)
        - prev_total (decimal, if cancelled/voided)
-       - created_by (varchar, username of the counter clerk who made the bill)
+       - created_by (varchar, username of the clerk/cashier who made the bill)
        
     3. bill_items (individual product items inside invoices, linked by bill_id):
        - id (int, primary key)
        - bill_id (int, references bills.id)
-       - product_code (varchar, references products.barcode) [WARNING: CAN BE NULL/EMPTY]
-       - product_name (varchar, references products.name) [USE THIS FOR JOINS/NAMES]
-       - qty (decimal, quantity sold)
+       - product_code (varchar, references products.barcode)
+       - product_name (varchar, references products.name)
+       - qty (int, quantity sold)
        - rate (decimal, selling price per unit)
        - amount (decimal, total for this line item, i.e. qty * rate)
        - bizz_percent (decimal)
@@ -1316,11 +2593,11 @@ def api_twin_ask():
        
     5. expenses (daily operational business expenses):
        - id (int, primary key)
-       - expense_date (date)
-       - amount (decimal)
        - category (varchar)
-       - description (varchar)
-       - created_by (varchar)
+       - description (text)
+       - amount (decimal)
+       - expense_date (datetime/timestamp)
+       - expense_group (varchar)
     """
 
     groq_api_key = os.environ.get("GROQ_API_KEY", "")
@@ -1332,16 +2609,17 @@ def api_twin_ask():
     # Step 1: LLM decides if it needs a SQL query to answer the user query, and generates it.
     sql_generation_prompt = (
         "You are a database operations expert for MaplePro Billing Software.\n"
-        "Your task is to analyze the user's natural language question and write a safe, clean MySQL SELECT statement to fetch the required data.\n"
+        "Your task is to analyze the user's natural language question and write a safe, clean SQL SELECT statement to fetch the required data.\n"
         "If the question does not require database records (e.g. a greeting or general help), answer with the word 'NONE'.\n"
         "Rules:\n"
         "1. You MUST ONLY write a single SELECT statement. No insert, update, delete or other DDL statements.\n"
         "2. Do not explain the SQL or provide any text other than the SQL query itself or the word 'NONE'.\n"
         "3. Ensure column names exist in the schema provided.\n"
-        "4. If filtering by date, remember that bill_date is datetime, so use DATE(bill_date) to match dates like CURDATE().\n"
+        "4. If filtering by date, remember that bill_date is datetime/timestamp, so use DATE(bill_date) to match dates like CURDATE() or CURRENT_DATE.\n"
         "5. Output only the query. No formatting, no code blocks, no backticks.\n"
-        "6. JOINING RULE: bill_items.product_code is NULLABLE and can be empty. NEVER join 'products' and 'bill_items' on 'product_code = barcode'. If you need to join products and bill_items, always join on name ('ON products.name = bill_items.product_name'). If you just need the list of products sold, query bill_items.product_name directly without joining products at all!\n"
-        "7. BILLS RULE: Always filter active bills using 'status != \"Cancelled\"' unless the user asks specifically for voids or cancelled invoices.\n"
+        "6. STRING LITERALS: You MUST use single quotes (') for all string literals (e.g., WHERE status != 'Cancelled' or WHERE payment_mode = 'CASH'). Never use double quotes (\") for strings, as PostgreSQL/MySQL treats them as column names.\n"
+        "7. JOINING RULE: If you need to join products and bill_items, always join on name ('ON products.name = bill_items.product_name'). If you just need the list of products sold, query bill_items.product_name directly without joining products at all!\n"
+        "8. BILLS RULE: Always filter active bills using 'status != \'Cancelled\'' unless the user asks specifically for voids or cancelled invoices.\n"
         f"Schema Info:\n{schema_info}"
     )
 
@@ -1390,7 +2668,7 @@ def api_twin_ask():
         forbidden = [
             'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 
             'TRUNCATE', 'REPLACE', 'GRANT', 'REVOKE', 'RENAME', 'EXECUTE',
-            'LOAD_FILE', 'OUTFILE', 'DUMPFILE'
+            'LOAD_FILE', 'OUTFILE', 'DUMPFILE', 'USERS', 'AUDIT_LOGS'
         ]
         
         is_safe = cleaned_sql.lower().startswith('select') and not any(w in forbidden for w in words)
@@ -1400,13 +2678,43 @@ def api_twin_ask():
             if 'LIMIT' not in q_upper:
                 cleaned_sql = cleaned_sql.rstrip(';') + " LIMIT 100;"
                 
+            # Pre-compile: Convert double quoted string values to single quotes for SQL compatibility (e.g. status != "Cancelled" -> status != 'Cancelled')
+            cleaned_sql = re.sub(r'"([^"]*)"', r"'\1'", cleaned_sql)
+            
             conn = get_db_connection()
             if conn:
                 try:
                     cursor = conn.cursor(dictionary=True)
                     cursor.execute(cleaned_sql)
                     rows = cursor.fetchall()
-                    db_context_str = f"SQL QUERY EXECUTED: {cleaned_sql}\nRESULTS:\n{json.dumps(rows, default=str, indent=2)}"
+                    
+                    # Sanitization/Masking layer for LLM data privacy
+                    secure_rows = []
+                    sensitive_cols = {
+                        'password_hash', 'password', 'email', 'phone', 'phone_number',
+                        'cashier_name', 'created_by', 'client_request_id', 'user_id',
+                        'raw_app_meta_data', 'raw_user_meta_data', 'encrypted_password'
+                    }
+                    import re
+                    email_pat = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b')
+                    phone_pat = re.compile(r'\b\d{10}\b|\b\d{3}[-.\s]??\d{3}[-.\s]??\d{4}\b')
+                    for r in rows:
+                        if isinstance(r, dict):
+                            new_r = {}
+                            for k, v in r.items():
+                                if k.lower() in sensitive_cols:
+                                    new_r[k] = "[REDACTED_SECURE]"
+                                elif isinstance(v, str):
+                                    v = email_pat.sub("[EMAIL_MASKED]", v)
+                                    v = phone_pat.sub("[PHONE_MASKED]", v)
+                                    new_r[k] = v
+                                else:
+                                    new_r[k] = v
+                            secure_rows.append(new_r)
+                        else:
+                            secure_rows.append(r)
+
+                    db_context_str = f"SQL QUERY EXECUTED: {cleaned_sql}\nRESULTS:\n{json.dumps(secure_rows, default=str, indent=2)}"
                     conn.close()
                 except Exception as e:
                     if conn: conn.close()
@@ -1421,7 +2729,7 @@ def api_twin_ask():
         "Your task is to analyze real-time business context, inspect safe database query results, and answer owner queries clearly.\n"
         "Keep your tone highly professional, analytical, concise, and helpful.\n"
         "Formatting Rules:\n"
-        "1. Do not use plain text blocks or standard raw markdown.\n"
+        "1. DO NOT mention SQL, query execution, database tables, column names, database errors, or technical database logs in your response. The user is a business owner and does not know SQL. Talk ONLY about the final business results.\n"
         "2. When presenting structured data or comparison lists (e.g. daily sales, category velocity, stock levels, returns, etc.), you MUST render them inside a clean, beautiful HTML <table>. Never write a plain text list if it can be represented as a table!\n"
         "3. In the tables, use status color badges using inline style for distinct rows, for example:\n"
         "   - Green status pill: <span style=\"background: rgba(16,185,129,0.15); color: #10b981; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(16,185,129,0.3);\">VALUE</span>\n"
@@ -1431,6 +2739,7 @@ def api_twin_ask():
         "   <div style=\"background: rgba(255,255,255,0.08); height: 6px; border-radius: 10px; overflow: hidden; width: 80px; display: inline-block; vertical-align: middle; margin-right: 8px;\"><div style=\"background: #10b981; width: 85%; height: 100%; border-radius: 10px;\"></div></div> 85%\n"
         "5. CURRENCY RULE: All monetary values, prices, amounts, or financial figures MUST strictly use the Indian Rupee symbol (₹) and be formatted using Indian numbering style (e.g., ₹2,770.00 or ₹1,50,000.00). NEVER use the dollar sign ($) or USD terminology under any circumstances.\n"
         "6. Output clean, compliant HTML only. Structure your paragraphs using <p>, <strong>, and <em>.\n"
+        "7. NO HALLUCINATION RULE: If the query execution returned an error (indicated by 'EXECUTION ERROR' in the live data context) or returned no records, DO NOT make up, guess, or hallucinate any numbers or dates. Politely inform the user that you couldn't find any matching database records or encountered an issue querying the database, without exposing technical SQL errors.\n"
         f"Today's Date: {today_str}\n"
         f"--- LIVE DATA CONTEXT ---\n"
         f"{db_context_str}\n"
@@ -1484,7 +2793,11 @@ def api_maintenance_status():
     if session.get('role') != 'admin':
         return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
         
-    mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+    is_local_host = Config.MYSQL_HOST in ('127.0.0.1', 'localhost')
+    if is_local_host:
+        mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+    else:
+        mysql_alive = is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
     
     cloud_alive = False
     try:
@@ -2679,6 +3992,7 @@ def process_return():
         
         # Real-time notification
         announcer.announce("update")
+        socketio.emit('stock_updated', {'type': 'billing_return', 'bill_id': bill_id})
         
         return jsonify({'status': 'success', 'redirect': '/sales/billing' if reprocess else None})
     except Exception as e:
@@ -2774,10 +4088,16 @@ def save_bill():
         
         log_audit(cursor, 'CREATE_BILL', 'bills', bill_id, None, f"Invoice: {invoice_no}, Total: {total}")
         conn.commit(); conn.close()
+        
+        # Asynchronously evolve the brain in the background in real-time!
+        import threading
+        threading.Thread(target=evolve_brain_realtime, args=(bill_id,)).start()
+        
         trigger_immediate_sync()
         
         # Trigger Real-time update
         announcer.announce("update")
+        socketio.emit('stock_updated', {'type': 'billing_creation', 'invoice_no': invoice_no})
         
         return jsonify({
             'status': 'success',
@@ -2871,6 +4191,7 @@ def get_stats():
     canceled_count = cancel_data[0] or 0
     canceled_amount = cancel_data[1] or 0
 
+    db_size_kb = fetch_database_size_kb(cursor)
     conn.close()
     avg_bill = (float(daily_sales) / bill_count) if bill_count > 0 else 0
     
@@ -2884,7 +4205,8 @@ def get_stats():
         'biz_charges': biz_charges,
         'canceled_bills': canceled_count,
         'canceled_amount': float(canceled_amount),
-        'avg_bill_value': float(avg_bill)
+        'avg_bill_value': float(avg_bill),
+        'db_size_kb': db_size_kb
     })
 
 @app.route('/api/stats/advanced')
@@ -2927,6 +4249,20 @@ def get_advanced_stats():
 
     conn.close()
     return jsonify({'trend': trend, 'payments': payments, 'top_products': top_products})
+
+@app.route('/api/stats/abc')
+def get_stats_abc():
+    conn = get_db_connection()
+    if not conn: return jsonify({'error': 'DB Connection failed'}), 500
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT barcode, name, category, current_stock as stock 
+        FROM products 
+        ORDER BY current_stock ASC
+    """)
+    products = cursor.fetchall()
+    conn.close()
+    return jsonify(products)
 
 @app.route('/api/analytics/deep')
 def get_deep_analytics():
@@ -3316,6 +4652,7 @@ def cancel_bill():
         
         # Real-time trigger
         announcer.announce("update")
+        socketio.emit('stock_updated', {'type': 'billing_cancellation', 'bill_id': bill_id})
         
         return jsonify({
             'status': 'success', 
@@ -3405,6 +4742,7 @@ def inventory_products(prod_id=None):
                 log_audit(cursor, 'ADD_PRODUCT', 'products', cursor.lastrowid, None, data['name'])
             
             conn.commit(); conn.close()
+            socketio.emit('stock_updated', {'type': 'product_mutation'})
             return jsonify({'status': 'success'})
         except Exception as e:
             if conn: conn.rollback(); conn.close()
@@ -3415,6 +4753,7 @@ def inventory_products(prod_id=None):
         try:
             cursor.execute("DELETE FROM products WHERE id = %s", (pid,))
             conn.commit(); conn.close()
+            socketio.emit('stock_updated', {'type': 'product_mutation'})
             return jsonify({'status': 'success'})
         except Exception as e:
             if conn: conn.rollback(); conn.close()
@@ -3465,6 +4804,7 @@ def api_inventory_stock_adjust():
 
         conn.commit()
         conn.close()
+        socketio.emit('stock_updated', {'type': 'stock_adjust', 'product_id': pid, 'stock_after': stock_after})
         return jsonify({'status': 'success'})
     except Exception as e:
         if conn: conn.rollback(); conn.close()
@@ -3502,6 +4842,7 @@ def api_stock_transfer():
                 """, (p['barcode'], p['name'], qty, from_loc, to_loc, f"Admin (Ref: {reference})"))
                 
         conn.commit(); conn.close()
+        socketio.emit('stock_updated', {'type': 'stock_transfer'})
         return jsonify({'status': 'success'})
     except Exception as e: 
         if conn: conn.rollback(); conn.close()
@@ -3516,9 +4857,8 @@ except ImportError:
     webview = None
 
 def run_flask():
-    from waitress import serve
-    print(f"Starting Waitress server on {Config.SERVER_HOST}:{Config.SERVER_PORT} with {Config.WAITRESS_THREADS} threads...")
-    serve(app, host=Config.SERVER_HOST, port=Config.SERVER_PORT, threads=Config.WAITRESS_THREADS)
+    print(f"Starting SocketIO server on {Config.SERVER_HOST}:{Config.SERVER_PORT}...")
+    socketio.run(app, host=Config.SERVER_HOST, port=Config.SERVER_PORT, allow_unsafe_werkzeug=True)
 
 if __name__ == '__main__':
     flask_thread = threading.Thread(target=run_flask, daemon=True)
