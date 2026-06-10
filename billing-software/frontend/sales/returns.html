@@ -10,11 +10,11 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Returns & Voids | Sagar Super Maple Pro</title>
+    <title>Returns & Voids | Maple Pro</title>
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
 
     <style>
 
@@ -346,6 +346,8 @@
 
     </style>
 
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
 </head>
 
 
@@ -354,7 +356,7 @@
 
     <nav class="sidebar">
 
-        <div class="brand"><img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> Sagar Super Maple Pro</div>
+        <div class="brand"><img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> <span class="maple-pro">Maple Pro</span></div>
 
         <ul class="nav-menu">
 
@@ -369,6 +371,10 @@
             <li><a href="/sales/report" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Reports</a></li>
 
             <li><a href="/sales/returns" class="nav-link active"><i class="fa-solid fa-rotate-left"></i> Returns & Voids</a></li>
+
+            <li><a href="/sales/stock/transfer" class="nav-link"><i class="fa-solid fa-truck-ramp-box"></i> Stock Transfer</a></li>
+
+            <li><a href="/sales/reports/transfer-report" class="nav-link"><i class="fa-solid fa-truck-arrow-right"></i> Transfer Report</a></li>
 
         </ul>
 
@@ -605,7 +611,7 @@
     }
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-    <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
+    <p>© 2025 Sagar Nilgiri Products | <span class="maple-pro">Maple Pro</span></p>
 </footer>
 </main>
 
@@ -963,7 +969,7 @@
 
         if (typeof io === 'undefined') {
             const script = document.createElement('script');
-            script.src = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
+            script.src = '{{ url_for('static', filename='assets/js/socket.io.min.js') }}';
             script.onload = initSocketIO;
             document.head.appendChild(script);
         } else {

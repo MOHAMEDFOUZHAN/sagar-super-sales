@@ -12,7 +12,7 @@
 
     <title>Cancelled Report - Sagar Super</title>
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
@@ -335,7 +335,7 @@
 
                     tr.innerHTML = `
 
-                        <td style="font-weight: 700;">SS-${b.id}</td>
+                        <td style="font-weight: 700;">${b.invoice_no || ('SS-' + b.id)}</td>
 
                         <td>${dateTime}</td>
 

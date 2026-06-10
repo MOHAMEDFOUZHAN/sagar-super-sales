@@ -4,122 +4,362 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IT Autopilot Console - Sagar Super Maple Pro</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- Chart.js CDN for live latency metrics chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .coming-soon-card {
-            background: rgba(10, 14, 26, 0.6);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--radius-lg);
-            padding: 50px 30px;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
-            margin-top: 20px;
-        }
-        .glow-container {
-            position: absolute;
-            top: -100px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 300px;
-            height: 300px;
-            pointer-events: none;
-            z-index: 0;
-            filter: blur(50px);
-            opacity: 0.15;
-        }
-        .glow-effect {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: radial-gradient(circle, var(--primary), var(--accent));
-        }
-        .card-icon {
-            margin-bottom: 25px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            z-index: 1;
-        }
-        .mock-grid {
+        .autopilot-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-top: 40px;
-            max-width: 800px;
-            margin-left: auto;
-            margin-right: auto;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        @media(max-width: 1024px) {
+            .autopilot-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .console-card {
+            background: rgba(10, 14, 26, 0.45);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
             position: relative;
-            z-index: 1;
-        }
-        .mock-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: var(--radius-md);
-            padding: 20px;
-            text-align: left;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        .mock-card-header {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            font-weight: 600;
-        }
-        .mock-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #f59e0b;
-            box-shadow: 0 0 6px #f59e0b;
-        }
-        .mock-dot.offline {
-            background: #a855f7;
-            box-shadow: 0 0 6px #a855f7;
-        }
-        .mock-value {
-            font-size: 1.3rem;
-            font-weight: 800;
-            color: #f59e0b;
-            letter-spacing: -0.01em;
-        }
-        .mock-progress {
-            height: 6px;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
             overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .mock-progress-bar {
-            height: 100%;
-            background: #f59e0b;
-            border-radius: 10px;
+        .console-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            opacity: 0.8;
         }
-        .dev-badge {
-            font-size: 0.7rem;
-            font-weight: 700;
-            padding: 3px 8px;
-            border-radius: 6px;
-            background: rgba(245, 158, 11, 0.15);
-            color: #f59e0b;
-            border: 1px solid rgba(245, 158, 11, 0.3);
+        .console-card.risk-low::before {
+            background: linear-gradient(90deg, #10b981, #34d399);
+        }
+        .console-card.risk-medium::before {
+            background: linear-gradient(90deg, #f59e0b, #fbbf24);
+        }
+        .console-card.risk-high::before {
+            background: linear-gradient(90deg, #ef4444, #f87171);
+        }
+        .console-card.risk-critical::before {
+            background: linear-gradient(90deg, #a855f7, #c084fc);
+        }
+        
+        .risk-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .risk-badge {
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: 50px;
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            vertical-align: middle;
-            margin-left: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.03);
         }
-        .fa-spin-slow {
-            animation: fa-spin 10s linear infinite;
+        .risk-badge.low {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .risk-badge.medium {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            animation: pulse-amber 2s infinite;
+        }
+        .risk-badge.high {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            animation: pulse-red 1.5s infinite;
+        }
+        .risk-badge.critical {
+            background: rgba(168, 85, 247, 0.15);
+            color: #a855f7;
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            animation: pulse-purple 1s infinite;
+        }
+
+        @keyframes pulse-amber {
+            0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+            70% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        @keyframes pulse-purple {
+            0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.5); }
+            70% { box-shadow: 0 0 0 12px rgba(168, 85, 247, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); }
+        }
+
+        .risk-bar-container {
+            height: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        .risk-bar-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 50px;
+            background: linear-gradient(90deg, #10b981, #3b82f6);
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .advisory-alert-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            margin-top: 16px;
+            position: relative;
+        }
+        .advisory-alert-box::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 15%;
+            height: 70%;
+            width: 3px;
+            background: var(--primary);
+            border-radius: 50px;
+        }
+        .advisory-alert-box.risk-low::after { background: #10b981; }
+        .advisory-alert-box.risk-medium::after { background: #f59e0b; }
+        .advisory-alert-box.risk-high::after { background: #ef4444; }
+        .advisory-alert-box.risk-critical::after { background: #a855f7; }
+
+        .telemetry-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .telemetry-stat {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .telemetry-stat .val {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: #fff;
+        }
+        .telemetry-stat .lbl {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            font-weight: 600;
+        }
+
+        .simulation-console {
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .simulation-controls {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+        .sim-btn {
+            padding: 10px 18px;
+            border-radius: var(--radius-md);
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.03);
+            color: #fff;
+            transition: all 0.2s ease;
+        }
+        .sim-btn:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+        .sim-btn.active-delay {
+            background: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.4);
+            color: #f59e0b;
+        }
+        .sim-btn.active-outage {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #ef4444;
+        }
+
+        .logs-table-wrapper {
+            background: rgba(10, 14, 26, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+        .logs-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+        .logs-table th {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 12px 16px;
+            font-weight: 700;
+            color: var(--text-muted);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+        .logs-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            color: #e2e8f0;
+        }
+        .logs-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .status-pill {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .status-pill.fault {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        .status-pill.healed {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .status-pill.info {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        /* Modal Dialog Styling */
+        .glass-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(5, 7, 15, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: rgba(15, 22, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-lg);
+            width: 90%;
+            max-width: 550px;
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            animation: modal-zoom 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes modal-zoom {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .modal-header {
+            padding: 18px 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-body {
+            padding: 24px;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            text-align: right;
+        }
+        .close-btn {
+            color: var(--text-muted);
+            font-size: 1.4rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .close-btn:hover {
+            color: #fff;
+        }
+        .diagnose-btn-action {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            border: none;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.75rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: opacity 0.2s;
+        }
+        .diagnose-btn-action:hover {
+            opacity: 0.9;
+        }
+        .diagnose-btn-action.loading {
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        
+        /* Sparkline chart height helper */
+        .chart-container {
+            position: relative;
+            height: 250px;
+            width: 100%;
         }
     </style>
 </head>
@@ -130,76 +370,427 @@
         <header class="section-header" style="margin-bottom: 30px;">
             <div>
                 <h1 style="display: inline-flex; align-items: center; flex-wrap: wrap;">
-                    IT Autopilot Recovery Console 
-                    <span class="dev-badge"><i class="fa-solid fa-screwdriver-wrench"></i> Feature In Development</span>
+                    IT Autopilot & AI Recovery Console 
+                    <span id="autopilotLiveStatus" style="font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); margin-left: 12px; letter-spacing: 0.05em; text-transform: uppercase;">
+                        <i class="fa-solid fa-circle-check"></i> System Autopilot Active
+                    </span>
                 </h1>
-                <p style="color: var(--text-muted); margin-top: 4px;">Next-generation automated network self-healing & AI infrastructure diagnostics.</p>
+                <p style="color: var(--text-muted); margin-top: 4px;">Predictive database downtime diagnostics and network self-healing telemetry.</p>
             </div>
         </header>
 
-        <!-- Premium Glassmorphic Feature Lock Card -->
-        <div class="coming-soon-card">
-            <div class="glow-container">
-                <div class="glow-effect"></div>
-            </div>
+        <!-- Dynamic Grid Layout -->
+        <div class="autopilot-grid">
             
-            <div class="card-icon">
-                <i class="fa-solid fa-microchip" style="font-size: 3.5rem; color: #f59e0b; filter: drop-shadow(0 0 15px rgba(245, 158, 11, 0.4));"></i>
-            </div>
-            
-            <h2 style="font-size: 1.8rem; font-weight: 800; color: #fff; margin-bottom: 12px; letter-spacing: -0.02em;">IT Autopilot Suite</h2>
-            <div style="font-size: 0.75rem; background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 4px 12px; border-radius: 20px; border: 1px solid rgba(245, 158, 11, 0.25); display: inline-block; font-weight: 700; margin-bottom: 20px; letter-spacing: 0.05em; text-transform: uppercase;">
-                Design Phase Lock • Release v2.0
-            </div>
-            
-            <p style="color: var(--text-muted); max-width: 500px; margin: 0 auto 30px auto; font-size: 0.9rem; line-height: 1.6;">
-                This module is currently undergoing active engineering and QA testing. Once complete, it will provide real-time daemon-level service monitors, sub-second auto-restarts, network subnet broadcasting, and zero-latency local-to-cloud database syncing.
-            </p>
-
-            <!-- Interactive Mock Dashboard Elements -->
-            <div class="mock-grid">
-                <div class="mock-card">
-                    <div class="mock-card-header">
-                        <span class="mock-dot"></span>
-                        <span>Auto-Healing Core</span>
-                    </div>
-                    <div class="mock-value">SIMULATED</div>
-                    <div class="mock-progress"><div class="mock-progress-bar" style="width: 85%;"></div></div>
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">85% Optimization Complete</span>
+            <!-- AI Downtime Predictor Panel -->
+            <div id="riskCard" class="console-card risk-low">
+                <div class="risk-header">
+                    <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-brain" style="color: var(--primary);"></i> AI Server Downtime Predictor
+                    </h3>
+                    <span id="riskBadge" class="risk-badge low">Low Risk</span>
                 </div>
                 
-                <div class="mock-card">
-                    <div class="mock-card-header">
-                        <span class="mock-dot offline"></span>
-                        <span>AI Diagnostic Agent</span>
-                    </div>
-                    <div class="mock-value" style="color: #a855f7;">INTEGRATING</div>
-                    <div class="mock-progress"><div class="mock-progress-bar" style="width: 60%; background: #a855f7;"></div></div>
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">Training LLM Diagnostic Models</span>
+                <div style="margin-bottom: 8px; font-size: 0.85rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+                    <span>Downtime Risk Level</span>
+                    <span id="riskScoreVal" style="font-weight: 700; color: #fff;">0%</span>
+                </div>
+                
+                <div class="risk-bar-container">
+                    <div id="riskBarFill" class="risk-bar-fill" style="width: 0%"></div>
                 </div>
 
-                <div class="mock-card">
-                    <div class="mock-card-header">
-                        <span class="mock-dot" style="background: #06b6d4; box-shadow: 0 0 6px #06b6d4;"></span>
-                        <span>Subnet Broadcast</span>
-                    </div>
-                    <div class="mock-value" style="color: #06b6d4;">STANDBY</div>
-                    <div class="mock-progress"><div class="mock-progress-bar" style="width: 95%; background: #06b6d4;"></div></div>
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">95% Broadcast Coverage Lock</span>
+                <div id="advisoryBox" class="advisory-alert-box risk-low">
+                    <strong style="color: #fff; font-size: 0.85rem; display: block; margin-bottom: 6px;">
+                        <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--primary); margin-right: 5px;"></i> AI Predictive Diagnostics Advisory
+                    </strong>
+                    <p id="advisoryText" style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; margin: 0;">
+                        Normal baseline latency detected. Local MySQL database connection is fully healthy.
+                    </p>
                 </div>
             </div>
 
-            <div style="margin-top: 35px;">
-                <button class="btn-heal-disabled" disabled style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.4); padding: 12px 24px; border-radius: var(--radius-md); font-weight: 700; font-size: 0.9rem; cursor: not-allowed; display: inline-flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-lock"></i> Developer Sandbox Locked
+            <!-- Live Latency Chart -->
+            <div class="console-card">
+                <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-chart-line" style="color: var(--accent);"></i> MySQL Latency Trend
+                </h3>
+                <div class="chart-container">
+                    <canvas id="latencyChart"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Telemetry Stats row -->
+        <div class="telemetry-row">
+            <div class="telemetry-stat">
+                <span class="lbl">MySQL Latency</span>
+                <span id="statLatency" class="val">-- ms</span>
+            </div>
+            <div class="telemetry-stat">
+                <span class="lbl">Stability Rate</span>
+                <span id="statStability" class="val">-- %</span>
+            </div>
+            <div class="telemetry-stat">
+                <span class="lbl">Query Speed</span>
+                <span id="statQuery" class="val">-- ms</span>
+            </div>
+            <div class="telemetry-stat">
+                <span class="lbl">Replication Sync</span>
+                <span id="statSync" class="val">--</span>
+            </div>
+        </div>
+
+        <!-- Simulation and Controls Box -->
+        <div class="simulation-console">
+            <h3 style="font-size: 0.95rem; font-weight: 800; color: #fff; margin-bottom: 6px;">
+                <i class="fa-solid fa-flask" style="color: #f59e0b; margin-right: 6px;"></i> Developer Simulation Sandbox
+            </h3>
+            <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0 0 16px 0; line-height: 1.4;">
+                Simulate network anomalies or database loads below to test AI predictive alerts and failover restore transitions immediately.
+            </p>
+            <div class="simulation-controls">
+                <button id="btnSimDelay" class="sim-btn" onclick="toggleSimDelay()">
+                    <i class="fa-solid fa-gauge-high"></i> Simulate Slow MySQL (800ms delay)
+                </button>
+                <button id="btnSimOutage" class="sim-btn" onclick="toggleSimOutage()">
+                    <i class="fa-solid fa-plug-circle-xmark"></i> Simulate Outage (100% drops)
+                </button>
+                <button class="sim-btn" onclick="runDiagnosticsCheck()">
+                    <i class="fa-solid fa-arrows-rotate"></i> Poll Now
                 </button>
             </div>
         </div>
 
-        <!-- Dynamic Footer -->
+        <!-- IT Autopilot Logs Table -->
+        <div class="console-card" style="padding-top: 20px;">
+            <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-list-check" style="color: #6366f1;"></i> Self-Healing Event & Incident Logs
+            </h3>
+            <div class="logs-table-wrapper">
+                <table class="logs-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 120px;">Timestamp</th>
+                            <th style="width: 150px;">Incident Category</th>
+                            <th style="width: 90px;">Status</th>
+                            <th>Description / Error Log</th>
+                            <th style="width: 180px;">Action Taken</th>
+                            <th style="width: 120px; text-align: center;">AI Diagnostics</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsTableBody">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">Loading incident logs...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Premium Glassmorphic Modal Dialog -->
+        <div id="aiModal" class="glass-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 style="font-size: 1.1rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px; margin: 0;">
+                        <i class="fa-solid fa-robot" style="color: var(--primary);"></i> AI Incident Diagnostics Result
+                    </h3>
+                    <span class="close-btn" onclick="closeModal()">&times;</span>
+                </div>
+                <div id="modalBody" class="modal-body">
+                    Fetching AI Diagnosis details...
+                </div>
+                <div class="modal-footer">
+                    <button class="sim-btn" onclick="closeModal()">Close Advisory</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
         <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-            <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
+            <p>© 2026 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
         </footer>
     </main>
+
+    <script>
+        let delayActive = false;
+        let outageActive = false;
+        let latencyChart = null;
+
+        // Initialize latency trend line chart
+        function initChart(labels, data) {
+            const ctx = document.getElementById('latencyChart').getContext('2d');
+            
+            // Create gradient highlight under the line
+            const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.25)');
+            gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+
+            latencyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Response Time (ms)',
+                        data: data,
+                        borderColor: '#6366f1',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#818cf8',
+                        pointBorderColor: 'rgba(255,255,255,0.8)',
+                        pointHoverRadius: 6,
+                        fill: true,
+                        backgroundColor: gradient,
+                        tension: 0.35
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#64748b', font: { size: 9 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                            ticks: { color: '#64748b', font: { size: 9 } },
+                            min: 0
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChart(labels, data) {
+            if (!latencyChart) {
+                initChart(labels, data);
+            } else {
+                latencyChart.data.labels = labels;
+                latencyChart.data.datasets[0].data = data;
+                latencyChart.update('none'); // Update without animation for continuous updates
+            }
+        }
+
+        // Fetch metrics and update indicators
+        async function fetchMetrics() {
+            try {
+                const res = await fetch('/api/admin/maintenance/metrics');
+                const result = await res.json();
+                
+                if (result.status === 'success') {
+                    // Update simulation button styles
+                    delayActive = result.simulated_delay > 0;
+                    outageActive = result.simulated_failures;
+                    
+                    const btnDelay = document.getElementById('btnSimDelay');
+                    const btnOutage = document.getElementById('btnSimOutage');
+                    
+                    if (delayActive) btnDelay.classList.add('active-delay');
+                    else btnDelay.classList.remove('active-delay');
+                    
+                    if (outageActive) btnOutage.classList.add('active-outage');
+                    else btnOutage.classList.remove('active-outage');
+
+                    // Extract metrics history
+                    const history = result.history || [];
+                    const timestamps = history.map(item => item.timestamp);
+                    const latencies = history.map(item => item.response_time);
+                    
+                    // Render/update graph
+                    updateChart(timestamps, latencies);
+
+                    // Update live telemetry statistics
+                    if (history.length > 0) {
+                        const latest = history[history.length - 1];
+                        document.getElementById('statLatency').innerText = latest.status === 'ONLINE' ? `${latest.response_time} ms` : 'TIMEOUT';
+                        document.getElementById('statQuery').innerText = latest.status === 'ONLINE' ? `${latest.query_speed} ms` : '--';
+                        
+                        // Calculate stability
+                        const onlineCount = history.filter(h => h.status === 'ONLINE').length;
+                        const stability = Math.round((onlineCount / history.length) * 100);
+                        document.getElementById('statStability').innerText = `${stability}%`;
+                    } else {
+                        document.getElementById('statLatency').innerText = '0 ms';
+                        document.getElementById('statQuery').innerText = '0 ms';
+                        document.getElementById('statStability').innerText = '100%';
+                    }
+
+                    // Replication Sync Mode
+                    document.getElementById('statSync').innerText = result.risk.level === 'CRITICAL' ? 'STANDBY FAILOVER' : 'REAL-TIME PUSH';
+
+                    // Update risk card
+                    const risk = result.risk;
+                    const riskCard = document.getElementById('riskCard');
+                    const riskBadge = document.getElementById('riskBadge');
+                    const riskScoreVal = document.getElementById('riskScoreVal');
+                    const riskBarFill = document.getElementById('riskBarFill');
+                    const advisoryBox = document.getElementById('advisoryBox');
+                    const advisoryText = document.getElementById('advisoryText');
+
+                    // Reset classes
+                    riskCard.className = 'console-card';
+                    riskBadge.className = 'risk-badge';
+                    advisoryBox.className = 'advisory-alert-box';
+
+                    // Apply risk class levels
+                    const risk_level_lower = risk.level.toLowerCase();
+                    riskCard.classList.add(`risk-${risk_level_lower}`);
+                    riskBadge.classList.add(risk_level_lower);
+                    riskBadge.innerText = risk.level === 'LOW' ? 'Low Risk' : (risk.level === 'MEDIUM' ? 'Medium Risk' : (risk.level === 'HIGH' ? 'High Risk' : 'Critical Outage'));
+                    advisoryBox.classList.add(`risk-${risk_level_lower}`);
+
+                    // Risk Score Progress
+                    riskScoreVal.innerText = `${risk.score}%`;
+                    riskBarFill.style.width = `${risk.score}%`;
+                    
+                    // Color bar gradient according to level
+                    if (risk.level === 'LOW') riskBarFill.style.background = 'linear-gradient(90deg, #10b981, #3b82f6)';
+                    else if (risk.level === 'MEDIUM') riskBarFill.style.background = 'linear-gradient(90deg, #f59e0b, #fbbf24)';
+                    else if (risk.level === 'HIGH') riskBarFill.style.background = 'linear-gradient(90deg, #ef4444, #f87171)';
+                    else riskBarFill.style.background = 'linear-gradient(90deg, #a855f7, #c084fc)';
+
+                    advisoryText.innerText = risk.advisory;
+                }
+            } catch (err) {
+                console.error("Failed to fetch metrics telemetry:", err);
+            }
+        }
+
+        // Fetch recovery logs and populate incident table
+        async function fetchLogs() {
+            try {
+                const res = await fetch('/api/admin/maintenance/logs');
+                const result = await res.json();
+                
+                if (result.status === 'success') {
+                    const tbody = document.getElementById('logsTableBody');
+                    tbody.innerHTML = '';
+                    
+                    const logs = result.logs || [];
+                    if (logs.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">No auto-healing recovery incidents logged. Database system status is clean.</td></tr>`;
+                        return;
+                    }
+
+                    logs.forEach(log => {
+                        const tr = document.createElement('tr');
+                        
+                        // Parse status indicator colors
+                        let status_class = 'info';
+                        if (log.status === 'FAULT') status_class = 'fault';
+                        else if (log.status === 'HEALED') status_class = 'healed';
+                        
+                        tr.innerHTML = `
+                            <td style="color: var(--text-muted); font-size: 0.8rem;">${log.timestamp}</td>
+                            <td style="font-weight: 700; color: #fff;">${log.service}</td>
+                            <td><span class="status-pill ${status_class}">${log.status}</span></td>
+                            <td style="color: #cbd5e1; font-size: 0.8rem;">${log.error_msg}</td>
+                            <td style="color: var(--text-muted); font-size: 0.8rem;">${log.action_taken}</td>
+                            <td style="text-align: center;">
+                                <button class="diagnose-btn-action" onclick="openAIModal(${log.id})">
+                                    <i class="fa-solid fa-robot"></i> Diagnose
+                                </button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to fetch recovery incident logs:", err);
+            }
+        }
+
+        // Toggle simulated query delay
+        async function toggleSimDelay() {
+            const nextDelay = delayActive ? 0.0 : 0.8; // Toggle between 0ms and 800ms
+            try {
+                const res = await fetch('/api/admin/maintenance/simulate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ delay: nextDelay })
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    fetchMetrics();
+                }
+            } catch (err) {
+                alert("Failed to toggle simulated delay: " + err);
+            }
+        }
+
+        // Toggle simulated connection drop outage
+        async function toggleSimOutage() {
+            const nextFailures = !outageActive;
+            try {
+                const res = await fetch('/api/admin/maintenance/simulate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ failures: nextFailures })
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    fetchMetrics();
+                    fetchLogs();
+                }
+            } catch (err) {
+                alert("Failed to toggle simulated outage: " + err);
+            }
+        }
+
+        function runDiagnosticsCheck() {
+            fetchMetrics();
+            fetchLogs();
+        }
+
+        // AI Diagnosis Details Dialog Modal Controls
+        async function openAIModal(logId) {
+            const modal = document.getElementById('aiModal');
+            const body = document.getElementById('modalBody');
+            
+            modal.style.display = 'flex';
+            body.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary); margin-bottom: 12px;"></i>
+                    <p style="color: var(--text-muted); font-size: 0.85rem;">Consulting IT Autopilot AI Specialist and reviewing server log indices...</p>
+                </div>
+            `;
+
+            try {
+                const res = await fetch(`/api/admin/maintenance/ai-diagnose/${logId}`, { method: 'POST' });
+                const result = await res.json();
+                
+                if (result.status === 'success') {
+                    body.innerHTML = result.diagnosis;
+                } else {
+                    body.innerHTML = `<p style="color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> AI Diagnosis failed: ${result.message}</p>`;
+                }
+            } catch (err) {
+                body.innerHTML = `<p style="color: #ef4444;"><i class="fa-solid fa-triangle-exclamation"></i> Diagnostic communication connection error: ${err}</p>`;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('aiModal').style.display = 'none';
+        }
+
+        // Window click triggers close modal
+        window.onclick = function(event) {
+            const modal = document.getElementById('aiModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Auto polling interval
+        window.onload = function() {
+            runDiagnosticsCheck();
+            setInterval(fetchMetrics, 3000);
+            setInterval(fetchLogs, 6000);
+        }
+    </script>
 </body>
 </html>

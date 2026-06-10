@@ -1,204 +1,332 @@
+<style>
+/* Collapsible sidebar dropdown styles */
+.nav-item-dropdown {
+    width: 100%;
+    margin-bottom: 2px;
+}
+.nav-dropdown-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    transition: all 0.3s var(--ease-out);
+    font-weight: 600;
+    font-size: 0.95rem;
+    user-select: none;
+}
+.nav-dropdown-header span {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.nav-dropdown-header span i {
+    width: 20px;
+    text-align: center;
+    font-size: 1.05rem;
+}
+.nav-dropdown-header:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: white;
+}
+.nav-dropdown-header.parent-active {
+    color: white;
+    background: rgba(255, 255, 255, 0.02);
+}
+.nav-dropdown-header .toggle-caret {
+    font-size: 0.75rem;
+    transition: transform 0.3s var(--ease-out);
+}
+.nav-item-dropdown.expanded .toggle-caret {
+    transform: rotate(180deg);
+}
+.sub-menu {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 4px;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    border-left: 1px dashed rgba(255, 255, 255, 0.1);
+    margin-left: 25px;
+}
+.sub-menu.show {
+    display: flex;
+}
+.sub-menu .nav-link {
+    padding: 10px 14px;
+    font-size: 0.88rem;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sub-menu .nav-link.active {
+    background: rgba(99, 102, 241, 0.1);
+    color: #818cf8;
+    border-right: none;
+    border-left: 3px solid var(--primary);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* Gill Sans MT Font class */
+.maple-pro-font {
+    font-family: 'Gill Sans MT', 'Gill Sans', Calibri, sans-serif !important;
+}
+</style>
+
+{% set is_ai_active = request.endpoint in ['admin_analytics', 'admin_intelligence_stock', 'admin_intelligence_twin'] or '/admin/intelligence/forecasting' in request.path %}
+{% set is_masters_active = request.endpoint in ['admin_products', 'admin_categories', 'admin_users'] %}
+{% set is_stock_active = request.endpoint in ['admin_stock_manage', 'admin_stock_transfer'] or 'stock_manage' in request.endpoint or 'stock_transfer' in request.endpoint %}
+{% set is_reports_active = 'billwise_sales' in request.endpoint or 'sales_report' in request.endpoint or 'daily_sales' in request.endpoint or 'detail_sales' in request.endpoint or 'total_sales' in request.endpoint or 'daily_stock' in request.endpoint or 'daily_position' in request.endpoint or 'cancelled_report' in request.endpoint or 'transfer_report' in request.endpoint or 'counter_wise' in request.endpoint or 'online_sales' in request.endpoint or 'final_report' in request.endpoint or 'final_sales_report' in request.endpoint or 'reports_expenses' in request.endpoint or 'reports_correction' in request.endpoint or 'change_sales' in request.endpoint or 'reports_cash' in request.endpoint or 'counter_sales' in request.endpoint or 'online_sales_reports' in request.endpoint or 'online_sales_invoices' in request.endpoint or 'final_report_admin' in request.endpoint %}
+{% set is_system_active = request.endpoint in ['admin_returns', 'admin_maintenance', 'admin_maintenance_health', 'admin_failover_sync'] or 'admin_returns' in request.endpoint or 'admin_maintenance' in request.endpoint or 'admin_maintenance_health' in request.endpoint or 'admin_failover_sync' in request.endpoint %}
+
 <nav class="sidebar">
-    <div class="brand">
-        <img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> Sagar Super Maple Pro
+    <div class="brand maple-pro-font" style="font-size: 1.8rem; letter-spacing: -0.5px; font-weight: 800;">
+        <img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> Maple Pro
     </div>
+    
     <ul class="nav-menu">
+        <!-- Dashboard (Direct Link) -->
         <li>
             <a href="{{ url_for('admin_dashboard') }}"
                 class="nav-link {{ 'active' if request.endpoint == 'admin_dashboard' else '' }}">
                 <i class="fa-solid fa-gauge-high"></i> Dashboard
             </a>
         </li>
-        <li>
-            <a href="{{ url_for('admin_analytics') }}"
-                class="nav-link {{ 'active' if request.endpoint == 'admin_analytics' else '' }}">
-                <i class="fa-solid fa-brain"></i> Intelligence
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_intelligence_stock') }}"
-                class="nav-link {{ 'active' if request.endpoint == 'admin_intelligence_stock' else '' }}">
-                <i class="fa-solid fa-microchip"></i> Stock AI
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_intelligence_twin') }}"
-                class="nav-link {{ 'active' if request.endpoint == 'admin_intelligence_twin' else '' }}">
-                <i class="fa-solid fa-clone"></i> Business Twin
-            </a>
-        </li>
-        <li>
-            <a href="/admin/intelligence/forecasting"
-                class="nav-link {{ 'active' if request.path == '/admin/intelligence/forecasting' else '' }}">
-                <i class="fa-solid fa-chart-line"></i> Demand Forecasting
-            </a>
+
+        <!-- AI Insights (Dropdown) -->
+        <li class="nav-item-dropdown {{ 'expanded' if is_ai_active else '' }}">
+            <div class="nav-dropdown-header {{ 'parent-active' if is_ai_active else '' }}">
+                <span><i class="fa-solid fa-brain"></i> AI Insights</span>
+                <i class="fa-solid fa-chevron-down toggle-caret"></i>
+            </div>
+            <ul class="sub-menu {{ 'show' if is_ai_active else '' }}">
+                <li>
+                    <a href="{{ url_for('admin_analytics') }}"
+                        class="nav-link {{ 'active' if request.endpoint == 'admin_analytics' else '' }}">
+                        <i class="fa-solid fa-lightbulb"></i> Intelligence
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_intelligence_stock') }}"
+                        class="nav-link {{ 'active' if request.endpoint == 'admin_intelligence_stock' else '' }}">
+                        <i class="fa-solid fa-microchip"></i> Stock AI
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_intelligence_twin') }}"
+                        class="nav-link {{ 'active' if request.endpoint == 'admin_intelligence_twin' else '' }}">
+                        <i class="fa-solid fa-clone"></i> Business Twin
+                    </a>
+                </li>
+                <li>
+                    <a href="/admin/intelligence/forecasting"
+                        class="nav-link {{ 'active' if request.path == '/admin/intelligence/forecasting' else '' }}">
+                        <i class="fa-solid fa-chart-line"></i> Demand Forecasting
+                    </a>
+                </li>
+            </ul>
         </li>
 
-
-        <li
-            style="margin-top: 10px; padding-left: 16px; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
-            Masters</li>
-        <li>
-            <a href="{{ url_for('admin_products') }}"
-                class="nav-link {{ 'active' if request.endpoint == 'admin_products' else '' }}">
-                <i class="fa-solid fa-box"></i> Products
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_categories') }}"
-                class="nav-link {{ 'active' if request.endpoint == 'admin_categories' else '' }}">
-                <i class="fa-solid fa-layer-group"></i> Categories
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_users') }}"
-                class="nav-link {{ 'active' if request.endpoint == 'admin_users' else '' }}">
-                <i class="fa-solid fa-user-shield"></i> User Management
-            </a>
-        </li>
-
-        <li
-            style="margin-top: 10px; padding-left: 16px; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
-            Stock</li>
-        <li>
-            <a href="{{ url_for('admin_stock_manage') }}" class="nav-link {{ 'active' if " stock_manage" in
-                request.endpoint else '' }}">
-                <i class="fa-solid fa-boxes-stacked"></i> Manage Stock
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_stock_transfer') }}" class="nav-link {{ 'active' if " stock_transfer" in
-                request.endpoint else '' }}">
-                <i class="fa-solid fa-truck-ramp-box"></i> Transfer
-            </a>
+        <!-- Masters (Dropdown) -->
+        <li class="nav-item-dropdown {{ 'expanded' if is_masters_active else '' }}">
+            <div class="nav-dropdown-header {{ 'parent-active' if is_masters_active else '' }}">
+                <span><i class="fa-solid fa-user-shield"></i> Masters</span>
+                <i class="fa-solid fa-chevron-down toggle-caret"></i>
+            </div>
+            <ul class="sub-menu {{ 'show' if is_masters_active else '' }}">
+                <li>
+                    <a href="{{ url_for('admin_products') }}"
+                        class="nav-link {{ 'active' if request.endpoint == 'admin_products' else '' }}">
+                        <i class="fa-solid fa-box"></i> Products
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_categories') }}"
+                        class="nav-link {{ 'active' if request.endpoint == 'admin_categories' else '' }}">
+                        <i class="fa-solid fa-layer-group"></i> Categories
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_users') }}"
+                        class="nav-link {{ 'active' if request.endpoint == 'admin_users' else '' }}">
+                        <i class="fa-solid fa-users"></i> User Management
+                    </a>
+                </li>
+            </ul>
         </li>
 
-        <li
-            style="margin-top: 10px; padding-left: 16px; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">
-            Reports</li>
-        <li>
-            <a href="{{ url_for('admin_reports_billwise_sales') }}"
-                class="nav-link {{ 'active' if 'billwise_sales' in request.endpoint else '' }}">
-                <i class="fa-solid fa-file-invoice-dollar"></i> Bill wise Sales Report
-            </a>
+        <!-- Stock (Dropdown) -->
+        <li class="nav-item-dropdown {{ 'expanded' if is_stock_active else '' }}">
+            <div class="nav-dropdown-header {{ 'parent-active' if is_stock_active else '' }}">
+                <span><i class="fa-solid fa-boxes-stacked"></i> Stock</span>
+                <i class="fa-solid fa-chevron-down toggle-caret"></i>
+            </div>
+            <ul class="sub-menu {{ 'show' if is_stock_active else '' }}">
+                <li>
+                    <a href="{{ url_for('admin_stock_manage') }}" class="nav-link {{ 'active' if 'stock_manage' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-box-open"></i> Manage Stock
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_stock_transfer') }}" class="nav-link {{ 'active' if 'stock_transfer' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-truck-ramp-box"></i> Stock Transfer
+                    </a>
+                </li>
+            </ul>
         </li>
-        <li>
-            <a href="{{ url_for('admin_reports_sales_report') }}"
-                class="nav-link {{ 'active' if 'sales_report' in request.endpoint else '' }}">
-                <i class="fa-solid fa-receipt"></i> Sales Report
-            </a>
+
+        <!-- Reports (Dropdown) -->
+        <li class="nav-item-dropdown {{ 'expanded' if is_reports_active else '' }}">
+            <div class="nav-dropdown-header {{ 'parent-active' if is_reports_active else '' }}">
+                <span><i class="fa-solid fa-file-invoice-dollar"></i> Reports</span>
+                <i class="fa-solid fa-chevron-down toggle-caret"></i>
+            </div>
+            <ul class="sub-menu {{ 'show' if is_reports_active else '' }}">
+                <li>
+                    <a href="{{ url_for('admin_reports_billwise_sales') }}"
+                        class="nav-link {{ 'active' if 'billwise_sales' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-file-invoice"></i> Bill wise Sales
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_sales_report') }}"
+                        class="nav-link {{ 'active' if 'sales_report' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-receipt"></i> Sales Report
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_daily_sales') }}"
+                        class="nav-link {{ 'active' if 'daily_sales' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-calendar-day"></i> Daily Sales Report
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_detail_sales') }}"
+                        class="nav-link {{ 'active' if 'detail_sales' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-circle-info"></i> Detail Sales Report
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_total_sales') }}"
+                        class="nav-link {{ 'active' if 'total_sales' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-chart-pie"></i> Total Sales Report
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_daily_stock') }}"
+                        class="nav-link {{ 'active' if 'daily_stock' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-boxes-stacked"></i> Daily Stock Report
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_daily_position') }}"
+                        class="nav-link {{ 'active' if 'daily_position' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-list-check"></i> Daily Position
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_cancelled_report') }}"
+                        class="nav-link {{ 'active' if 'cancelled_report' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-ban"></i> Cancelled Report
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_transfer_report') }}"
+                        class="nav-link {{ 'active' if 'transfer_report' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-truck-arrow-right"></i> Transfer Report
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_counter_wise') }}"
+                        class="nav-link {{ 'active' if 'counter_wise' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-users-viewfinder"></i> Counter wise Sales
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_online_sales') }}"
+                        class="nav-link {{ 'active' if 'online_sales' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-globe"></i> Online Sales
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_final_report') }}"
+                        class="nav-link {{ 'active' if 'final_report' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-file-contract"></i> Final Report
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_final_sales_report') }}"
+                        class="nav-link {{ 'active' if 'final_sales_report' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-file-lines"></i> Final Sales Report
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_expenses') }}"
+                        class="nav-link {{ 'active' if 'reports_expenses' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-wallet"></i> Expenses
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_correction') }}"
+                        class="nav-link {{ 'active' if 'reports_correction' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-pen-to-square"></i> Correction Bill
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_change_sales') }}"
+                        class="nav-link {{ 'active' if 'change_sales' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-right-left"></i> Exchange Bills
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_reports_cash') }}"
+                        class="nav-link {{ 'active' if 'reports_cash' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-calculator"></i> Cash Calculator
+                    </a>
+                </li>
+            </ul>
         </li>
-        <li>
-            <a href="{{ url_for('admin_reports_daily_sales') }}"
-                class="nav-link {{ 'active' if 'daily_sales' in request.endpoint else '' }}">
-                <i class="fa-solid fa-calendar-day"></i> Daily Sales Report
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_detail_sales') }}"
-                class="nav-link {{ 'active' if 'detail_sales' in request.endpoint else '' }}">
-                <i class="fa-solid fa-circle-info"></i> Detail Sales Report
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_total_sales') }}"
-                class="nav-link {{ 'active' if 'total_sales' in request.endpoint else '' }}">
-                <i class="fa-solid fa-chart-pie"></i> Total Sales Report
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_daily_stock') }}"
-                class="nav-link {{ 'active' if 'daily_stock' in request.endpoint else '' }}">
-                <i class="fa-solid fa-boxes-stacked"></i> Daily Stock Report
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_daily_position') }}"
-                class="nav-link {{ 'active' if 'daily_position' in request.endpoint else '' }}">
-                <i class="fa-solid fa-list-check"></i> Daily Position
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_cancelled_report') }}"
-                class="nav-link {{ 'active' if 'cancelled_report' in request.endpoint else '' }}">
-                <i class="fa-solid fa-ban"></i> Cancelled Report
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_transfer_report') }}"
-                class="nav-link {{ 'active' if 'transfer_report' in request.endpoint else '' }}">
-                <i class="fa-solid fa-truck-arrow-right"></i> Transfer Report
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_counter_wise') }}"
-                class="nav-link {{ 'active' if 'counter_wise' in request.endpoint else '' }}">
-                <i class="fa-solid fa-users-viewfinder"></i> Counter wise Sales
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_online_sales') }}"
-                class="nav-link {{ 'active' if 'online_sales' in request.endpoint else '' }}">
-                <i class="fa-solid fa-globe"></i> Online Sales
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_final_report') }}"
-                class="nav-link {{ 'active' if 'final_report' in request.endpoint else '' }}">
-                <i class="fa-solid fa-file-contract"></i> Final Report
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_final_sales_report') }}"
-                class="nav-link {{ 'active' if 'final_sales_report' in request.endpoint else '' }}">
-                <i class="fa-solid fa-file-lines"></i> Final Sales Report
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_expenses') }}"
-                class="nav-link {{ 'active' if 'reports_expenses' in request.endpoint else '' }}">
-                <i class="fa-solid fa-wallet"></i> Expenses
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_correction') }}"
-                class="nav-link {{ 'active' if 'reports_correction' in request.endpoint else '' }}">
-                <i class="fa-solid fa-pen-to-square"></i> Correction Bill
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_change_sales') }}"
-                class="nav-link {{ 'active' if 'change_sales' in request.endpoint else '' }}">
-                <i class="fa-solid fa-right-left"></i> Change Sales Report
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_reports_cash') }}"
-                class="nav-link {{ 'active' if 'reports_cash' in request.endpoint else '' }}">
-                <i class="fa-solid fa-calculator"></i> Cash Calculator
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_returns') }}"
-                class="nav-link {{ 'active' if 'admin_returns' in request.endpoint else '' }}">
-                <i class="fa-solid fa-rotate-left"></i> Returns & Voids
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_maintenance') }}"
-                class="nav-link {{ 'active' if 'admin_maintenance' in request.endpoint else '' }}">
-                <i class="fa-solid fa-gears"></i> System Maintenance
-            </a>
-        </li>
-        <li>
-            <a href="{{ url_for('admin_maintenance_health') }}"
-                class="nav-link {{ 'active' if 'admin_maintenance_health' in request.endpoint else '' }}"
-                style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                <span style="display: flex; align-items: center; gap: 10px;">
-                    <i class="fa-solid fa-tower-broadcast"></i> IT Autopilot
-                </span>
-                <span style="font-size: 0.6rem; background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700; letter-spacing: 0.05em; line-height: 1;">DEV</span>
-            </a>
+
+        <!-- System (Dropdown) -->
+        <li class="nav-item-dropdown {{ 'expanded' if is_system_active else '' }}">
+            <div class="nav-dropdown-header {{ 'parent-active' if is_system_active else '' }}">
+                <span><i class="fa-solid fa-gears"></i> System</span>
+                <i class="fa-solid fa-chevron-down toggle-caret"></i>
+            </div>
+            <ul class="sub-menu {{ 'show' if is_system_active else '' }}">
+                <li>
+                    <a href="{{ url_for('admin_returns') }}"
+                        class="nav-link {{ 'active' if 'admin_returns' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-rotate-left"></i> Returns & Voids
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_maintenance') }}"
+                        class="nav-link {{ 'active' if 'admin_maintenance' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-toolbox"></i> System Maintenance
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_maintenance_health') }}"
+                        class="nav-link {{ 'active' if 'admin_maintenance_health' in request.endpoint else '' }}"
+                        style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                        <span style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fa-solid fa-tower-broadcast"></i> IT Autopilot
+                        </span>
+                        <span style="font-size: 0.6rem; background: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 700; letter-spacing: 0.05em; line-height: 1;">DEV</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_failover_sync') }}"
+                        class="nav-link {{ 'active' if 'admin_failover_sync' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-sync"></i> Failover & Sync
+                    </a>
+                </li>
+            </ul>
         </li>
     </ul>
 
@@ -216,6 +344,41 @@
         
         <script>
             document.addEventListener("DOMContentLoaded", function() {
+                // Dynamic brand text replacement & font styling
+                if (document.title.includes("Sagar Super Maple Pro")) {
+                    document.title = document.title.replace(/Sagar Super Maple Pro/g, "Maple Pro");
+                } else if (document.title.includes("Sagar Super")) {
+                    // Also handle templates that only had 'Sagar Super' in title
+                    document.title = document.title.replace(/Sagar Super/g, "Maple Pro");
+                }
+                
+                document.querySelectorAll("footer p, .dynamic-footer p, footer, .dynamic-footer").forEach(elem => {
+                    if (elem.innerHTML && elem.innerHTML.includes("Sagar Super Maple Pro")) {
+                        elem.innerHTML = elem.innerHTML.replace(/Sagar Super Maple Pro/g, '<span class="maple-pro">Maple Pro</span>');
+                    }
+                });
+
+                // Dropdown Header Expand/Collapse logic
+                const headers = document.querySelectorAll(".nav-dropdown-header");
+                headers.forEach(header => {
+                    header.addEventListener("click", function() {
+                        const dropdown = this.parentElement;
+                        const subMenu = dropdown.querySelector(".sub-menu");
+                        
+                        // Toggle expanded class (rotates caret)
+                        dropdown.classList.toggle("expanded");
+                        
+                        // Toggle sub-menu view
+                        if (subMenu.classList.contains("show")) {
+                            subMenu.classList.remove("show");
+                            subMenu.style.display = "none";
+                        } else {
+                            subMenu.classList.add("show");
+                            subMenu.style.display = "flex";
+                        }
+                    });
+                });
+
                 function updateDbStatus() {
                     fetch("/api/db-status")
                         .then(res => res.json())
@@ -288,7 +451,7 @@
 
                 if (typeof io === 'undefined') {
                     const script = document.createElement('script');
-                    script.src = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
+                    script.src = '{{ url_for('static', filename='assets/js/socket.io.min.js') }}';
                     script.onload = initSocketIO;
                     document.head.appendChild(script);
                 } else {

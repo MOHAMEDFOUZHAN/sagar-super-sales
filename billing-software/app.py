@@ -36,6 +36,20 @@ if getattr(sys, 'frozen', False):
 else:
     base_dir = os.path.dirname(os.path.abspath(__file__))
 env_path = os.path.join(base_dir, ".env")
+
+# Set runtime default environment variables
+os.environ.setdefault("GROQ_API_KEY", "YOUR_GROQ_API_KEY")
+os.environ.setdefault("FORECASTING_PASSWORD", "1234")
+
+# If .env does not exist, automatically initialize it with defaults
+if not os.path.exists(env_path):
+    try:
+        with open(env_path, "w", encoding="utf-8") as env_file:
+            env_file.write("GROQ_API_KEY=YOUR_GROQ_API_KEY\n")
+            env_file.write("FORECASTING_PASSWORD=1234\n")
+    except Exception as e:
+        print(f"Error creating default .env: {e}")
+
 if os.path.exists(env_path):
     with open(env_path, "r", encoding="utf-8") as env_file:
         for line in env_file:
@@ -183,7 +197,7 @@ def perform_database_sync(mysql_conn, pg_conn):
                 
                 # Cloud audit log
                 pg_cur.execute("""
-                    INSERT INTO audit_logs (action_type, table_name, record_id, old_values, new_values, performed_by)
+                    INSERT INTO audit_logs (action, table_name, record_id, old_value, new_value, user_id)
                     VALUES (%s, %s, %s, %s, %s, %s)
                 """, ('SYNC_LOCAL_TO_CLOUD', 'bills', new_bill_id, None, f"Invoice: {bill['invoice_no']}", 'SYSTEM'))
 
@@ -223,7 +237,7 @@ def perform_database_sync(mysql_conn, pg_conn):
                 
                 # Local audit log
                 mysql_cur.execute("""
-                    INSERT INTO audit_logs (action_type, table_name, record_id, old_values, new_values, performed_by)
+                    INSERT INTO audit_logs (action, table_name, record_id, old_value, new_value, user_id)
                     VALUES (%s, %s, %s, %s, %s, %s)
                 """, ('SYNC_CLOUD_TO_LOCAL', 'bills', new_bill_id, None, f"Invoice: {bill['invoice_no']}", 'SYSTEM'))
 
@@ -324,6 +338,140 @@ def perform_database_sync(mysql_conn, pg_conn):
         print(f"[SYNC ENGINE ERROR] {e}")
 
 
+# IT Autopilot AI Metrics, Predictions, and Simulation Flags
+MYSQL_HEALTH_HISTORY = []  # List of metrics dicts: {'timestamp': str, 'response_time': float, 'query_speed': float, 'status': str}
+MYSQL_DOWNTIME_RISK = {
+    'level': 'LOW',
+    'score': 0,
+    'advisory': 'Normal baseline latency detected. Database connection is healthy.'
+}
+SIMULATED_MYSQL_DELAY = 0.0  # mock query delay in seconds (e.g., 0.8)
+SIMULATED_MYSQL_FAILURES = False  # mock complete failure
+LAST_AI_ADVISORY_FETCH_TIME = 0.0  # rate limit tracker for Groq calls
+
+def generate_ai_prediction_advisory_async(recent_avg_rt, failures_count, level, score):
+    def fetch_job():
+        global MYSQL_DOWNTIME_RISK
+        groq_api_key = os.environ.get("GROQ_API_KEY", "")
+        if not groq_api_key:
+            return
+            
+        import requests
+        prompt = (
+            "You are 'IT Autopilot AI Specialist' for MaplePro Billing Systems.\n"
+            "Generate a predictive warning/advisory alert for the local MySQL database.\n"
+            f"Current stats: Average Latency is {recent_avg_rt:.1f}ms, Connection Drops is {failures_count} in the last 10 checks.\n"
+            f"Calculated Risk Level is {level} (Score {score}%).\n"
+            "Explain what symptoms the AI has detected, warning them before the database goes down, "
+            "and suggest one quick advisory action (e.g. check concurrent transactions, restart Laragon service, or optimize slow queries).\n"
+            "Format: Output a single paragraph. Keep it concise, professional, and clear. Do not use markdown."
+        )
+        
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [
+                {"role": "system", "content": "You are a professional IT system administrator. Answer in a single short paragraph under 3 sentences without markdown."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.5,
+            "max_tokens": 150
+        }
+        try:
+            r = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json=payload,
+                headers={"Authorization": f"Bearer {groq_api_key}", "Content-Type": "application/json"},
+                timeout=5
+            )
+            if r.status_code == 200:
+                ai_text = r.json()["choices"][0]["message"]["content"].strip()
+                MYSQL_DOWNTIME_RISK['advisory'] = f"🤖 AI PREDICTIVE ALERT: {ai_text}"
+        except Exception as e:
+            print(f"[AI Advisor Fetch Error] {e}")
+            
+    import threading
+    threading.Thread(target=fetch_job, daemon=True).start()
+
+def update_downtime_risk_prediction():
+    global MYSQL_DOWNTIME_RISK, LAST_AI_ADVISORY_FETCH_TIME
+    history = MYSQL_HEALTH_HISTORY
+    if not history:
+        return
+        
+    latest = history[-1]
+    
+    if latest['status'] == 'OFFLINE':
+        MYSQL_DOWNTIME_RISK = {
+            'level': 'CRITICAL',
+            'score': 100,
+            'advisory': 'CRITICAL WARNING: Local MySQL service is offline. Failover is active.'
+        }
+        return
+        
+    recent_checks = history[-5:]
+    older_checks = history[:-5] if len(history) > 5 else history
+    
+    recent_avg_rt = sum(c['response_time'] for c in recent_checks) / len(recent_checks)
+    older_avg_rt = sum(c['response_time'] for c in older_checks) / len(older_checks)
+    
+    failures_in_history = sum(1 for c in history[-10:] if c['status'] == 'OFFLINE')
+    
+    score = 0
+    
+    # 1. Base latency check
+    if recent_avg_rt > 1000:
+        score += 60
+    elif recent_avg_rt > 500:
+        score += 40
+    elif recent_avg_rt > 200:
+        score += 20
+    elif recent_avg_rt > 50:
+        score += 10
+        
+    # 2. Performance degradation speed (velocity penalty)
+    if older_avg_rt > 0 and recent_avg_rt > older_avg_rt * 2.0:
+        score += 25
+    elif older_avg_rt > 0 and recent_avg_rt > older_avg_rt * 1.5:
+        score += 15
+        
+    # 3. Connection drop frequency penalty
+    if failures_in_history > 0:
+        score += failures_in_history * 15
+        
+    score = min(score, 95)
+    
+    # Map score to level
+    if score >= 70:
+        level = 'HIGH'
+        advisory = f"WARNING: High downtime risk detected ({score}%). Latency has spiked to {round(recent_avg_rt, 1)}ms with query performance deterioration. Rerouting warning active."
+    elif score >= 30:
+        level = 'MEDIUM'
+        advisory = f"ADVISORY: Moderate downtime risk detected ({score}%). Response time is degraded ({round(recent_avg_rt, 1)}ms). Autopilot is monitoring."
+    else:
+        level = 'LOW'
+        advisory = f"HEALTHY: Low downtime risk ({score}%). MySQL response is optimal ({round(recent_avg_rt, 1)}ms)."
+        
+    import time
+    current_time = time.time()
+    if level in ('MEDIUM', 'HIGH') and (current_time - LAST_AI_ADVISORY_FETCH_TIME > 60.0):
+        LAST_AI_ADVISORY_FETCH_TIME = current_time
+        generate_ai_prediction_advisory_async(recent_avg_rt, failures_in_history, level, score)
+        MYSQL_DOWNTIME_RISK = {
+            'level': level,
+            'score': score,
+            'advisory': advisory
+        }
+    else:
+        if level in ('MEDIUM', 'HIGH') and MYSQL_DOWNTIME_RISK['level'] == level and '🤖 AI' in MYSQL_DOWNTIME_RISK['advisory']:
+            MYSQL_DOWNTIME_RISK['score'] = score
+        else:
+            MYSQL_DOWNTIME_RISK = {
+                'level': level,
+                'score': score,
+                'advisory': advisory
+            }
+
+
 def self_healing_monitor_loop():
     """Background Daemon: constantly check local stack integrity, auto-repair faults, and sync databases."""
     global last_system_states
@@ -333,12 +481,56 @@ def self_healing_monitor_loop():
         mysql_conn = None
         pg_conn = None
         try:
-            # 1. Local or Remote MySQL Check
+            # 1. Local or Remote MySQL Check (with active metric measurements)
             is_local_host = Config.MYSQL_HOST in ('127.0.0.1', 'localhost')
-            if is_local_host:
-                mysql_alive = is_process_running("mysqld.exe") and is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+            
+            start_conn = time.time()
+            metrics_ok = False
+            conn_time = 0.0
+            query_time = 0.0
+            
+            if not SIMULATED_MYSQL_FAILURES:
+                try:
+                    test_conn = mysql.connector.connect(
+                        host=Config.MYSQL_HOST,
+                        port=Config.MYSQL_PORT,
+                        user=Config.MYSQL_USER,
+                        password=Config.MYSQL_PASSWORD,
+                        database=Config.MYSQL_DB,
+                        connection_timeout=2
+                    )
+                    conn_time = time.time() - start_conn
+                    
+                    if SIMULATED_MYSQL_DELAY > 0:
+                        time.sleep(SIMULATED_MYSQL_DELAY)
+                        
+                    start_query = time.time()
+                    test_cur = test_conn.cursor()
+                    test_cur.execute("SELECT 1")
+                    test_cur.fetchone()
+                    test_cur.close()
+                    test_conn.close()
+                    query_time = time.time() - start_query
+                    metrics_ok = True
+                except:
+                    metrics_ok = False
             else:
-                mysql_alive = is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
+                metrics_ok = False
+                
+            # Log metrics history
+            metric_entry = {
+                'timestamp': datetime.datetime.now().strftime("%H:%M:%S"),
+                'response_time': round((conn_time + SIMULATED_MYSQL_DELAY) * 1000, 2) if metrics_ok else 2000.0,
+                'query_speed': round(query_time * 1000, 2) if metrics_ok else 0.0,
+                'status': 'ONLINE' if metrics_ok else 'OFFLINE'
+            }
+            MYSQL_HEALTH_HISTORY.append(metric_entry)
+            if len(MYSQL_HEALTH_HISTORY) > 30:
+                MYSQL_HEALTH_HISTORY.pop(0)
+                
+            update_downtime_risk_prediction()
+            
+            mysql_alive = metrics_ok
             
             global MYSQL_IS_ALIVE
             MYSQL_IS_ALIVE = mysql_alive
@@ -746,20 +938,68 @@ class PostgreSQLProxyCursor:
     def execute(self, query, params=None):
         translated_query = self._translate_mysql_to_pg(query)
         translated_params = self._translate_params(query, params)
-        
-        self._cursor.execute(translated_query, translated_params)
-        
-        # Capture lastrowid for INSERT queries using PostgreSQL lastval()
+
         upper_query = query.upper().strip()
-        if upper_query.startswith("INSERT "):
+        is_insert = upper_query.startswith("INSERT ")
+
+        if not is_insert:
+            # Non-INSERT: plain execute, no lastrowid needed
+            self._cursor.execute(translated_query, translated_params)
+            return self
+
+        # ── INSERT path ────────────────────────────────────────────────────
+        # Strategy: try INSERT ... RETURNING id inside a SAVEPOINT.
+        # If the table has no 'id' column, ROLLBACK TO SAVEPOINT and retry
+        # with a plain INSERT + SAVEPOINT-protected lastval().
+        # Either way the OUTER transaction is NEVER left in aborted state.
+
+        base_query = translated_query.rstrip(';').rstrip()
+
+        # Step 1: SAVEPOINT before attempt with RETURNING id
+        savepoint_ok = False
+        try:
+            self._cursor.execute("SAVEPOINT _pg_insert_sp")
+            savepoint_ok = True
+        except Exception:
+            pass  # autocommit mode or similar — skip savepoint approach
+
+        if savepoint_ok:
             try:
-                conn = self._cursor.connection
-                with conn.cursor() as temp_cursor:
-                    temp_cursor.execute("SELECT lastval();")
-                    self._lastrowid = temp_cursor.fetchone()[0]
+                self._cursor.execute(base_query + " RETURNING id", translated_params)
+                row = self._cursor.fetchone()
+                self._lastrowid = row[0] if row else None
+                self._cursor.execute("RELEASE SAVEPOINT _pg_insert_sp")
+                return self  # ✅ success with RETURNING id
             except Exception:
-                self._lastrowid = None
+                # RETURNING id failed (no id column, or other schema issue)
+                # Roll back to savepoint so transaction stays clean, then retry
+                try:
+                    self._cursor.execute("ROLLBACK TO SAVEPOINT _pg_insert_sp")
+                    self._cursor.execute("RELEASE SAVEPOINT _pg_insert_sp")
+                except Exception:
+                    pass
+
+        # Step 2: Plain INSERT (no RETURNING id)
+        self._cursor.execute(base_query, translated_params)
+
+        # Step 3: Capture lastrowid via SAVEPOINT-protected lastval()
+        try:
+            self._cursor.execute("SAVEPOINT _pg_lastval_sp")
+            self._cursor.execute("SELECT lastval()")
+            row = self._cursor.fetchone()
+            self._lastrowid = row[0] if row else None
+            self._cursor.execute("RELEASE SAVEPOINT _pg_lastval_sp")
+        except Exception:
+            # lastval() failed - rollback to savepoint, transaction stays alive
+            try:
+                self._cursor.execute("ROLLBACK TO SAVEPOINT _pg_lastval_sp")
+                self._cursor.execute("RELEASE SAVEPOINT _pg_lastval_sp")
+            except Exception:
+                pass
+            self._lastrowid = None
+
         return self
+
 
     def executemany(self, query, seq_of_params):
         translated_query = self._translate_mysql_to_pg(query)
@@ -785,6 +1025,12 @@ class PostgreSQLProxyCursor:
         if "SET FOREIGN_KEY_CHECKS" in query_upper:
             return "SELECT 1"
             
+        # Translate TRUNCATE TABLE to TRUNCATE TABLE CASCADE for PostgreSQL
+        if "TRUNCATE TABLE" in query_upper:
+            if "CASCADE" not in query_upper:
+                query = query.rstrip(';').strip() + " CASCADE"
+                query_upper = query.upper()
+            
         # Translate INSERT IGNORE
         if "INSERT IGNORE" in query_upper:
             query = query.replace("INSERT IGNORE", "INSERT")
@@ -809,6 +1055,30 @@ class PostgreSQLProxyCursor:
                     opening_balance=EXCLUDED.opening_balance, closing_balance=EXCLUDED.closing_balance, 
                     actual_closing=EXCLUDED.actual_closing, difference=EXCLUDED.difference
                 """
+
+        # Translate ON DUPLICATE KEY UPDATE for seasonal_history
+        if "ON DUPLICATE KEY UPDATE" in query_upper and "SEASONAL_HISTORY" in query_upper:
+            query = """
+                INSERT INTO seasonal_history (year, month, category, multiplier)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (year, month, category) DO UPDATE SET multiplier = EXCLUDED.multiplier
+            """
+
+        # Generic fallback: translate any remaining ON DUPLICATE KEY UPDATE → ON CONFLICT DO UPDATE SET
+        if "ON DUPLICATE KEY UPDATE" in query.upper():
+            import re
+            # Pattern: ON DUPLICATE KEY UPDATE col = val
+            match = re.search(
+                r'ON DUPLICATE KEY UPDATE\s+(\w+)\s*=\s*(%s|VALUES\(\w+\)|\w+)',
+                query, re.IGNORECASE
+            )
+            if match:
+                col = match.group(1)
+                query = re.sub(
+                    r'ON DUPLICATE KEY UPDATE.*$',
+                    f'ON CONFLICT DO UPDATE SET {col} = EXCLUDED.{col}',
+                    query, flags=re.IGNORECASE | re.DOTALL
+                )
 
         # Translate backticks to double quotes for PostgreSQL compatibility
         if "`" in query:
@@ -902,10 +1172,521 @@ class PostgreSQLProxyConnection:
         return "postgres"
 
 
-def get_db_connection():
-    global DB_STATUS, MYSQL_IS_ALIVE, CLOUD_IS_ALIVE
+def get_cloud_db_connection_direct():
+    global DB_STATUS, CLOUD_IS_ALIVE
+    try:
+        raw_pg_conn = psycopg2.connect(
+            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+            port=6543,
+            database="postgres",
+            user="postgres",
+            password=SUPABASE_PASSWORD,
+            connect_timeout=2
+        )
+        DB_STATUS = "cloud"
+        return PostgreSQLProxyConnection(raw_pg_conn)
+    except Exception as pg_err:
+        err_msg = f"[CRITICAL ERROR] Supabase Connection Failed: {pg_err}"
+        print(err_msg)
+        log_error(err_msg)
+        CLOUD_IS_ALIVE = False
+        return None
+
+class SyncProxyCursor:
+    def __init__(self, raw_cursor, parent_conn):
+        self._cursor = raw_cursor
+        self._parent = parent_conn
+
+    def execute(self, query, params=None):
+        # 1. Execute the query on the underlying database
+        res = self._cursor.execute(query, params)
+        
+        # 2. Intercept write queries (INSERT, UPDATE, DELETE)
+        query_upper = query.upper().strip()
+        is_write = any(query_upper.startswith(op) for op in ("INSERT ", "UPDATE ", "DELETE "))
+        is_sync_queue = "SYNC_QUEUE" in query_upper
+        
+        if is_write and not is_sync_queue:
+            table_name = self._parent._extract_table_name(query)
+            op_type = "INSERT" if query_upper.startswith("INSERT ") else ("UPDATE" if query_upper.startswith("UPDATE ") else "DELETE")
+            
+            rec_id = None
+            if op_type == "INSERT":
+                try:
+                    rec_id = str(self._cursor.lastrowid)
+                except:
+                    pass
+            elif "WHERE" in query_upper:
+                # Try to extract record ID if standard pattern
+                try:
+                    import re
+                    match = re.search(r"WHERE\s+(?:id\s*=\s*|bill_id\s*=\s*|barcode\s*=\s*['\"]?)([^'\";\s)]+)", query, re.IGNORECASE)
+                    if match:
+                        rec_id = match.group(1)
+                except:
+                    pass
+                    
+            self._parent.enqueue_change(table_name, rec_id, op_type, query, params)
+            
+        return res
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class SyncProxyConnection:
+    def __init__(self, raw_conn, is_pg=False):
+        self._conn = raw_conn
+        self.is_pg = is_pg
+        self.pending_changes = []
+
+    def cursor(self, dictionary=False):
+        raw_cur = self._conn.cursor(dictionary=dictionary)
+        return SyncProxyCursor(raw_cur, self)
+
+    def commit(self):
+        res = self._conn.commit()
+        self._flush_changes()
+        return res
+
+    def rollback(self):
+        self.pending_changes.clear()
+        return self._conn.rollback()
+
+    def close(self):
+        return self._conn.close()
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+    def _extract_table_name(self, query):
+        query_upper = query.upper().strip()
+        import re
+        if query_upper.startswith("INSERT "):
+            match = re.search(r"INSERT\s+INTO\s+(\w+)", query, re.IGNORECASE)
+            return match.group(1) if match else "unknown"
+        elif query_upper.startswith("UPDATE "):
+            match = re.search(r"UPDATE\s+(\w+)", query, re.IGNORECASE)
+            return match.group(1) if match else "unknown"
+        elif query_upper.startswith("DELETE "):
+            match = re.search(r"DELETE\s+FROM\s+(\w+)", query, re.IGNORECASE)
+            return match.group(1) if match else "unknown"
+        return "unknown"
+
+    def enqueue_change(self, table_name, record_id, op_type, query, params):
+        self.pending_changes.append({
+            'table_name': table_name,
+            'record_id': record_id,
+            'op_type': op_type,
+            'query': query,
+            'params': params
+        })
+
+    def _flush_changes(self):
+        if not self.pending_changes:
+            return
+        try:
+            cur = self._conn.cursor()
+            for chg in self.pending_changes:
+                serialized_params = None
+                if chg['params'] is not None:
+                    try:
+                        import json
+                        def default_converter(o):
+                            if hasattr(o, 'isoformat'):
+                                return o.isoformat()
+                            return str(o)
+                        serialized_params = json.dumps(chg['params'], default=default_converter)
+                    except:
+                        serialized_params = str(chg['params'])
+                
+                cur.execute("""
+                    INSERT INTO sync_queue (table_name, record_id, operation_type, query_sql, query_params, status)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (chg['table_name'], chg['record_id'], chg['op_type'], chg['query'], serialized_params, 'PENDING'))
+            self._conn.commit()
+            cur.close()
+        except Exception as e:
+            print(f"[SYNC QUEUE ERROR] Failed to flush sync queue to database: {e}")
+        finally:
+            self.pending_changes.clear()
+
+
+# Mode Manager status variables
+SYNC_SYSTEM_MODE = "LOCAL_PRIMARY" # "LOCAL_PRIMARY", "CLOUD_FAILOVER", "RESTORING"
+MYSQL_HEALTH_RETRIES = 0
+MAX_MYSQL_HEALTH_RETRIES = 3
+SYNC_LOGS = []
+
+def log_sync_event(event_type, message):
+    global SYNC_LOGS
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = {'timestamp': timestamp, 'type': event_type, 'message': message}
+    print(f"[{event_type}] {message}")
+    SYNC_LOGS.insert(0, log_entry)
+    if len(SYNC_LOGS) > 100:
+        SYNC_LOGS.pop()
+
+def check_mysql_health():
+    try:
+        conn = mysql.connector.connect(
+            host=Config.MYSQL_HOST,
+            port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER,
+            password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DB,
+            connection_timeout=2
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return True
+    except:
+        return False
+
+def check_cloud_health():
+    try:
+        conn = psycopg2.connect(
+            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+            port=6543,
+            database="postgres",
+            user="postgres",
+            password=SUPABASE_PASSWORD,
+            connect_timeout=2
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return True
+    except:
+        return False
+
+def ensure_sync_queue_tables():
+    # 1. Local MySQL
+    try:
+        conn = mysql.connector.connect(
+            host=Config.MYSQL_HOST,
+            port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER,
+            password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DB
+        )
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sync_queue (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                table_name VARCHAR(50) NOT NULL,
+                record_id VARCHAR(50),
+                operation_type VARCHAR(10) NOT NULL,
+                query_sql TEXT NOT NULL,
+                query_params TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status VARCHAR(20) DEFAULT 'PENDING'
+            )
+        """)
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"[SYNC INIT WARNING] Could not create local sync table: {e}")
+
+    # 2. Supabase Cloud
+    try:
+        conn = psycopg2.connect(
+            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+            port=6543,
+            database="postgres",
+            user="postgres",
+            password=SUPABASE_PASSWORD
+        )
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sync_queue (
+                id SERIAL PRIMARY KEY,
+                table_name VARCHAR(50) NOT NULL,
+                record_id VARCHAR(50),
+                operation_type VARCHAR(10) NOT NULL,
+                query_sql TEXT NOT NULL,
+                query_params TEXT,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                status VARCHAR(20) DEFAULT 'PENDING'
+            )
+        """)
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"[SYNC INIT WARNING] Could not create cloud sync table: {e}")
+
+def push_local_queue_to_cloud():
+    conn_local = None
+    conn_cloud = None
+    try:
+        conn_local = mysql.connector.connect(
+            host=Config.MYSQL_HOST,
+            port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER,
+            password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DB
+        )
+        cur_local = conn_local.cursor(dictionary=True)
+        cur_local.execute("SELECT * FROM sync_queue WHERE status = 'PENDING' ORDER BY id ASC")
+        rows = cur_local.fetchall()
+        if not rows:
+            cur_local.close()
+            conn_local.close()
+            return
+        
+        raw_cloud_conn = psycopg2.connect(
+            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+            port=6543,
+            database="postgres",
+            user="postgres",
+            password=SUPABASE_PASSWORD
+        )
+        conn_cloud = PostgreSQLProxyConnection(raw_cloud_conn)
+        cur_cloud = conn_cloud.cursor()
+        
+        log_sync_event("SYNC_PUSH", f"Pusher detected {len(rows)} local changes pending sync to Supabase.")
+        
+        for row in rows:
+            query = row['query_sql']
+            import json
+            params = None
+            if row['query_params']:
+                try:
+                    params = json.loads(row['query_params'])
+                    if isinstance(params, list):
+                        params = tuple(params)
+                except Exception as ex:
+                    params = row['query_params']
+            
+            try:
+                cur_cloud.execute(query, params)
+                conn_cloud.commit()
+                
+                cur_local_write = conn_local.cursor()
+                cur_local_write.execute("UPDATE sync_queue SET status = 'PROCESSED' WHERE id = %s", (row['id'],))
+                conn_local.commit()
+                cur_local_write.close()
+                log_sync_event("SYNC_SUCCESS", f"Synced local operation {row['operation_type']} on table {row['table_name']} to Cloud.")
+            except Exception as e_cloud:
+                if conn_cloud: conn_cloud.rollback()
+                err_str = str(e_cloud).lower()
+                if "duplicate key" in err_str or "unique constraint" in err_str or "uniqueviolation" in err_str:
+                    try:
+                        cur_local_write = conn_local.cursor()
+                        cur_local_write.execute("UPDATE sync_queue SET status = 'PROCESSED' WHERE id = %s", (row['id'],))
+                        conn_local.commit()
+                        cur_local_write.close()
+                        log_sync_event("SYNC_SKIP", f"Skipped duplicate insert for change ID {row['id']} (already exists on cloud).")
+                        continue
+                    except Exception as e_local:
+                        print(f"[SYNC ERROR] Failed to update skipped status: {e_local}")
+                
+                log_sync_event("SYNC_FAIL", f"Push failed for local change ID {row['id']}: {e_cloud}. Retrying.")
+                break
+                
+        cur_cloud.close()
+        conn_cloud.close()
+        cur_local.close()
+        conn_local.close()
+        
+    except Exception as e:
+        print(f"[SYNC MONITOR] Pusher error: {e}")
+        if conn_local:
+            try: conn_local.close()
+            except: pass
+        if conn_cloud:
+            try: conn_cloud.close()
+            except: pass
+
+def run_restore_process():
+    global SYNC_SYSTEM_MODE, DB_STATUS
+    log_sync_event("RESTORE_START", "Starting restore and reconciliation sequence.")
     
-    # 1. Always try the configured server DB first. Health flags are advisory only.
+    conn_local = None
+    conn_cloud = None
+    try:
+        conn_local = mysql.connector.connect(
+            host=Config.MYSQL_HOST,
+            port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER,
+            password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DB
+        )
+        cur_local = conn_local.cursor(dictionary=True)
+        
+        conn_cloud = psycopg2.connect(
+            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+            port=6543,
+            database="postgres",
+            user="postgres",
+            password=SUPABASE_PASSWORD
+        )
+        from psycopg2.extras import RealDictCursor
+        cur_cloud = conn_cloud.cursor(cursor_factory=RealDictCursor)
+        
+        cur_cloud.execute("SELECT * FROM sync_queue WHERE status = 'PENDING' ORDER BY id ASC")
+        cloud_changes = cur_cloud.fetchall()
+        
+        log_sync_event("RESTORE_PULL", f"Pulled {len(cloud_changes)} changes from Supabase Cloud to apply locally.")
+        
+        for idx, change in enumerate(cloud_changes):
+            is_conflicted_and_newer_locally = False
+            if change['table_name'] and change['record_id']:
+                cur_local.execute("""
+                    SELECT created_at FROM sync_queue 
+                    WHERE table_name = %s AND record_id = %s 
+                    ORDER BY id DESC LIMIT 1
+                """, (change['table_name'], change['record_id']))
+                local_change = cur_local.fetchone()
+                if local_change:
+                    local_ts = local_change['created_at']
+                    cloud_ts = change['created_at']
+                    
+                    if isinstance(local_ts, str):
+                        local_ts = datetime.datetime.strptime(local_ts.split('.')[0], "%Y-%m-%d %H:%M:%S")
+                    if isinstance(cloud_ts, str):
+                        cloud_ts = datetime.datetime.strptime(cloud_ts.split('.')[0], "%Y-%m-%d %H:%M:%S")
+                    
+                    if hasattr(local_ts, 'tzinfo') and local_ts.tzinfo:
+                        local_ts = local_ts.replace(tzinfo=None)
+                    if hasattr(cloud_ts, 'tzinfo') and cloud_ts.tzinfo:
+                        cloud_ts = cloud_ts.replace(tzinfo=None)
+                        
+                    if local_ts > cloud_ts:
+                        is_conflicted_and_newer_locally = True
+                        log_sync_event("CONFLICT_RESOLVED", f"Conflict on {change['table_name']} record {change['record_id']}. Local change newer ({local_ts} > {cloud_ts}). Skipping.")
+            
+            if not is_conflicted_and_newer_locally:
+                query = change['query_sql']
+                import json
+                params = None
+                if change['query_params']:
+                    try:
+                        params = json.loads(change['query_params'])
+                        if isinstance(params, list):
+                            params = tuple(params)
+                    except:
+                        params = change['query_params']
+                
+                is_duplicate = False
+                if change['operation_type'] == 'INSERT' and change['record_id']:
+                    try:
+                        cur_dup = conn_local.cursor()
+                        cur_dup.execute(f"SELECT 1 FROM {change['table_name']} WHERE id = %s", (change['record_id'],))
+                        if cur_dup.fetchone():
+                            is_duplicate = True
+                        cur_dup.close()
+                    except:
+                        pass
+                
+                if is_duplicate:
+                    log_sync_event("RESTORE_SKIP", f"Duplicate detected for insert on {change['table_name']} record {change['record_id']}. Skipping.")
+                else:
+                    try:
+                        cur_local_write = conn_local.cursor()
+                        cur_local_write.execute(query, params)
+                        conn_local.commit()
+                        cur_local_write.close()
+                        log_sync_event("RESTORE_APPLY", f"[{idx+1}/{len(cloud_changes)}] Applied cloud change ({change['operation_type']}) to local table {change['table_name']}.")
+                    except Exception as e_mysql:
+                        conn_local.rollback()
+                        log_sync_event("RESTORE_ERROR", f"Failed to apply change ID {change['id']}: {e_mysql}")
+            
+            cur_cloud_write = conn_cloud.cursor()
+            cur_cloud_write.execute("UPDATE sync_queue SET status = 'PROCESSED' WHERE id = %s", (change['id'],))
+            conn_cloud.commit()
+            cur_cloud_write.close()
+            
+        log_sync_event("RESTORE_COMPLETE", "Reconciliation complete. Local MySQL is fully up to date.")
+        DB_STATUS = "local"
+        SYNC_SYSTEM_MODE = "LOCAL_PRIMARY"
+        
+        cur_local.close()
+        conn_local.close()
+        cur_cloud.close()
+        conn_cloud.close()
+        
+    except Exception as e:
+        log_sync_event("RESTORE_FATAL", f"Fatal error during restore sequence: {e}")
+        if conn_local:
+            try: conn_local.close()
+            except: pass
+        if conn_cloud:
+            try: conn_cloud.close()
+            except: pass
+        SYNC_SYSTEM_MODE = "CLOUD_FAILOVER"
+
+def db_sync_monitor_loop():
+    global SYNC_SYSTEM_MODE, MYSQL_HEALTH_RETRIES, MYSQL_IS_ALIVE, CLOUD_IS_ALIVE, DB_STATUS
+    
+    import time
+    time.sleep(5)  # Wait for startup to complete
+    
+    try:
+        ensure_sync_queue_tables()
+    except Exception as e:
+        log_sync_event("INIT_ERROR", f"Failed to initialize sync tables: {e}")
+        
+    log_sync_event("INIT", "Sync Failover Engine started.")
+    
+    while True:
+        try:
+            mysql_ok = check_mysql_health()
+            cloud_ok = check_cloud_health()
+            
+            MYSQL_IS_ALIVE = mysql_ok
+            CLOUD_IS_ALIVE = cloud_ok
+            
+            if SYNC_SYSTEM_MODE == "LOCAL_PRIMARY":
+                if not mysql_ok:
+                    MYSQL_HEALTH_RETRIES += 1
+                    if MYSQL_HEALTH_RETRIES >= MAX_MYSQL_HEALTH_RETRIES:
+                        log_sync_event("FAILOVER", f"Local MySQL offline after {MYSQL_HEALTH_RETRIES} retries. Switching to Cloud Failover.")
+                        SYNC_SYSTEM_MODE = "CLOUD_FAILOVER"
+                        DB_STATUS = "cloud"
+                else:
+                    MYSQL_HEALTH_RETRIES = 0
+                    push_local_queue_to_cloud()
+                    
+            elif SYNC_SYSTEM_MODE == "CLOUD_FAILOVER":
+                if mysql_ok:
+                    log_sync_event("RESTORE", "Local MySQL online. Initiating Restore sequence.")
+                    SYNC_SYSTEM_MODE = "RESTORING"
+                    import threading
+                    threading.Thread(target=run_restore_process, daemon=True).start()
+                    
+            elif SYNC_SYSTEM_MODE == "RESTORING":
+                pass
+                
+        except Exception as e:
+            log_sync_event("MONITOR_ERROR", f"Monitor loop error: {e}")
+            
+        time.sleep(3)
+
+
+def get_db_connection():
+    global DB_STATUS, MYSQL_IS_ALIVE, CLOUD_IS_ALIVE, SYNC_SYSTEM_MODE
+    
+    if SYNC_SYSTEM_MODE == "CLOUD_FAILOVER":
+        conn = get_cloud_db_connection_direct()
+        if conn:
+            DB_STATUS = "cloud"
+            return SyncProxyConnection(conn, is_pg=True)
+        return None
+
     try:
         pool = db_pool
         if pool is None:
@@ -924,7 +1705,7 @@ def get_db_connection():
             cursor.close()
             MYSQL_IS_ALIVE = True
             DB_STATUS = "local"
-            return conn
+            return SyncProxyConnection(conn, is_pg=False)
         if pool:
             conn = pool.get_connection()
             conn.autocommit = Config.MYSQL_AUTOCOMMIT
@@ -933,38 +1714,23 @@ def get_db_connection():
             cursor.close()
             MYSQL_IS_ALIVE = True
             DB_STATUS = "local"
-            return conn
+            return SyncProxyConnection(conn, is_pg=False)
     except Exception as local_err:
-        err_msg = f"[AUTOPILOT] Local MySQL request connection failed: {local_err}"
-        print(err_msg)
-        log_error(err_msg)
         MYSQL_IS_ALIVE = False
-            
-    # 2. If primary fails or is bypassed, instantly route to Supabase PostgreSQL (Failover) on Port 6543
-    if CLOUD_IS_ALIVE:
-        try:
-            raw_pg_conn = psycopg2.connect(
-                host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
-                port=6543,
-                database="postgres",
-                user="postgres",
-                password=SUPABASE_PASSWORD,
-                connect_timeout=1
-            )
+        conn = get_cloud_db_connection_direct()
+        if conn:
             DB_STATUS = "cloud"
-            return PostgreSQLProxyConnection(raw_pg_conn)
-        except Exception as pg_err:
-            err_msg = f"[CRITICAL FAILOVER ERROR] Supabase Connection Failed: {pg_err}"
-            print(err_msg)
-            log_error(err_msg)
-            CLOUD_IS_ALIVE = False  # Skip Cloud for future requests until background loop restores it!
-            return None
-    else:
-        return None
+            return SyncProxyConnection(conn, is_pg=True)
+            
+    return None
+
 
 def get_login_db_connection():
-    """Fast login-only connection to the configured server DB, without cloud failover waits."""
-    global DB_STATUS, MYSQL_IS_ALIVE
+    global DB_STATUS, MYSQL_IS_ALIVE, SYNC_SYSTEM_MODE
+    
+    if SYNC_SYSTEM_MODE == "CLOUD_FAILOVER":
+        return get_cloud_db_connection_direct()
+        
     try:
         conn = mysql.connector.connect(
             host=Config.MYSQL_HOST,
@@ -982,8 +1748,10 @@ def get_login_db_connection():
         DB_STATUS = "local"
         return conn
     except Exception as e:
-        log_error(f"[LOGIN DB ERROR] {e}")
-        return None
+        log_error(f"[LOGIN DB ERROR] Local MySQL: {e}")
+        MYSQL_IS_ALIVE = False
+        
+    return get_cloud_db_connection_direct()
 
 @app.route('/api/db-status')
 def get_db_status_route():
@@ -1000,15 +1768,21 @@ def manage_server_ip():
     if request.method == 'GET':
         return jsonify({
             'current_ip': Config.MYSQL_HOST,
+            'db_mode': getattr(Config, 'DATABASE_MODE', 'failover'),
             'active_config': getattr(Config, 'ACTIVE_CONFIG_PATH', 'Not Found')
         })
     
     data = request.json
     new_ip = data.get('ip', '127.0.0.1').strip()
+    new_mode = data.get('db_mode', 'failover').strip().lower()
     
+    if new_mode not in ('local', 'cloud', 'failover'):
+        return jsonify({'status': 'error', 'message': 'Invalid database mode.'}), 400
+        
     try:
         # 1. Update Class Memory
         Config.MYSQL_HOST = new_ip
+        Config.DATABASE_MODE = new_mode
         
         # 2. Update config.json file
         config_path = getattr(Config, 'ACTIVE_CONFIG_PATH', None)
@@ -1017,15 +1791,19 @@ def manage_server_ip():
                 config_data = json.load(f)
             
             config_data['MYSQL_HOST'] = new_ip
+            config_data['DATABASE_MODE'] = new_mode
             
             with open(config_path, 'w') as f:
                 json.dump(config_data, f, indent=4)
         
-        # 3. Reset DB Pool to force reconnect to new IP
+        # 3. Reset DB Pool to force reconnect
         global db_pool
         db_pool = None 
         
-        return jsonify({'status': 'success', 'message': f'Server IP updated to {new_ip}. Please restart if connection fails.'})
+        return jsonify({
+            'status': 'success', 
+            'message': f'Server configuration updated (IP: {new_ip}, Mode: {new_mode}). Please restart if connection fails.'
+            })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -1103,6 +1881,11 @@ def reset_database_route():
             except Exception as hist_err:
                 print(f"[AI AUTOPILOT WARNING] Failed to compile seasonal history: {hist_err}")
                 log_error(f"Failed to compile seasonal history during reset: {hist_err}")
+                # CRITICAL: rollback any aborted transaction state so subsequent queries work
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
 
             # Clear all transactional data but keep products and users
             tables = [
@@ -1147,6 +1930,96 @@ def reset_database_route():
         return jsonify({'status': 'error', 'message': f"Reset failed: {str(e)}"}), 500
     finally:
         if conn: conn.close()
+
+
+@app.route('/api/admin/system/wipe-both-dbs', methods=['POST'])
+def wipe_both_databases():
+    """Wipe all transaction data from BOTH local MySQL and Supabase cloud.
+    This gives a clean identical starting point on both sides for testing."""
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+
+    data = request.json or {}
+    password = data.get('password')
+
+    # Verify admin password against whichever DB is reachable
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'status': 'error', 'message': 'No database connection available'}), 500
+
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT password_hash FROM users WHERE username = %s", (session.get('username'),))
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user or user['password_hash'] != password:
+        return jsonify({'status': 'error', 'message': 'Incorrect security password.'}), 401
+
+    TRANSACTION_TABLES = [
+        'bill_items', 'bill_sequences', 'returns_log',
+        'stock_movements', 'expenses', 'audit_logs',
+        'account_entries', 'cash_balance', 'denominations', 'bills'
+    ]
+
+    results = {}
+
+    # ── 1. Wipe LOCAL MySQL ────────────────────────────────────────────────
+    try:
+        mysql_conn = mysql.connector.connect(
+            host=Config.MYSQL_HOST,
+            port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER,
+            password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DB,
+            connection_timeout=3,
+        )
+        mcur = mysql_conn.cursor()
+        mcur.execute("SET FOREIGN_KEY_CHECKS = 0")
+        for tbl in TRANSACTION_TABLES:
+            try:
+                mcur.execute(f"TRUNCATE TABLE {tbl}")
+            except Exception as te:
+                print(f"[WIPE LOCAL] {tbl}: {te}")
+        mcur.execute("SET FOREIGN_KEY_CHECKS = 1")
+        mysql_conn.commit()
+        mysql_conn.close()
+        results['local_mysql'] = 'wiped'
+        print("[WIPE] Local MySQL cleared successfully.")
+    except Exception as e:
+        results['local_mysql'] = f'skipped ({e})'
+        print(f"[WIPE] Local MySQL not available: {e}")
+
+    # ── 2. Wipe CLOUD Supabase ────────────────────────────────────────────
+    try:
+        raw_pg = psycopg2.connect(
+            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+            port=6543,
+            database="postgres",
+            user="postgres",
+            password=SUPABASE_PASSWORD,
+            connect_timeout=5
+        )
+        pgcur = raw_pg.cursor()
+        for tbl in TRANSACTION_TABLES:
+            try:
+                pgcur.execute(f"TRUNCATE TABLE {tbl} CASCADE")
+                raw_pg.commit()
+            except Exception as te:
+                raw_pg.rollback()
+                print(f"[WIPE CLOUD] {tbl}: {te}")
+        pgcur.close()
+        raw_pg.close()
+        results['supabase_cloud'] = 'wiped'
+        print("[WIPE] Supabase cloud cleared successfully.")
+    except Exception as e:
+        results['supabase_cloud'] = f'skipped ({e})'
+        print(f"[WIPE] Supabase not available: {e}")
+
+    return jsonify({
+        'status': 'success',
+        'message': 'Both databases wiped. Clean slate ready for testing.',
+        'details': results
+    })
 
 def fetch_database_size_kb(cursor):
     global DB_STATUS
@@ -1818,6 +2691,225 @@ def check_and_init_db():
         log_error(err_msg)
 
 
+def ensure_cloud_tables():
+    """Ensure all required tables exist in Supabase (PostgreSQL). Called at startup."""
+    print("[CLOUD INIT] Ensuring Supabase tables exist...")
+    try:
+        raw_conn = psycopg2.connect(
+            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+            port=6543,
+            database="postgres",
+            user="postgres",
+            password=SUPABASE_PASSWORD,
+            connect_timeout=5
+        )
+        cur = raw_conn.cursor()
+
+        ddl_statements = [
+            # users
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) NOT NULL UNIQUE,
+                password_hash VARCHAR(255) NOT NULL,
+                role VARCHAR(20) DEFAULT 'sales',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            # products
+            """
+            CREATE TABLE IF NOT EXISTS products (
+                id SERIAL PRIMARY KEY,
+                barcode VARCHAR(50) UNIQUE,
+                name VARCHAR(100) NOT NULL,
+                category VARCHAR(50),
+                price DECIMAL(10,2) NOT NULL,
+                current_stock DECIMAL(10,2) DEFAULT 0,
+                unit VARCHAR(20) DEFAULT 'PCS',
+                bizz DECIMAL(10,2) DEFAULT 0.00,
+                min_threshold INT DEFAULT 25,
+                expiry_date DATE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            # categories
+            "CREATE TABLE IF NOT EXISTS categories (id SERIAL PRIMARY KEY, name VARCHAR(100) NOT NULL UNIQUE)",
+            # bills
+            """
+            CREATE TABLE IF NOT EXISTS bills (
+                id SERIAL PRIMARY KEY,
+                invoice_no VARCHAR(20) UNIQUE,
+                client_request_id VARCHAR(64) UNIQUE,
+                bill_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                total_amount DECIMAL(10,2) NOT NULL,
+                payment_mode VARCHAR(20),
+                status VARCHAR(20) DEFAULT 'Paid',
+                tsc_percent DECIMAL(5,2) DEFAULT 0.00,
+                tsc_amount DECIMAL(10,2) DEFAULT 0.00,
+                discount DECIMAL(10,2) DEFAULT 0.00,
+                source_bill_id INT,
+                prev_total DECIMAL(10,2) DEFAULT 0.00,
+                balance DECIMAL(10,2) DEFAULT 0.00,
+                created_by VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            # bill_items
+            """
+            CREATE TABLE IF NOT EXISTS bill_items (
+                id SERIAL PRIMARY KEY,
+                bill_id INT REFERENCES bills(id) ON DELETE CASCADE,
+                product_code VARCHAR(50),
+                product_name VARCHAR(100),
+                qty DECIMAL(10,2),
+                rate DECIMAL(10,2),
+                amount DECIMAL(10,2),
+                bizz_percent DECIMAL(5,2),
+                bizz_amount DECIMAL(10,2)
+            )""",
+            # bill_sequences
+            """
+            CREATE TABLE IF NOT EXISTS bill_sequences (
+                seq_date DATE PRIMARY KEY,
+                last_value INT NOT NULL DEFAULT 0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            # stock_movements
+            """
+            CREATE TABLE IF NOT EXISTS stock_movements (
+                id SERIAL PRIMARY KEY,
+                product_id INT,
+                bill_id INT,
+                movement_type VARCHAR(30) NOT NULL,
+                qty_change DECIMAL(10,2) NOT NULL,
+                stock_before DECIMAL(10,2) NOT NULL,
+                stock_after DECIMAL(10,2) NOT NULL,
+                created_by VARCHAR(50),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            # returns_log
+            """
+            CREATE TABLE IF NOT EXISTS returns_log (
+                id SERIAL PRIMARY KEY,
+                bill_id INT,
+                product_name VARCHAR(100),
+                qty DECIMAL(10,2),
+                amount DECIMAL(10,2),
+                reason TEXT,
+                product_code VARCHAR(50),
+                status VARCHAR(50),
+                action VARCHAR(50),
+                created_by VARCHAR(50),
+                returned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            # expenses
+            """
+            CREATE TABLE IF NOT EXISTS expenses (
+                id SERIAL PRIMARY KEY,
+                expense_date DATE,
+                category VARCHAR(50),
+                amount DECIMAL(10,2),
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            # audit_logs
+            """
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id SERIAL PRIMARY KEY,
+                user_id VARCHAR(50),
+                action VARCHAR(255),
+                table_name VARCHAR(50),
+                record_id INT,
+                old_value TEXT,
+                new_value TEXT,
+                action_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+            # cash_balance
+            """
+            CREATE TABLE IF NOT EXISTS cash_balance (
+                id SERIAL PRIMARY KEY,
+                balance_date DATE UNIQUE,
+                opening_balance DECIMAL(10,2),
+                closing_balance DECIMAL(10,2),
+                actual_closing DECIMAL(10,2),
+                difference DECIMAL(10,2),
+                status VARCHAR(20) DEFAULT 'CLOSED'
+            )""",
+            # denominations
+            """
+            CREATE TABLE IF NOT EXISTS denominations (
+                id SERIAL PRIMARY KEY,
+                balance_id INT REFERENCES cash_balance(id) ON DELETE CASCADE,
+                note_value INT,
+                count INT
+            )""",
+            # account_entries
+            """
+            CREATE TABLE IF NOT EXISTS account_entries (
+                id SERIAL PRIMARY KEY,
+                entry_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                major_type VARCHAR(50) NOT NULL,
+                sub_type VARCHAR(100) NOT NULL,
+                description TEXT,
+                amount DECIMAL(15,2) NOT NULL,
+                payment_type VARCHAR(20) DEFAULT 'Cash',
+                created_by INT
+            )""",
+            # daily_position_list
+            "CREATE TABLE IF NOT EXISTS daily_position_list (barcode VARCHAR(50) PRIMARY KEY)",
+            # seasonal_history
+            """
+            CREATE TABLE IF NOT EXISTS seasonal_history (
+                id SERIAL PRIMARY KEY,
+                year INT NOT NULL,
+                month INT NOT NULL,
+                category VARCHAR(50) NOT NULL,
+                multiplier DECIMAL(5,2) DEFAULT 1.00,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (year, month, category)
+            )""",
+            # holidays
+            """
+            CREATE TABLE IF NOT EXISTS holidays (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(50) NOT NULL UNIQUE,
+                date DATE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
+        ]
+
+        for ddl in ddl_statements:
+            try:
+                cur.execute(ddl)
+                raw_conn.commit()
+            except Exception as tbl_err:
+                raw_conn.rollback()
+                print(f"[CLOUD INIT] Table create skipped (may already exist): {tbl_err}")
+
+        # Ensure default users exist
+        default_users = [
+            ('admin', 'admin123', 'admin'),
+            ('counter', '123', 'sales'),
+            ('counter1', '123', 'sales'),
+            ('counter2', '123', 'sales'),
+            ('counter3', '123', 'sales'),
+            ('counter4', '123', 'sales'),
+            ('accountant', 'account123', 'account')
+        ]
+        for uname, upwd, urole in default_users:
+            try:
+                cur.execute(
+                    "INSERT INTO users (username, password_hash, role) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+                    (uname, upwd, urole)
+                )
+                raw_conn.commit()
+            except Exception:
+                raw_conn.rollback()
+
+        cur.close()
+        raw_conn.close()
+        print("[CLOUD INIT] Supabase tables verified/created successfully.")
+    except Exception as e:
+        print(f"[CLOUD INIT WARNING] Could not connect to Supabase at startup: {e}")
+
+
 def process_seed_item(cursor, code, name, rate, bizz, category):
     try:
         if not code or not name: return
@@ -1840,6 +2932,16 @@ def process_seed_item(cursor, code, name, rate, bizz, category):
 # Check database before first request
 with app.app_context():
     check_and_init_db()
+    try:
+        import threading
+        threading.Thread(target=ensure_cloud_tables, daemon=True).start()
+    except Exception as _cloud_init_err:
+        print(f"[CLOUD INIT] Could not start table init thread: {_cloud_init_err}")
+    try:
+        import threading
+        threading.Thread(target=db_sync_monitor_loop, daemon=True).start()
+    except Exception as _sync_init_err:
+        print(f"[SYNC MON INIT] Could not start sync monitor thread: {_sync_init_err}")
 
 @app.route('/')
 def index():
@@ -2967,6 +4069,101 @@ def api_twin_ask():
             'message': f"Failed to generate Business Twin answer: {last_error}"
         }), 500
 
+@app.route('/admin/failover-sync')
+def admin_failover_sync():
+    if session.get('role') != 'admin':
+        return redirect(url_for('login'))
+    return render_template('admin/failover_sync.html')
+
+@app.route('/api/admin/sync/status')
+def api_sync_status():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+        
+    local_pending = 0
+    try:
+        conn = mysql.connector.connect(
+            host=Config.MYSQL_HOST,
+            port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER,
+            password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DB
+        )
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM sync_queue WHERE status = 'PENDING'")
+        local_pending = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+    except:
+        pass
+        
+    cloud_pending = 0
+    try:
+        conn = psycopg2.connect(
+            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+            port=6543,
+            database="postgres",
+            user="postgres",
+            password=SUPABASE_PASSWORD
+        )
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM sync_queue WHERE status = 'PENDING'")
+        cloud_pending = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+    except:
+        pass
+
+    return jsonify({
+        'status': 'success',
+        'mode': SYNC_SYSTEM_MODE,
+        'mysql': 'ONLINE' if check_mysql_health() else 'OFFLINE',
+        'cloud': 'ONLINE' if check_cloud_health() else 'OFFLINE',
+        'local_queue_pending': local_pending,
+        'cloud_queue_pending': cloud_pending,
+        'logs': SYNC_LOGS[:30]
+    })
+
+@app.route('/api/admin/sync/toggle-mode', methods=['POST'])
+def api_sync_toggle_mode():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+        
+    data = request.json or {}
+    target_mode = data.get('mode')
+    
+    global SYNC_SYSTEM_MODE, DB_STATUS
+    if target_mode in ("LOCAL_PRIMARY", "CLOUD_FAILOVER"):
+        SYNC_SYSTEM_MODE = target_mode
+        DB_STATUS = "local" if target_mode == "LOCAL_PRIMARY" else "cloud"
+        log_sync_event("MANUAL_MODE_CHANGE", f"Admin manually switched mode to {target_mode}.")
+        return jsonify({'status': 'success', 'message': f'Switched mode to {target_mode}'})
+        
+    return jsonify({'status': 'error', 'message': 'Invalid mode'}), 400
+
+@app.route('/api/admin/sync/force-action', methods=['POST'])
+def api_sync_force_action():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+        
+    data = request.json or {}
+    action = data.get('action')
+    
+    global SYNC_SYSTEM_MODE
+    if action == 'push':
+        import threading
+        threading.Thread(target=push_local_queue_to_cloud, daemon=True).start()
+        return jsonify({'status': 'success', 'message': 'Triggered local sync push in background.'})
+    elif action == 'restore':
+        if SYNC_SYSTEM_MODE != "RESTORING":
+            SYNC_SYSTEM_MODE = "RESTORING"
+            import threading
+            threading.Thread(target=run_restore_process, daemon=True).start()
+            return jsonify({'status': 'success', 'message': 'Triggered restore process in background.'})
+        return jsonify({'status': 'error', 'message': 'Restore already running'}), 400
+        
+    return jsonify({'status': 'error', 'message': 'Invalid action'}), 400
+
 @app.route('/admin/maintenance/health')
 def admin_maintenance_health():
     if session.get('role') != 'admin':
@@ -3009,6 +4206,43 @@ def api_maintenance_status():
             'waitress': 'ONLINE',
             'printer': 'ONLINE' if is_port_open(9100, "127.0.0.1", 0.5) else 'ONLINE (USB Virtual Mode)'
         }
+    })
+
+@app.route('/api/admin/maintenance/metrics')
+def api_maintenance_metrics():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+    return jsonify({
+        'status': 'success',
+        'history': MYSQL_HEALTH_HISTORY,
+        'risk': MYSQL_DOWNTIME_RISK,
+        'simulated_delay': SIMULATED_MYSQL_DELAY,
+        'simulated_failures': SIMULATED_MYSQL_FAILURES
+    })
+
+@app.route('/api/admin/maintenance/simulate', methods=['POST'])
+def api_maintenance_simulate():
+    if session.get('role') != 'admin':
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 403
+        
+    data = request.json or {}
+    global SIMULATED_MYSQL_DELAY, SIMULATED_MYSQL_FAILURES
+    
+    if 'delay' in data:
+        SIMULATED_MYSQL_DELAY = float(data['delay'])
+    if 'failures' in data:
+        SIMULATED_MYSQL_FAILURES = bool(data['failures'])
+        
+    if SIMULATED_MYSQL_FAILURES:
+        log_healing_event("MySQL Database", "FAULT", "Simulated database connection drops activated by administrator.", "Failover preparing; monitoring connection recovery.")
+    elif 'failures' in data and not SIMULATED_MYSQL_FAILURES:
+        log_healing_event("MySQL Database", "HEALED", "Simulated database connection drops deactivated by administrator.", "Connection re-established and healthy.")
+        
+    return jsonify({
+        'status': 'success',
+        'message': 'Simulation state updated successfully.',
+        'simulated_delay': SIMULATED_MYSQL_DELAY,
+        'simulated_failures': SIMULATED_MYSQL_FAILURES
     })
 
 @app.route('/api/admin/maintenance/logs')
@@ -3372,7 +4606,8 @@ def get_sales_changes_report():
                 rl.*, 
                 b.invoice_no as original_doc_id,
                 b.payment_mode,
-                (SELECT id FROM bills WHERE source_bill_id = rl.bill_id LIMIT 1) as new_bill_id
+                (SELECT id FROM bills WHERE source_bill_id = rl.bill_id LIMIT 1) as new_bill_id,
+                (SELECT invoice_no FROM bills WHERE source_bill_id = rl.bill_id LIMIT 1) as new_invoice_no
             FROM returns_log rl
             LEFT JOIN bills b ON rl.bill_id = b.id
             WHERE DATE(rl.return_date) >= %s AND DATE(rl.return_date) <= %s
@@ -3396,9 +4631,9 @@ def get_sales_changes_report():
                 'date': log['return_date'].strftime('%Y-%m-%dT%H:%M:%S') if log['return_date'] else None,
                 'type': type_label,
                 'bill_id': log['bill_id'],
-                'doc_id': f"{log['bill_id']:05d}",
-                'original_doc': f"{log['bill_id']:05d}",
-                'new_doc': f"{new_id:05d}" if new_id else None,
+                'doc_id': log['original_doc_id'] or f"{log['bill_id']:05d}",
+                'original_doc': log['original_doc_id'] or f"{log['bill_id']:05d}",
+                'new_doc': log['new_invoice_no'] or (f"{new_id:05d}" if new_id else None),
                 'product': log['product_name'],
                 'qty': float(log['qty'] or 0),
                 'amount': float(log['amount'] or 0),
@@ -4005,15 +5240,276 @@ def save_shift_data():
 
 @app.route('/api/stock/daily-report')
 def get_daily_stock_report():
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    
     conn = get_db_connection()
     if not conn: return jsonify([])
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT barcode, name, category, current_stock as stock, unit FROM products ORDER BY (barcode + 0), barcode")
-    data = cursor.fetchall()
-    conn.close()
-    for row in data:
-        row['stock'] = float(row['stock'] or 0)
-    return jsonify(data)
+    
+    try:
+        if start_date and end_date:
+            start_dt = f"{start_date} 00:00:00"
+            end_dt = f"{end_date} 23:59:59"
+            
+            # 1. Fetch all products
+            cursor.execute("SELECT id, barcode, name, category, current_stock, unit FROM products")
+            products = cursor.fetchall()
+            
+            # Sort products in Python to be database-agnostic (handles MySQL and Postgres)
+            def get_sort_key(p):
+                bc = p.get('barcode') or ''
+                try:
+                    return (0, float(bc), bc)
+                except ValueError:
+                    return (1, 0.0, bc)
+            products.sort(key=get_sort_key)
+            
+            # Map products by ID
+            results = {}
+            for p in products:
+                results[p['id']] = {
+                    'barcode': p['barcode'],
+                    'name': p['name'],
+                    'category': p['category'],
+                    'unit': p['unit'],
+                    'current_stock': float(p['current_stock'] or 0),
+                    'sales_during': 0.0,
+                    'sales_after': 0.0,
+                    'transfers_in_during': 0.0,
+                    'transfers_in_after': 0.0,
+                    'transfers_out_during': 0.0,
+                    'transfers_out_after': 0.0,
+                    'adjustments_pos_during': 0.0,
+                    'adjustments_neg_during': 0.0,
+                    'adjustments_after': 0.0,
+                    'returns_during': 0.0,
+                    'returns_after': 0.0,
+                    'voids_during': 0.0,
+                    'voids_after': 0.0,
+                }
+            
+            # 2. Sales during range
+            cursor.execute("""
+                SELECT p.id, COALESCE(SUM(bi.qty), 0) as qty
+                FROM bill_items bi
+                JOIN bills b ON bi.bill_id = b.id
+                JOIN products p ON bi.product_name = p.name
+                WHERE b.bill_date BETWEEN %s AND %s AND b.status != 'Cancelled'
+                GROUP BY p.id
+            """, (start_dt, end_dt))
+            for row in cursor.fetchall():
+                if row['id'] in results:
+                    results[row['id']]['sales_during'] = float(row['qty'])
+                    
+            # 3. Sales after range
+            cursor.execute("""
+                SELECT p.id, COALESCE(SUM(bi.qty), 0) as qty
+                FROM bill_items bi
+                JOIN bills b ON bi.bill_id = b.id
+                JOIN products p ON bi.product_name = p.name
+                WHERE b.bill_date > %s AND b.status != 'Cancelled'
+                GROUP BY p.id
+            """, (end_dt,))
+            for row in cursor.fetchall():
+                if row['id'] in results:
+                    results[row['id']]['sales_after'] = float(row['qty'])
+                    
+            # 4. Transfers during range
+            cursor.execute("""
+                SELECT p.id, st.transfer_type, COALESCE(SUM(st.qty), 0) as qty
+                FROM stock_transfers st
+                JOIN products p ON st.product_barcode = p.barcode
+                WHERE st.transfer_date BETWEEN %s AND %s
+                GROUP BY p.id, st.transfer_type
+            """, (start_dt, end_dt))
+            for row in cursor.fetchall():
+                pid = row['id']
+                if pid in results:
+                    ttype = row['transfer_type'].upper()
+                    if ttype == 'IN':
+                        results[pid]['transfers_in_during'] = float(row['qty'])
+                    elif ttype == 'OUT':
+                        results[pid]['transfers_out_during'] = float(row['qty'])
+                        
+            # 5. Transfers after range
+            cursor.execute("""
+                SELECT p.id, st.transfer_type, COALESCE(SUM(st.qty), 0) as qty
+                FROM stock_transfers st
+                JOIN products p ON st.product_barcode = p.barcode
+                WHERE st.transfer_date > %s
+                GROUP BY p.id, st.transfer_type
+            """, (end_dt,))
+            for row in cursor.fetchall():
+                pid = row['id']
+                if pid in results:
+                    ttype = row['transfer_type'].upper()
+                    if ttype == 'IN':
+                        results[pid]['transfers_in_after'] = float(row['qty'])
+                    elif ttype == 'OUT':
+                        results[pid]['transfers_out_after'] = float(row['qty'])
+                        
+            # 6. Adjustments during range
+            cursor.execute("""
+                SELECT product_id,
+                       COALESCE(SUM(CASE WHEN qty_change > 0 THEN qty_change ELSE 0 END), 0) as qty_pos,
+                       COALESCE(SUM(CASE WHEN qty_change < 0 THEN qty_change ELSE 0 END), 0) as qty_neg
+                FROM stock_movements
+                WHERE created_at BETWEEN %s AND %s AND movement_type = 'ADJUSTMENT'
+                GROUP BY product_id
+            """, (start_dt, end_dt))
+            for row in cursor.fetchall():
+                pid = row['product_id']
+                if pid in results:
+                    results[pid]['adjustments_pos_during'] = float(row['qty_pos'])
+                    results[pid]['adjustments_neg_during'] = float(row['qty_neg'])
+                    
+            # 7. Adjustments after range
+            cursor.execute("""
+                SELECT product_id, COALESCE(SUM(qty_change), 0) as qty
+                FROM stock_movements
+                WHERE created_at > %s AND movement_type = 'ADJUSTMENT'
+                GROUP BY product_id
+            """, (end_dt,))
+            for row in cursor.fetchall():
+                pid = row['product_id']
+                if pid in results:
+                    results[pid]['adjustments_after'] = float(row['qty'])
+            
+            # Determine return date column name
+            ret_col = "return_date"
+            try:
+                cursor.execute("SELECT return_date FROM returns_log LIMIT 1")
+                cursor.fetchall()
+            except Exception:
+                ret_col = "returned_at"
+                
+            # 8. Returns during range
+            cursor.execute(f"""
+                SELECT p.id, COALESCE(SUM(r.qty), 0) as qty
+                FROM returns_log r
+                JOIN products p ON r.product_code = p.barcode
+                WHERE r.{ret_col} BETWEEN %s AND %s AND r.action = 'restock'
+                GROUP BY p.id
+            """, (start_dt, end_dt))
+            for row in cursor.fetchall():
+                if row['id'] in results:
+                    results[row['id']]['returns_during'] = float(row['qty'])
+                    
+            # 9. Returns after range
+            cursor.execute(f"""
+                SELECT p.id, COALESCE(SUM(r.qty), 0) as qty
+                FROM returns_log r
+                JOIN products p ON r.product_code = p.barcode
+                WHERE r.{ret_col} > %s AND r.action = 'restock'
+                GROUP BY p.id
+            """, (end_dt,))
+            for row in cursor.fetchall():
+                if row['id'] in results:
+                    results[row['id']]['returns_after'] = float(row['qty'])
+                    
+            # 10. Voids during range (created before start_dt but cancelled/voided during range)
+            try:
+                cursor.execute("""
+                    SELECT p.id, COALESCE(SUM(bi.qty), 0) as qty
+                    FROM bill_items bi
+                    JOIN bills b ON bi.bill_id = b.id
+                    JOIN products p ON bi.product_name = p.name
+                    JOIN audit_logs al ON al.table_name = 'bills' AND al.record_id = b.id
+                    WHERE b.bill_date < %s AND al.action_time BETWEEN %s AND %s AND al.action IN ('CANCEL_BILL_PROCESS', 'VOID_BILL', 'DELETE_BILL')
+                    GROUP BY p.id
+                """, (start_dt, start_dt, end_dt))
+                for row in cursor.fetchall():
+                    if row['id'] in results:
+                        results[row['id']]['voids_during'] = float(row['qty'])
+            except Exception as e:
+                print(f"[Daily Stock Report Voids During Error] {e}")
+                
+            # 11. Voids after range (created before end_dt but cancelled/voided after end_dt)
+            try:
+                cursor.execute("""
+                    SELECT p.id, COALESCE(SUM(bi.qty), 0) as qty
+                    FROM bill_items bi
+                    JOIN bills b ON bi.bill_id = b.id
+                    JOIN products p ON bi.product_name = p.name
+                    JOIN audit_logs al ON al.table_name = 'bills' AND al.record_id = b.id
+                    WHERE b.bill_date <= %s AND al.action_time > %s AND al.action IN ('CANCEL_BILL_PROCESS', 'VOID_BILL', 'DELETE_BILL')
+                    GROUP BY p.id
+                """, (end_dt, end_dt))
+                for row in cursor.fetchall():
+                    if row['id'] in results:
+                        results[row['id']]['voids_after'] = float(row['qty'])
+            except Exception as e:
+                print(f"[Daily Stock Report Voids After Error] {e}")
+
+            # Assemble report data
+            report_data = []
+            for pid, r in results.items():
+                closing_stock = (
+                    r['current_stock']
+                    + r['sales_after']
+                    - r['returns_after']
+                    - r['voids_after']
+                    - r['transfers_in_after']
+                    + r['transfers_out_after']
+                    - r['adjustments_after']
+                )
+                
+                opening_stock = (
+                    closing_stock
+                    + r['sales_during']
+                    - r['returns_during']
+                    - r['voids_during']
+                    - r['transfers_in_during']
+                    + r['transfers_out_during']
+                    - r['adjustments_pos_during']
+                    - r['adjustments_neg_during']
+                )
+                
+                stock_received = r['adjustments_pos_during'] + r['adjustments_neg_during'] + r['returns_during'] + r['voids_during']
+                transfer = r['transfers_in_during'] - r['transfers_out_during']
+                sales = r['sales_during']
+                
+                report_data.append({
+                    'barcode': r['barcode'],
+                    'name': r['name'],
+                    'category': r['category'],
+                    'unit': r['unit'],
+                    'opening_stock': opening_stock,
+                    'stock_received': stock_received,
+                    'transfer': transfer,
+                    'sales': sales,
+                    'closing_stock': closing_stock,
+                    'stock': closing_stock
+                })
+            conn.close()
+            return jsonify(report_data)
+        else:
+            # Fallback to simple current stock report
+            cursor.execute("SELECT barcode, name, category, current_stock as stock, unit FROM products")
+            data = cursor.fetchall()
+            
+            # Sort products in Python to be database-agnostic (handles MySQL and Postgres)
+            def get_sort_key(p):
+                bc = p.get('barcode') or ''
+                try:
+                    return (0, float(bc), bc)
+                except ValueError:
+                    return (1, 0.0, bc)
+            data.sort(key=get_sort_key)
+            conn.close()
+            for row in data:
+                row['stock'] = float(row['stock'] or 0)
+                row['opening_stock'] = row['stock']
+                row['stock_received'] = 0.0
+                row['transfer'] = 0.0
+                row['sales'] = 0.0
+                row['closing_stock'] = row['stock']
+            return jsonify(data)
+    except Exception as e:
+        if conn: conn.close()
+        print(f"[Daily Stock Report Endpoint Error] {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/reports/daily-position')
 def get_daily_position_report():
@@ -4080,14 +5576,40 @@ def get_stock_transfers():
     conn = get_db_connection()
     if not conn: return jsonify([])
     cursor = conn.cursor(dictionary=True)
+    
+    start = request.args.get('start')
+    end = request.args.get('end')
+    
     try:
-        cursor.execute("SELECT transfer_date, product_barcode, product_name, qty, from_location, to_location FROM stock_transfers ORDER BY transfer_date DESC")
+        # Ensure transfer_type column exists (safe idempotent check)
+        try:
+            cursor.execute("ALTER TABLE stock_transfers ADD COLUMN transfer_type VARCHAR(10) DEFAULT 'OUT'")
+            conn.commit()
+        except:
+            conn.rollback()
+            
+        if start and end:
+            cursor.execute("""
+                SELECT transfer_date, product_barcode, product_name, qty,
+                       from_location, to_location, transfer_type, pushed_by
+                FROM stock_transfers
+                WHERE DATE(transfer_date) >= %s AND DATE(transfer_date) <= %s
+                ORDER BY transfer_date DESC
+            """, (start, end))
+        else:
+            cursor.execute("""
+                SELECT transfer_date, product_barcode, product_name, qty,
+                       from_location, to_location, transfer_type, pushed_by
+                FROM stock_transfers ORDER BY transfer_date DESC
+            """)
         data = cursor.fetchall()
-    except:
+    except Exception as e:
+        print(f"[Transfer Report Error] {e}")
         data = []
     conn.close()
     for row in data:
         row['qty'] = float(row['qty'] or 0)
+        row['transfer_type'] = row.get('transfer_type') or 'OUT'
         if isinstance(row.get('transfer_date'), (datetime.datetime, datetime.date)):
             row['transfer_date'] = row['transfer_date'].isoformat()
     return jsonify(data)
@@ -4127,6 +5649,11 @@ def sales_preview():
 @app.route('/sales/report')
 def sales_report():
     return render_template('sales/final_report.html')
+
+@app.route('/sales/returns')
+def sales_returns():
+    return render_template('sales/returns.html')
+
 
 @app.route('/api/return-item', methods=['POST'])
 def process_return():
@@ -4263,8 +5790,9 @@ def save_bill():
             
         # Continuous Global sequence (Does not reset daily)
         global_key = datetime.date(2000, 1, 1)
-        today_prefix = datetime.date.today().strftime("%Y%m%d")
         
+        # Note: `last_value` is backtick-quoted because it is a reserved keyword in MySQL 8.0.
+        # The PostgreSQL proxy translator automatically converts backticks to double-quotes.
         cursor.execute("SELECT `last_value` FROM bill_sequences WHERE seq_date = %s FOR UPDATE", (global_key,))
         res = cursor.fetchone()
         
@@ -4503,10 +6031,10 @@ def get_deep_analytics():
         if not c['category']: c['category'] = 'Uncategorized'
 
     cursor.execute("""
-        SELECT HOUR(bill_date) as hour, SUM(total_amount) as revenue
+        SELECT EXTRACT(HOUR FROM bill_date) as hour, SUM(total_amount) as revenue
         FROM bills
         WHERE status != 'Cancelled'
-        GROUP BY hour
+        GROUP BY EXTRACT(HOUR FROM bill_date)
         ORDER BY hour
     """)
     hourly_sales = cursor.fetchall()
@@ -4532,15 +6060,15 @@ def get_dashboard_realtime():
         query_params_today.append(session.get('username'))
 
     cursor.execute(f"""
-        SELECT HOUR(bill_date) as hour, SUM(total_amount) as revenue
+        SELECT EXTRACT(HOUR FROM bill_date) as hour, SUM(total_amount) as revenue
         FROM bills
         WHERE DATE(bill_date) = %s AND status != 'Cancelled'{user_filter}
-        GROUP BY hour
+        GROUP BY EXTRACT(HOUR FROM bill_date)
         ORDER BY hour
     """, tuple(query_params_today))
     hourly_raw = cursor.fetchall()
     
-    hourly_map = {row['hour']: float(row['revenue']) for row in hourly_raw}
+    hourly_map = {int(row['hour']): float(row['revenue']) for row in hourly_raw}
     hourly_data = []
     labels = []
     for h in range(9, 22):
@@ -4640,9 +6168,8 @@ def get_recent_bills():
             params.append(f"{int(bill_no):05d}")
             params.append(bill_no)
         else:
-            conditions.append("(invoice_no LIKE %s OR id = %s)")
+            conditions.append("invoice_no LIKE %s")
             params.append(f"%{bill_no}%")
-            params.append(bill_no)
             
     if start_date:
         conditions.append("DATE(bill_date) >= %s")
@@ -4706,13 +6233,15 @@ def get_all_bills_api():
     if not conn: return jsonify([])
     cursor = conn.cursor(dictionary=True)
     # Fetching all columns needed by the Bill-wise report
-    cursor.execute("SELECT id, invoice_no, total_amount, bill_date, status, discount, prev_total, source_bill_id FROM bills ORDER BY id DESC")
+    cursor.execute("SELECT id, invoice_no, total_amount, bill_date, status, discount, prev_total, source_bill_id, payment_mode, tsc_percent, tsc_amount FROM bills ORDER BY id DESC")
     bills = cursor.fetchall()
     conn.close()
     for b in bills:
         b['total_amount'] = float(b['total_amount'] or 0)
         b['discount'] = float(b.get('discount') or 0)
         b['prev_total'] = float(b.get('prev_total') or 0)
+        b['tsc_amount'] = float(b.get('tsc_amount') or 0)
+        b['tsc_percent'] = float(b.get('tsc_percent') or 0)
         if isinstance(b['bill_date'], (datetime.datetime, datetime.date)):
             b['bill_date'] = b['bill_date'].isoformat()
     return jsonify(bills)
@@ -5074,13 +6603,54 @@ def api_inventory_stock_adjust():
         if conn: conn.rollback(); conn.close()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/stock/next-reference')
+def get_next_transfer_reference_route():
+    transfer_key = datetime.date(2000, 1, 2)
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'next_id': "1", 'display_id': 'TRF-1'})
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT `last_value` FROM bill_sequences WHERE seq_date = %s", (transfer_key,))
+        res = cursor.fetchone()
+        next_val = 1
+        if res:
+            next_val = res[0] + 1
+        conn.close()
+        return jsonify({
+            'next_id': f"{next_val}",
+            'display_id': f"TRF-{next_val}"
+        })
+    except Exception as e:
+        if conn:
+            conn.close()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/sales/stock/transfer')
+def sales_stock_transfer():
+    return render_template('sales/stock_transfer.html')
+
+@app.route('/sales/reports/transfer-report')
+def sales_reports_transfer_report():
+    return render_template('sales/transfer_report.html')
+
 @app.route('/api/stock/transfer', methods=['POST'])
 def api_stock_transfer():
     data = request.json
     items = data.get('items', [])
-    from_loc = data.get('from_location')
-    to_loc = data.get('to_location')
-    transfer_type = data.get('type', 'out') # 'in' or 'out'
+    
+    # Enforce role-based transfer rules strictly on backend
+    role = session.get('role')
+    if role == 'admin':
+        transfer_type = 'IN'
+        from_loc = 'Godown'
+        to_loc = 'Shop'
+    else:
+        # Default/Sales/Counter role
+        transfer_type = 'OUT'
+        from_loc = 'Shop'
+        to_loc = 'Godown'
+        
     reference = data.get('reference', 'GEN-TRF')
 
     conn = get_db_connection()
@@ -5088,29 +6658,64 @@ def api_stock_transfer():
     
     try:
         cursor = conn.cursor(dictionary=True)
+        
+        # Ensure transfer_type column exists
+        try:
+            cursor.execute("ALTER TABLE stock_transfers ADD COLUMN transfer_type VARCHAR(10) DEFAULT 'OUT'")
+            conn.commit()
+        except:
+            conn.rollback()
+        
+        # Auto-sequence reference logic if reference is AUTO, MANUAL, GEN-TRF, empty, or starts with TRF-
+        is_auto = False
+        ref_stripped = reference.strip() if reference else ""
+        if not ref_stripped or ref_stripped == 'AUTO' or ref_stripped == 'MANUAL' or ref_stripped == 'GEN-TRF' or ref_stripped.startswith('TRF-'):
+            is_auto = True
+            
+        if is_auto:
+            transfer_key = datetime.date(2000, 1, 2)
+            cursor.execute("SELECT `last_value` FROM bill_sequences WHERE seq_date = %s FOR UPDATE", (transfer_key,))
+            res = cursor.fetchone()
+            if res:
+                next_val = res['last_value'] + 1
+                cursor.execute("UPDATE bill_sequences SET `last_value` = %s WHERE seq_date = %s", (next_val, transfer_key))
+            else:
+                next_val = 1
+                cursor.execute("INSERT INTO bill_sequences (seq_date, `last_value`) VALUES (%s, %s)", (transfer_key, next_val))
+            reference = f"TRF-{next_val}"
+        
         for item in items:
             pid = item['id']
             qty = float(item['qty'])
-            diff = qty if transfer_type == 'in' else -qty
+            # IN = stock increases (coming in), OUT = stock decreases (going out)
+            diff = qty if transfer_type == 'IN' else -qty
             
-            # 1. Update stock
+            # 1. Update product stock
             cursor.execute("UPDATE products SET current_stock = current_stock + %s WHERE id = %s", (diff, pid))
             
-            # 2. Log transfer
-            cursor.execute("SELECT barcode, name FROM products WHERE id = %s", (pid,))
+            # 2. Log transfer record with type
+            cursor.execute("SELECT barcode, name, current_stock FROM products WHERE id = %s", (pid,))
             p = cursor.fetchone()
             if p:
                 cursor.execute("""
-                    INSERT INTO stock_transfers (product_barcode, product_name, qty, from_location, to_location, pushed_by)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (p['barcode'], p['name'], qty, from_loc, to_loc, f"Admin (Ref: {reference})"))
-                
-        conn.commit(); conn.close()
+                     INSERT INTO stock_transfers
+                       (product_barcode, product_name, qty, from_location, to_location, transfer_type, pushed_by)
+                     VALUES (%s, %s, %s, %s, %s, %s, %s)
+                 """, (
+                    p['barcode'], p['name'], qty,
+                    from_loc, to_loc,
+                    transfer_type,
+                    f"{session.get('username', 'Admin')} (Ref: {reference})"
+                ))
+                 
+        conn.commit()
+        conn.close()
         socketio.emit('stock_updated', {'type': 'stock_transfer'})
-        return jsonify({'status': 'success'})
+        return jsonify({'status': 'success', 'reference': reference})
     except Exception as e: 
         if conn: conn.rollback(); conn.close()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 import threading
 import webbrowser
@@ -5125,9 +6730,44 @@ def run_flask():
     socketio.run(app, host=Config.SERVER_HOST, port=Config.SERVER_PORT, allow_unsafe_werkzeug=True)
 
 if __name__ == '__main__':
+    # Auto-create required tables if missing
+    try:
+        _conn = get_db_connection()
+        if _conn:
+            _cur = _conn.cursor()
+            is_pg = False
+            if hasattr(_conn, 'is_pg'):
+                is_pg = _conn.is_pg
+                
+            id_col_def = "id SERIAL PRIMARY KEY" if is_pg else "id INT AUTO_INCREMENT PRIMARY KEY"
+            _cur.execute(
+                f"CREATE TABLE IF NOT EXISTS stock_transfers ("
+                f"  {id_col_def},"
+                "  transfer_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+                "  product_barcode VARCHAR(50),"
+                "  product_name VARCHAR(255),"
+                "  qty DECIMAL(10,2),"
+                "  from_location VARCHAR(100),"
+                "  to_location VARCHAR(100),"
+                "  transfer_type VARCHAR(10) DEFAULT 'OUT',"
+                "  pushed_by VARCHAR(100)"
+                ")"
+            )
+            # Add transfer_type column if table existed without it
+            try:
+                _cur.execute("ALTER TABLE stock_transfers ADD COLUMN transfer_type VARCHAR(10) DEFAULT 'OUT'")
+            except:
+                pass
+            _conn.commit()
+            _conn.close()
+            print("[Startup] stock_transfers table ready.")
+    except Exception as _e:
+        print(f"[Startup] Table check skipped: {_e}")
+
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
     time.sleep(2)
+
     try:
         host = Config.SERVER_HOST if Config.SERVER_HOST != '0.0.0.0' else '127.0.0.1'
         url = f"http://{host}:{Config.SERVER_PORT}/"

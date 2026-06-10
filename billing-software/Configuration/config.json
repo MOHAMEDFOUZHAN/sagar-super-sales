@@ -6,9 +6,10 @@
     "MYSQL_PORT": 3306,
     "MYSQL_POOL_NAME": "maple_pool",
     "MYSQL_POOL_SIZE": 32,
-    "AUTO_START_LARAGON": true,
+    "AUTO_START_LARAGON": false,
     "SERVER_HOST": "0.0.0.0",
     "SERVER_PORT": 5004,
     "WAITRESS_THREADS": 50,
-    "SCAN_MODE": "manual"
+    "SCAN_MODE": "manual",
+    "DATABASE_MODE": "failover"
 }

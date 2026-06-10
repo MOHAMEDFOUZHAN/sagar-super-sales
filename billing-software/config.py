@@ -13,6 +13,7 @@ class Config:
     MYSQL_POOL_SIZE = 32
     MYSQL_AUTOCOMMIT = False
     AUTO_START_LARAGON = False
+    DATABASE_MODE = 'failover'  # 'local', 'cloud', or 'failover'
     
     # Server Connection Configuration
     SERVER_HOST = '0.0.0.0' # Listen on all interfaces so client PCs can connect
@@ -73,7 +74,8 @@ class Config:
                     "AUTO_START_LARAGON": cls.AUTO_START_LARAGON,
                     "SERVER_HOST": cls.SERVER_HOST,
                     "SERVER_PORT": cls.SERVER_PORT,
-                    "WAITRESS_THREADS": cls.WAITRESS_THREADS
+                    "WAITRESS_THREADS": cls.WAITRESS_THREADS,
+                    "DATABASE_MODE": cls.DATABASE_MODE
                 }
                 with open(found_file, 'w') as f:
                     json.dump(sample_data, f, indent=4)
@@ -95,6 +97,7 @@ class Config:
                     cls.SERVER_PORT = int(data.get('SERVER_PORT', cls.SERVER_PORT))
                     cls.WAITRESS_THREADS = int(data.get('WAITRESS_THREADS', cls.WAITRESS_THREADS))
                     cls.SCAN_MODE = data.get('SCAN_MODE', cls.SCAN_MODE)
+                    cls.DATABASE_MODE = data.get('DATABASE_MODE', cls.DATABASE_MODE)
                 
                 # Store the actual path used for other utilities to reference
                 cls.ACTIVE_CONFIG_PATH = found_file

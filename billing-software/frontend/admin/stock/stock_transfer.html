@@ -12,7 +12,7 @@
 
     <title>Stock Transfer - Sagar Super Maple Pro</title>
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
@@ -72,11 +72,11 @@
 
                     <label>Transfer Type</label>
 
-                    <select id="tType" class="input-dark">
+                    <select id="tType" class="input-dark" disabled style="background: rgba(255,255,255,0.03); color: var(--text-muted); cursor: not-allowed;">
 
-                        <option value="in">IN (From Godown/Supplier)</option>
+                        <option value="in" selected>IN (Godown → Shop)</option>
 
-                        <option value="out">OUT (To Godown/Damage/Loss)</option>
+                        <option value="out">OUT (Shop → Godown)</option>
 
                     </select>
 
@@ -154,7 +154,7 @@
 
                     <div class="form-group" style="margin: 0; width: 200px;">
 
-                        <input type="text" id="tRef" class="input-dark" placeholder="Reference / Challan No">
+                        <input type="text" id="tRef" class="input-dark" placeholder="Reference / Challan No" readonly style="background: rgba(255,255,255,0.03); color: var(--text-muted); cursor: not-allowed;">
 
                     </div>
 
@@ -201,12 +201,11 @@
 
 
                 <div
-
                     style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border); display: flex; gap: 15px;">
 
-                    <button class="btn btn-secondary" onclick="clearList()" style="flex: 1;">
+                    <button onclick="clearList()" style="flex: 1; padding: 12px; border-radius: var(--radius-md); border: 1px solid rgba(239,68,68,0.5); background: rgba(239,68,68,0.12); color: #ef4444; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease;" onmouseover="this.style.background='rgba(239,68,68,0.22)'" onmouseout="this.style.background='rgba(239,68,68,0.12)'">
 
-                        <i class="fa-solid fa-trash-can"></i> Clear List
+                        <i class="fa-solid fa-trash-can"></i> CLEAR LIST
 
                     </button>
 
@@ -265,6 +264,14 @@
 
             } catch (err) { console.error('Failed to load products'); }
 
+            // Fetch next reference sequence
+            try {
+                const refRes = await fetch('/api/stock/next-reference');
+                const refData = await refRes.json();
+                if (refData.display_id) {
+                    document.getElementById('tRef').value = refData.display_id;
+                }
+            } catch (err) { console.error('Failed to load next reference sequence', err); }
         }
 
 
@@ -521,13 +528,20 @@
 
         async function submitBatchTransfer() {
 
-            const type = document.getElementById('tType').value;
+            const type = document.getElementById('tType').value; // 'in' or 'out'
 
             const ref = document.getElementById('tRef').value;
 
 
 
             if (transferItems.length === 0) return;
+
+
+
+            // IN = Godown → Shop (stock increases in shop)
+            // OUT = Shop → Godown (stock decreases from shop)
+            const fromLoc = type === 'in' ? 'Godown' : 'Shop';
+            const toLoc   = type === 'in' ? 'Shop'   : 'Godown';
 
 
 
@@ -543,7 +557,7 @@
 
             try {
 
-                const res = await fetch('/api/inventory/batch-stock-adjust', {
+                const res = await fetch('/api/stock/transfer', {
 
                     method: 'POST',
 
@@ -553,7 +567,11 @@
 
                         type: type,
 
-                        reference: ref,
+                        reference: ref || 'MANUAL',
+
+                        from_location: fromLoc,
+
+                        to_location: toLoc,
 
                         items: transferItems
 
@@ -567,7 +585,9 @@
 
                 if (result.status === 'success') {
 
-                    alert('Batch Transfer Recorded Successfully!');
+                    const typeLabel = type === 'in' ? '✅ Stock IN recorded!' : '✅ Stock OUT recorded!';
+
+                    alert(typeLabel + ' Batch Transfer Completed Successfully!');
 
                     transferItems = [];
 

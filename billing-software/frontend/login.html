@@ -14,15 +14,15 @@
 
     <!-- Google Fonts: Inter -->
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    
 
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
 
     <!-- Font Awesome for Icons -->
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
 
     <style>
 
@@ -843,7 +843,7 @@
 
                 <div class="brand" style="justify-content: center; margin-bottom: 25px;">
 
-                    <img src="/images/logo.ico" style="width: 42px; height: 42px; object-fit: contain;"> Sagar Super Maple Pro
+                    <img src="/images/logo.ico" style="width: 42px; height: 42px; object-fit: contain;"> <span class="maple-pro">Maple Pro</span>
 
                 </div>
 
@@ -1005,13 +1005,37 @@
 
             <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 20px;">
 
-                Enter the IP Address of the Main Server PC.
+                Choose the Database Mode and configure the connection settings.
 
             </p>
 
             
 
-            <div class="form-group" style="opacity: 1; transform: none; animation: none;">
+            <div class="form-group" style="opacity: 1; transform: none; animation: none; margin-bottom: 15px;">
+
+                <label>Database Mode</label>
+
+                <div class="input-wrapper">
+
+                    <select id="dbMode" class="form-control" onchange="toggleIpField()" style="cursor: pointer; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--glass-border); color: white; padding-right: 30px;">
+
+                        <option value="local" style="background: #1e1e2e; color: #fff;">Local Only (Main Server)</option>
+
+                        <option value="cloud" style="background: #1e1e2e; color: #fff;">Cloud Only (Supabase)</option>
+
+                        <option value="failover" style="background: #1e1e2e; color: #fff;">Hybrid / Failover (Local + Cloud)</option>
+
+                    </select>
+
+                    <i class="fa-solid fa-database"></i>
+
+                </div>
+
+            </div>
+
+
+
+            <div id="serverIpGroup" class="form-group" style="opacity: 1; transform: none; animation: none;">
 
                 <label>Main Server IP</label>
 
@@ -1045,6 +1069,26 @@
 
     <script>
 
+        function toggleIpField() {
+
+            const dbMode = document.getElementById('dbMode').value;
+
+            const ipGroup = document.getElementById('serverIpGroup');
+
+            if (dbMode === 'cloud') {
+
+                ipGroup.style.display = 'none';
+
+            } else {
+
+                ipGroup.style.display = 'block';
+
+            }
+
+        }
+
+
+
         function openConfigModal() {
 
             document.getElementById('configModal').style.display = 'flex';
@@ -1055,7 +1099,11 @@
 
                 .then(data => {
 
-                    document.getElementById('serverIp').value = data.current_ip;
+                    document.getElementById('serverIp').value = data.current_ip || '127.0.0.1';
+
+                    document.getElementById('dbMode').value = data.db_mode || 'failover';
+
+                    toggleIpField();
 
                 });
 
@@ -1075,6 +1123,8 @@
 
             const ip = document.getElementById('serverIp').value;
 
+            const dbMode = document.getElementById('dbMode').value;
+
             const status = document.getElementById('configStatus');
 
             status.innerHTML = '<span style="color: #6366f1;">Updating...</span>';
@@ -1087,7 +1137,7 @@
 
                 headers: {'Content-Type': 'application/json'},
 
-                body: JSON.stringify({ip: ip})
+                body: JSON.stringify({ip: ip, db_mode: dbMode})
 
             })
 
@@ -1214,7 +1264,7 @@
     }
 </style>
 <footer class="dynamic-footer" style="position: absolute; bottom: 0; left: 0; width: 100%; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; z-index: 5; background: transparent;">
-    <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
+    <p>© 2025 Sagar Nilgiri Products | <span class="maple-pro">Maple Pro</span></p>
 </footer>
 </body>
 

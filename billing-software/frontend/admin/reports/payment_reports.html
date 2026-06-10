@@ -12,11 +12,11 @@
 
     <title>Payment Reports - Sagar Super</title>
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='assets/js/chart.js') }}"></script>
 
     <style>
 
@@ -639,7 +639,7 @@
 
                             const timeStr = bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
-                            const docID = `SS-${item.bill_id}`;
+                            const docID = item.invoice_no || `SS-${item.bill_id}`;
 
 
 

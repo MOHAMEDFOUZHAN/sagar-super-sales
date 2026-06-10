@@ -12,7 +12,7 @@
 
     <title>Billwise Sales Report - Sagar Super</title>
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
@@ -427,7 +427,7 @@
 
                     <td style="color: var(--text-muted);">${timeStr}</td>
 
-                    <td style="font-weight: 700; color: var(--primary);">SS-${b.id}</td>
+                    <td style="font-weight: 700; color: var(--primary);">${b.invoice_no || ('SS-' + b.id)}</td>
 
                     <td><span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-main);">${modeUpper}</span></td>
 

@@ -16,6 +16,8 @@ DROP TABLE IF EXISTS products CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS account_entries CASCADE;
 DROP TABLE IF EXISTS daily_position_list CASCADE;
+DROP TABLE IF EXISTS seasonal_history CASCADE;
+DROP TABLE IF EXISTS holidays CASCADE;
 
 -- 2. CREATE TABLES IN LOGICAL ORDER
 
@@ -173,6 +175,25 @@ CREATE TABLE IF NOT EXISTS account_entries (
 -- Daily Position List Table
 CREATE TABLE IF NOT EXISTS daily_position_list (
     barcode VARCHAR(50) PRIMARY KEY
+);
+
+-- Seasonal History Table
+CREATE TABLE IF NOT EXISTS seasonal_history (
+    id SERIAL PRIMARY KEY,
+    year INT NOT NULL,
+    month INT NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    multiplier DECIMAL(5, 2) DEFAULT 1.00,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (year, month, category)
+);
+
+-- Holidays Table
+CREATE TABLE IF NOT EXISTS holidays (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    date DATE NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 3. CREATE PERFORMANCE INDEXES

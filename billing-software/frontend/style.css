@@ -82,6 +82,7 @@ body {
 }
 
 .brand {
+    font-family: 'Gill Sans MT', 'Gill Sans', Calibri, sans-serif !important;
     font-size: 1.6rem;
     font-weight: 800;
     color: white;
@@ -89,7 +90,11 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
-    letter-spacing: -1px;
+    letter-spacing: -0.5px;
+}
+
+.maple-pro {
+    font-family: 'Gill Sans MT', 'Gill Sans', Calibri, sans-serif !important;
 }
 
 .brand i {

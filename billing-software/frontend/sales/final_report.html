@@ -14,13 +14,9 @@
 
     <!-- Fonts & Icons -->
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+    
 
-        rel="stylesheet">
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
 
     <style>
 
@@ -839,6 +835,7 @@
     </style>
 
     <link rel='stylesheet' href='/theme.css'>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
 </head>
 
@@ -852,7 +849,7 @@
 
         <div class="brand" style="font-size: 1.5rem; font-weight: 900; margin-bottom: 40px; color: white; display: flex; align-items: center; gap: 12px;">
 
-            <img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> Sagar Super Maple Pro
+            <img src="/images/logo.ico" style="width: 32px; height: 32px; object-fit: contain;"> <span class="maple-pro">Maple Pro</span>
 
         </div>
 
@@ -869,6 +866,10 @@
             <li><a href="/sales/report" class="nav-link active"><i class="fa-solid fa-file-invoice-dollar"></i> Final Audit</a></li>
 
             <li><a href="/sales/returns" class="nav-link"><i class="fa-solid fa-rotate-left"></i> Returns & Voids</a></li>
+
+            <li><a href="/sales/stock/transfer" class="nav-link"><i class="fa-solid fa-truck-ramp-box"></i> Stock Transfer</a></li>
+
+            <li><a href="/sales/reports/transfer-report" class="nav-link"><i class="fa-solid fa-truck-arrow-right"></i> Transfer Report</a></li>
 
         </ul>
 
@@ -1395,7 +1396,7 @@
     }
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-    <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
+    <p>© 2025 Sagar Nilgiri Products | <span class="maple-pro">Maple Pro</span></p>
 </footer>
 </main>
 
@@ -2177,7 +2178,7 @@
 
         if (typeof io === 'undefined') {
             const script = document.createElement('script');
-            script.src = 'https://cdn.socket.io/4.7.5/socket.io.min.js';
+            script.src = '{{ url_for('static', filename='assets/js/socket.io.min.js') }}';
             script.onload = initSocketIO;
             document.head.appendChild(script);
         } else {

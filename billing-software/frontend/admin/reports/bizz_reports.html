@@ -12,11 +12,11 @@
 
     <title>Loyalty Analytics - Sagar Super</title>
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='assets/js/chart.js') }}"></script>
 
     <style>
 
@@ -659,7 +659,7 @@
 
                 const filteredBills = billData.filter(r => {
 
-                    const bDate = new Date(r.date);
+                    const bDate = new Date(r.bill_date);
 
                     const d = bDate.getFullYear() + '-' + String(bDate.getMonth() + 1).padStart(2, '0') + '-' + String(bDate.getDate()).padStart(2, '0');
 
@@ -747,7 +747,7 @@
 
                             <td style="font-size: 0.75rem; color: var(--text-muted);">${new Date(r.bill_date).toLocaleDateString()}</td>
 
-                            <td>#${r.bill_id}</td>
+                            <td>${r.invoice_no || ('#' + r.bill_id)}</td>
 
                             <td style="font-weight: bold;">${r.product_name}</td>
 
@@ -865,17 +865,17 @@
 
                         <tr>
 
-                            <td style="font-size: 0.75rem; color: var(--text-muted);">${new Date(r.date).toLocaleDateString()}</td>
+                            <td style="font-size: 0.75rem; color: var(--text-muted);">${new Date(r.bill_date).toLocaleDateString()}</td>
 
-                            <td style="font-weight: bold;">${r.doc_id}</td>
+                            <td style="font-weight: bold;">${r.invoice_no || ('SS-' + r.id)}</td>
 
-                            <td style="font-weight: 600;">\u20B9${r.total.toLocaleString('en-IN')}</td>
+                            <td style="font-weight: 600;">\u20B9${(r.total_amount || 0).toLocaleString('en-IN')}</td>
 
                             <td><span class="slab-badge">${r.tsc_percent}%</span></td>
 
                             <td style="color: var(--accent); font-weight: 800;">\u20B9${r.tsc_amount.toFixed(2)}</td>
 
-                            <td><span class="stat-badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted);">${r.mode}</span></td>
+                            <td><span class="stat-badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted);">${r.payment_mode || ''}</span></td>
 
                         </tr>
 
@@ -899,7 +899,8 @@
 
                 if (r.tsc_amount > 0) {
 
-                    modeData[r.mode] = (modeData[r.mode] || 0) + r.tsc_amount;
+                    const pMode = r.payment_mode || 'UNKNOWN';
+                    modeData[pMode] = (modeData[pMode] || 0) + r.tsc_amount;
 
                 }
 
