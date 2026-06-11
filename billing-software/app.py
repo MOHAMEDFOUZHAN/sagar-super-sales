@@ -32,7 +32,11 @@ from engineio.async_drivers import threading as engineio_threading
 
 # Load local .env variables dynamically (Zero-dependency dotenv support)
 if getattr(sys, 'frozen', False):
-    base_dir = os.path.dirname(sys.executable)
+    exe_dir = os.path.dirname(sys.executable)
+    if os.path.exists(os.path.join(exe_dir, ".env")):
+        base_dir = exe_dir
+    else:
+        base_dir = getattr(sys, '_MEIPASS', exe_dir)
 else:
     base_dir = os.path.dirname(os.path.abspath(__file__))
 env_path = os.path.join(base_dir, ".env")
@@ -155,6 +159,7 @@ def perform_database_sync(mysql_conn, pg_conn):
         return str(val)
 
     try:
+        local_changes_made = False
         mysql_cur = mysql_conn.cursor(dictionary=True)
         pg_cur = pg_conn.cursor(dictionary=True)
 
@@ -174,6 +179,49 @@ def perform_database_sync(mysql_conn, pg_conn):
                 mysql_cur.execute("SELECT * FROM bills WHERE invoice_no = %s", (inv,))
                 bill = mysql_cur.fetchone()
                 if not bill: continue
+
+                # Check if this invoice has a PENDING INSERT in the local sync_queue
+                mysql_cur.execute("""
+                    SELECT 1 FROM sync_queue 
+                    WHERE table_name = 'bills' AND operation_type = 'INSERT' AND invoice_no = %s AND status = 'PENDING'
+                """, (inv,))
+                is_pending = mysql_cur.fetchone()
+                
+                if not is_pending:
+                    # The bill has already been synced and was deleted on the cloud. Delete it locally.
+                    print(f"[SYNC] Bill SS#{inv} was deleted on Cloud. Deleting locally to sync.")
+                    
+                    # 1. Fetch items of the bill
+                    mysql_cur.execute("SELECT * FROM bill_items WHERE bill_id = %s", (bill['id'],))
+                    items = mysql_cur.fetchall()
+                    
+                    # 2. Restock items if the status is not Cancelled
+                    if bill['status'] != 'Cancelled':
+                        for item in items:
+                            mysql_cur.execute("UPDATE products SET current_stock = current_stock + %s WHERE name = %s", (item['qty'], item['product_name']))
+                    
+                    # 3. Delete from local tables
+                    mysql_cur.execute("DELETE FROM returns_log WHERE bill_id = %s", (bill['id'],))
+                    mysql_cur.execute("DELETE FROM bill_items WHERE bill_id = %s", (bill['id'],))
+                    mysql_cur.execute("DELETE FROM stock_movements WHERE bill_id = %s", (bill['id'],))
+                    mysql_cur.execute("DELETE FROM bills WHERE id = %s", (bill['id'],))
+                    
+                    # Log audit trail locally
+                    mysql_cur.execute("""
+                        INSERT INTO audit_logs (action, table_name, record_id, old_value, new_value, user_id)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, ('SYNC_CLOUD_DELETE_TO_LOCAL', 'bills', bill['id'], f"Invoice: {bill['invoice_no']}", None, 'SYSTEM'))
+                    
+                    mysql_conn.commit()
+                    local_changes_made = True
+                    
+                    # Emit socket update to notify clients of local stock changes
+                    try:
+                        socketio.emit('stock_updated', {'type': 'billing_deletion', 'bill_id': bill['id']})
+                    except Exception as socket_err:
+                        print(f"[SYNC WARNING] Failed to emit Socket.IO event: {socket_err}")
+                        
+                    continue
 
                 mysql_cur.execute("SELECT * FROM bill_items WHERE bill_id = %s", (bill['id'],))
                 items = mysql_cur.fetchall()
@@ -242,6 +290,7 @@ def perform_database_sync(mysql_conn, pg_conn):
                 """, ('SYNC_CLOUD_TO_LOCAL', 'bills', new_bill_id, None, f"Invoice: {bill['invoice_no']}", 'SYSTEM'))
 
                 mysql_conn.commit()
+                local_changes_made = True
                 print(f"[SYNC] Downloaded Cloud Bill SS#{bill['invoice_no']} to Local MySQL.")
             except Exception as e:
                 mysql_conn.rollback()
@@ -270,6 +319,7 @@ def perform_database_sync(mysql_conn, pg_conn):
                         elif p_status == 'Cancelled':
                             mysql_cur.execute("UPDATE bills SET status = 'Cancelled', total_amount = 0 WHERE invoice_no = %s", (inv,))
                             mysql_conn.commit()
+                            local_changes_made = True
                             print(f"[SYNC] Synced cancellation status for Bill SS#{inv} to Local.")
 
         # ----------------------------------------------------
@@ -302,6 +352,7 @@ def perform_database_sync(mysql_conn, pg_conn):
                         VALUES (%s, %s, %s, %s)
                     """, (exp_date_str, exp['category'], exp['amount'], exp['description']))
                     mysql_conn.commit()
+                    local_changes_made = True
                 except Exception:
                     mysql_conn.rollback()
 
@@ -334,6 +385,11 @@ def perform_database_sync(mysql_conn, pg_conn):
 
         mysql_cur.close()
         pg_cur.close()
+        if local_changes_made:
+            try:
+                socketio.emit('stock_updated', {'type': 'reconciliation'})
+            except Exception as socket_err:
+                print(f"[SYNC WARNING] Failed to emit Socket.IO event: {socket_err}")
     except Exception as e:
         print(f"[SYNC ENGINE ERROR] {e}")
 
@@ -821,6 +877,13 @@ app = Flask(__name__,
 app.secret_key = Config.SECRET_KEY
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
+@app.after_request
+def add_cache_control_headers(response):
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 def format_sse(data: str, event=None) -> str:
     msg = f'data: {data}\n\n'
     if event:
@@ -848,6 +911,30 @@ def realtime_stream():
 db_pool = None
 db_pool_warming = False
 db_pool_lock = threading.Lock()
+
+pg_pool = None
+pg_pool_lock = threading.Lock()
+
+def get_pg_pool():
+    global pg_pool
+    if pg_pool is None:
+        with pg_pool_lock:
+            if pg_pool is None:
+                try:
+                    from psycopg2.pool import ThreadedConnectionPool
+                    pg_pool = ThreadedConnectionPool(
+                        minconn=1,
+                        maxconn=10,
+                        host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+                        port=6543,
+                        database="postgres",
+                        user="postgres",
+                        password=SUPABASE_PASSWORD
+                    )
+                    print("[SYNC] Supabase Cloud Threaded Connection Pool initialized successfully.")
+                except Exception as e:
+                    print(f"[POOL ERROR] Could not initialize Supabase connection pool: {e}")
+    return pg_pool
 
 
 def log_error(msg):
@@ -1145,8 +1232,9 @@ class PostgreSQLProxyCursor:
 
 
 class PostgreSQLProxyConnection:
-    def __init__(self, raw_conn):
+    def __init__(self, raw_conn, pool=None):
         self._conn = raw_conn
+        self._pool = pool
         self.autocommit = True
 
     def cursor(self, dictionary=False):
@@ -1165,7 +1253,14 @@ class PostgreSQLProxyConnection:
         return self._conn.rollback()
 
     def close(self):
-        return self._conn.close()
+        if self._pool and self._conn:
+            try:
+                self._pool.putconn(self._conn)
+            except Exception as e:
+                print(f"[POOL ERROR] Failed to return connection to pool: {e}")
+            self._conn = None
+        elif self._conn:
+            self._conn.close()
 
     @property
     def connection_id(self):
@@ -1175,6 +1270,12 @@ class PostgreSQLProxyConnection:
 def get_cloud_db_connection_direct():
     global DB_STATUS, CLOUD_IS_ALIVE
     try:
+        pool = get_pg_pool()
+        if pool:
+            raw_pg_conn = pool.getconn()
+            DB_STATUS = "cloud"
+            return PostgreSQLProxyConnection(raw_pg_conn, pool=pool)
+            
         raw_pg_conn = psycopg2.connect(
             host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
             port=6543,
@@ -1198,14 +1299,85 @@ class SyncProxyCursor:
         self._parent = parent_conn
 
     def execute(self, query, params=None):
-        # 1. Execute the query on the underlying database
-        res = self._cursor.execute(query, params)
-        
-        # 2. Intercept write queries (INSERT, UPDATE, DELETE)
+        # 1. Intercept write queries (INSERT, UPDATE, DELETE) BEFORE execution to pre-fetch invoice_no
         query_upper = query.upper().strip()
         is_write = any(query_upper.startswith(op) for op in ("INSERT ", "UPDATE ", "DELETE "))
         is_sync_queue = "SYNC_QUEUE" in query_upper
         
+        invoice_no = None
+        
+        if is_write and not is_sync_queue:
+            table_name = self._parent._extract_table_name(query)
+            op_type = "INSERT" if query_upper.startswith("INSERT ") else ("UPDATE" if query_upper.startswith("UPDATE ") else "DELETE")
+            tbl_lower = table_name.lower()
+            
+            # Pre-fetch invoice_no for bills and child tables referencing bill_id or id
+            if tbl_lower in ('bills', 'bill_items', 'returns_log', 'stock_movements'):
+                if op_type == 'INSERT':
+                    if tbl_lower == 'bills':
+                        # Parse columns to find invoice_no index
+                        import re
+                        cols_match = re.search(r"INSERT\s+INTO\s+bills\s*\(([^)]+)\)", query_upper)
+                        if cols_match:
+                            cols = [c.strip().strip('"`[]') for c in cols_match.group(1).split(',')]
+                            try:
+                                inv_idx = cols.index('INVOICE_NO')
+                                if params and inv_idx < len(params):
+                                    invoice_no = params[inv_idx]
+                            except ValueError:
+                                pass
+                    else:
+                        # For child tables, get bill_id and fetch invoice_no from bills table
+                        import re
+                        cols_match = re.search(r"INSERT\s+INTO\s+" + tbl_lower + r"\s*\(([^)]+)\)", query_upper)
+                        if cols_match:
+                            cols = [c.strip().strip('"`[]') for c in cols_match.group(1).split(',')]
+                            try:
+                                bill_id_idx = cols.index('BILL_ID')
+                                if params and bill_id_idx < len(params):
+                                    local_bill_id = params[bill_id_idx]
+                                    temp_cur = self._parent._conn.cursor()
+                                    temp_cur.execute("SELECT invoice_no FROM bills WHERE id = %s", (local_bill_id,))
+                                    row_res = temp_cur.fetchone()
+                                    if row_res:
+                                        invoice_no = row_res[0]
+                                    temp_cur.close()
+                            except ValueError:
+                                pass
+                            except Exception as e:
+                                print(f"[SYNC PREFETCH INSERT CHILD WARNING] Failed: {e}")
+                elif op_type in ('UPDATE', 'DELETE'):
+                    local_bill_id = None
+                    import re
+                    # Case 1: parameterized query with %s
+                    matches = list(re.finditer(r"\b(id|bill_id)\s*=\s*%s", query_upper))
+                    if matches:
+                        pos = matches[0].start()
+                        pre_query = query_upper[:pos]
+                        param_idx = pre_query.count("%S")
+                        if params and param_idx < len(params):
+                            local_bill_id = params[param_idx]
+                    else:
+                        # Case 2: hardcoded ID in query (e.g. WHERE id = 8)
+                        match = re.search(r"\b(?:id|bill_id)\s*=\s*([0-9]+)", query_upper)
+                        if match:
+                            local_bill_id = int(match.group(1))
+                            
+                    if local_bill_id is not None:
+                        try:
+                            temp_cur = self._parent._conn.cursor()
+                            temp_cur.execute("SELECT invoice_no FROM bills WHERE id = %s", (local_bill_id,))
+                            row_res = temp_cur.fetchone()
+                            if row_res:
+                                invoice_no = row_res[0]
+                            temp_cur.close()
+                        except Exception as e:
+                            print(f"[SYNC PREFETCH UPDATE/DELETE WARNING] Failed: {e}")
+
+        # 2. Execute the query on the underlying database
+        res = self._cursor.execute(query, params)
+        
+        # 3. Intercept write queries (INSERT, UPDATE, DELETE) AFTER execution to record queue changes
         if is_write and not is_sync_queue:
             table_name = self._parent._extract_table_name(query)
             op_type = "INSERT" if query_upper.startswith("INSERT ") else ("UPDATE" if query_upper.startswith("UPDATE ") else "DELETE")
@@ -1226,7 +1398,7 @@ class SyncProxyCursor:
                 except:
                     pass
                     
-            self._parent.enqueue_change(table_name, rec_id, op_type, query, params)
+            self._parent.enqueue_change(table_name, rec_id, op_type, query, params, invoice_no=invoice_no)
             
         return res
 
@@ -1279,13 +1451,14 @@ class SyncProxyConnection:
             return match.group(1) if match else "unknown"
         return "unknown"
 
-    def enqueue_change(self, table_name, record_id, op_type, query, params):
+    def enqueue_change(self, table_name, record_id, op_type, query, params, invoice_no=None):
         self.pending_changes.append({
             'table_name': table_name,
             'record_id': record_id,
             'op_type': op_type,
             'query': query,
-            'params': params
+            'params': params,
+            'invoice_no': invoice_no
         })
 
     def _flush_changes(self):
@@ -1307,9 +1480,9 @@ class SyncProxyConnection:
                         serialized_params = str(chg['params'])
                 
                 cur.execute("""
-                    INSERT INTO sync_queue (table_name, record_id, operation_type, query_sql, query_params, status)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (chg['table_name'], chg['record_id'], chg['op_type'], chg['query'], serialized_params, 'PENDING'))
+                    INSERT INTO sync_queue (table_name, record_id, operation_type, query_sql, query_params, status, invoice_no)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (chg['table_name'], chg['record_id'], chg['op_type'], chg['query'], serialized_params, 'PENDING', chg.get('invoice_no')))
             self._conn.commit()
             cur.close()
         except Exception as e:
@@ -1391,9 +1564,14 @@ def ensure_sync_queue_tables():
                 query_sql TEXT NOT NULL,
                 query_params TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                status VARCHAR(20) DEFAULT 'PENDING'
+                status VARCHAR(20) DEFAULT 'PENDING',
+                invoice_no VARCHAR(100) DEFAULT NULL
             )
         """)
+        try:
+            cur.execute("ALTER TABLE sync_queue ADD COLUMN invoice_no VARCHAR(100) DEFAULT NULL")
+        except:
+            pass
         conn.commit()
         cur.close()
         conn.close()
@@ -1419,14 +1597,152 @@ def ensure_sync_queue_tables():
                 query_sql TEXT NOT NULL,
                 query_params TEXT,
                 created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                status VARCHAR(20) DEFAULT 'PENDING'
+                status VARCHAR(20) DEFAULT 'PENDING',
+                invoice_no VARCHAR(100) DEFAULT NULL
             )
         """)
+        try:
+            cur.execute("ALTER TABLE sync_queue ADD COLUMN invoice_no VARCHAR(100) DEFAULT NULL")
+        except:
+            pass
         conn.commit()
         cur.close()
         conn.close()
     except Exception as e:
         print(f"[SYNC INIT WARNING] Could not create cloud sync table: {e}")
+
+TABLES_WITH_ID = {
+    'users', 'categories', 'products', 'bills', 'bill_items', 
+    'stock_movements', 'returns_log', 'expenses', 'audit_logs', 
+    'cash_balance', 'denominations', 'account_entries', 'seasonal_history', 'holidays'
+}
+
+def inject_id_into_insert(table_name, query, record_id, params):
+    if not record_id or not table_name:
+        return query, params
+        
+    if table_name.lower() not in TABLES_WITH_ID:
+        return query, params
+        
+    query_upper = query.upper().strip()
+    if not query_upper.startswith("INSERT "):
+        return query, params
+        
+    # Check if 'id' is already in columns list
+    import re
+    match_cols = re.search(r"\(([^)]+)\)", query)
+    if not match_cols:
+        return query, params
+        
+    cols_str = match_cols.group(1)
+    cols = [c.strip().strip('"`[]') for c in cols_str.split(',')]
+    if 'id' in [c.lower() for c in cols]:
+        return query, params
+        
+    values_match = re.search(r"\bVALUES\s*\(", query, re.IGNORECASE)
+    if not values_match:
+        return query, params
+        
+    first_paren = query.find('(')
+    if first_paren == -1 or first_paren >= values_match.start():
+        return query, params
+        
+    values_paren = values_match.end() - 1
+    
+    # Construct the new query
+    new_query = (
+        query[:first_paren + 1] + 
+        "id, " + 
+        query[first_paren + 1:values_paren + 1] + 
+        "%s, " + 
+        query[values_paren + 1:]
+    )
+    
+    # Construct new parameters
+    new_params = list(params) if params else []
+    try:
+        if isinstance(record_id, str) and record_id.isdigit():
+            val = int(record_id)
+        else:
+            val = record_id
+    except:
+        val = record_id
+        
+    new_params.insert(0, val)
+    return new_query, tuple(new_params)
+
+def remap_ids_for_cloud(table_name, query, params, conn_local, cur_cloud, invoice_no=None):
+    if not params:
+        return query, params
+        
+    try:
+        import re
+        query_upper = query.upper().strip()
+        tbl_lower = table_name.lower()
+        
+        local_bill_id = None
+        param_idx = -1
+        
+        # Case A: Child table inserts referencing bills
+        if query_upper.startswith("INSERT "):
+            match_cols = re.search(r"\(([^)]+)\)", query)
+            if match_cols:
+                cols_str = match_cols.group(1)
+                cols = [c.strip().strip('"`[]').lower() for c in cols_str.split(',')]
+                if 'bill_id' in cols:
+                    param_idx = cols.index('bill_id')
+                    if param_idx < len(params):
+                        local_bill_id = params[param_idx]
+        
+        # Case B: Update/Delete queries referencing bill_id
+        if local_bill_id is None:
+            match = re.search(r"BILL_ID\s*=\s*%S", query_upper)
+            if match:
+                pre_query = query_upper[:match.start()]
+                param_idx = pre_query.count("%S")
+                if param_idx < len(params):
+                    local_bill_id = params[param_idx]
+                    
+        # Case C: Update/Delete queries on the bills table referencing id
+        if local_bill_id is None and tbl_lower == 'bills':
+            match = re.search(r"\bID\s*=\s*%S", query_upper)
+            if match:
+                pre_query = query_upper[:match.start()]
+                param_idx = pre_query.count("%S")
+                if param_idx < len(params):
+                    local_bill_id = params[param_idx]
+                    
+        if local_bill_id is not None:
+            try:
+                local_bill_id_int = int(local_bill_id)
+            except:
+                return query, params
+                
+            res_local = None
+            if invoice_no:
+                res_local = {'invoice_no': invoice_no}
+            else:
+                # Query local MySQL for the invoice number
+                cur_temp = conn_local.cursor(dictionary=True)
+                cur_temp.execute("SELECT invoice_no FROM bills WHERE id = %s", (local_bill_id_int,))
+                res_local = cur_temp.fetchone()
+                cur_temp.close()
+            
+            if res_local:
+                invoice_no_val = res_local['invoice_no']
+                # Query cloud database (PostgreSQL/Supabase) for the cloud ID
+                cur_cloud.execute("SELECT id FROM bills WHERE invoice_no = %s", (invoice_no_val,))
+                res_cloud = cur_cloud.fetchone()
+                if res_cloud:
+                    cloud_bill_id = res_cloud[0]
+                    new_params = list(params)
+                    new_params[param_idx] = cloud_bill_id
+                    params = tuple(new_params)
+                    print(f"[SYNC PUSH REMAP] Remapped ID for {table_name}: local {local_bill_id} -> cloud {cloud_bill_id} (Invoice: {invoice_no_val})")
+    except Exception as remap_err:
+        print(f"[SYNC PUSH REMAP ERROR] Failed to remap IDs for cloud: {remap_err}")
+        
+    return query, params
 
 def push_local_queue_to_cloud():
     conn_local = None
@@ -1447,14 +1763,11 @@ def push_local_queue_to_cloud():
             conn_local.close()
             return
         
-        raw_cloud_conn = psycopg2.connect(
-            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
-            port=6543,
-            database="postgres",
-            user="postgres",
-            password=SUPABASE_PASSWORD
-        )
-        conn_cloud = PostgreSQLProxyConnection(raw_cloud_conn)
+        conn_cloud = get_cloud_db_connection_direct()
+        if not conn_cloud:
+            cur_local.close()
+            conn_local.close()
+            return
         cur_cloud = conn_cloud.cursor()
         
         log_sync_event("SYNC_PUSH", f"Pusher detected {len(rows)} local changes pending sync to Supabase.")
@@ -1471,9 +1784,25 @@ def push_local_queue_to_cloud():
                 except Exception as ex:
                     params = row['query_params']
             
+            table_name = row['table_name']
+            if row['operation_type'] == 'INSERT' and row['record_id']:
+                query, params = inject_id_into_insert(table_name, query, row['record_id'], params)
+            
+            # Remap IDs to match cloud records
+            query, params = remap_ids_for_cloud(table_name, query, params, conn_local, cur_cloud, invoice_no=row.get('invoice_no'))
+            
             try:
                 cur_cloud.execute(query, params)
                 conn_cloud.commit()
+                
+                # Update PostgreSQL sequence to match MAX(id) to avoid future duplicate keys
+                if row['operation_type'] == 'INSERT' and row['record_id'] and table_name.lower() in TABLES_WITH_ID:
+                    tbl_lower = table_name.lower()
+                    try:
+                        cur_cloud._cursor.execute(f"SELECT setval(pg_get_serial_sequence('{tbl_lower}', 'id'), COALESCE(MAX(id), 1)) FROM {tbl_lower}")
+                        conn_cloud.commit()
+                    except Exception as seq_err:
+                        print(f"[SYNC WARNING] Could not update serial sequence for {tbl_lower}: {seq_err}")
                 
                 cur_local_write = conn_local.cursor()
                 cur_local_write.execute("UPDATE sync_queue SET status = 'PROCESSED' WHERE id = %s", (row['id'],))
@@ -1483,13 +1812,13 @@ def push_local_queue_to_cloud():
             except Exception as e_cloud:
                 if conn_cloud: conn_cloud.rollback()
                 err_str = str(e_cloud).lower()
-                if "duplicate key" in err_str or "unique constraint" in err_str or "uniqueviolation" in err_str:
+                if "duplicate key" in err_str or "unique constraint" in err_str or "uniqueviolation" in err_str or "foreign key" in err_str or "foreignkey" in err_str:
                     try:
                         cur_local_write = conn_local.cursor()
                         cur_local_write.execute("UPDATE sync_queue SET status = 'PROCESSED' WHERE id = %s", (row['id'],))
                         conn_local.commit()
                         cur_local_write.close()
-                        log_sync_event("SYNC_SKIP", f"Skipped duplicate insert for change ID {row['id']} (already exists on cloud).")
+                        log_sync_event("SYNC_SKIP", f"Skipped duplicate or invalid foreign key query for change ID {row['id']}: {e_cloud}")
                         continue
                     except Exception as e_local:
                         print(f"[SYNC ERROR] Failed to update skipped status: {e_local}")
@@ -1527,15 +1856,12 @@ def run_restore_process():
         )
         cur_local = conn_local.cursor(dictionary=True)
         
-        conn_cloud = psycopg2.connect(
-            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
-            port=6543,
-            database="postgres",
-            user="postgres",
-            password=SUPABASE_PASSWORD
-        )
-        from psycopg2.extras import RealDictCursor
-        cur_cloud = conn_cloud.cursor(cursor_factory=RealDictCursor)
+        conn_cloud = get_cloud_db_connection_direct()
+        if not conn_cloud:
+            cur_local.close()
+            conn_local.close()
+            return
+        cur_cloud = conn_cloud.cursor(dictionary=True)
         
         cur_cloud.execute("SELECT * FROM sync_queue WHERE status = 'PENDING' ORDER BY id ASC")
         cloud_changes = cur_cloud.fetchall()
@@ -1581,6 +1907,10 @@ def run_restore_process():
                     except:
                         params = change['query_params']
                 
+                table_name = change['table_name']
+                if change['operation_type'] == 'INSERT' and change['record_id']:
+                    query, params = inject_id_into_insert(table_name, query, change['record_id'], params)
+                
                 is_duplicate = False
                 if change['operation_type'] == 'INSERT' and change['record_id']:
                     try:
@@ -1613,6 +1943,12 @@ def run_restore_process():
         log_sync_event("RESTORE_COMPLETE", "Reconciliation complete. Local MySQL is fully up to date.")
         DB_STATUS = "local"
         SYNC_SYSTEM_MODE = "LOCAL_PRIMARY"
+        
+        # Emit Socket.IO event to refresh local UI after database restore
+        try:
+            socketio.emit('stock_updated', {'type': 'reconciliation'})
+        except Exception as socket_err:
+            print(f"[SYNC WARNING] Failed to emit Socket.IO event: {socket_err}")
         
         cur_local.close()
         conn_local.close()
@@ -4099,18 +4435,13 @@ def api_sync_status():
         
     cloud_pending = 0
     try:
-        conn = psycopg2.connect(
-            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
-            port=6543,
-            database="postgres",
-            user="postgres",
-            password=SUPABASE_PASSWORD
-        )
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM sync_queue WHERE status = 'PENDING'")
-        cloud_pending = cur.fetchone()[0]
-        cur.close()
-        conn.close()
+        conn = get_cloud_db_connection_direct()
+        if conn:
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM sync_queue WHERE status = 'PENDING'")
+            cloud_pending = cur.fetchone()[0]
+            cur.close()
+            conn.close()
     except:
         pass
 

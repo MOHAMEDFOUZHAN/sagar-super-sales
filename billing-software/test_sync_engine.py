@@ -15,7 +15,8 @@ try:
         SyncProxyConnection, SyncProxyCursor,
         SYNC_SYSTEM_MODE, check_mysql_health, check_cloud_health,
         ensure_sync_queue_tables, push_local_queue_to_cloud, run_restore_process,
-        db_sync_monitor_loop, log_sync_event, SYNC_LOGS
+        db_sync_monitor_loop, log_sync_event, SYNC_LOGS,
+        inject_id_into_insert, TABLES_WITH_ID
     )
 except ImportError as e:
     print(f"Error importing app sync modules: {e}")
@@ -54,6 +55,33 @@ class TestSyncEngineUnit(unittest.TestCase):
         proxy_conn.commit()
         mock_raw_conn.commit.assert_called()
         self.assertEqual(len(proxy_conn.pending_changes), 0)  # Flushed
+
+    def test_inject_id_into_insert(self):
+        """Unit test for: inject_id_into_insert SQL rewriter"""
+        # 1. Standard injection
+        q1, p1 = inject_id_into_insert("bills", "INSERT INTO bills (invoice_no, total_amount) VALUES (%s, %s)", "3", ("INV-001", 100.0))
+        self.assertEqual(q1, "INSERT INTO bills (id, invoice_no, total_amount) VALUES (%s, %s, %s)")
+        self.assertEqual(p1, (3, "INV-001", 100.0))
+        
+        # 2. Excluded table
+        q2, p2 = inject_id_into_insert("bill_sequences", "INSERT INTO bill_sequences (seq_date, last_value) VALUES (%s, %s)", "3", ("2026-06-11", 1))
+        self.assertEqual(q2, "INSERT INTO bill_sequences (seq_date, last_value) VALUES (%s, %s)")
+        self.assertEqual(p2, ("2026-06-11", 1))
+        
+        # 3. Already has ID
+        q3, p3 = inject_id_into_insert("bills", "INSERT INTO bills (id, invoice_no) VALUES (%s, %s)", "3", (3, "INV-001"))
+        self.assertEqual(q3, "INSERT INTO bills (id, invoice_no) VALUES (%s, %s)")
+        self.assertEqual(p3, (3, "INV-001"))
+        
+        # 4. Non-INSERT query
+        q4, p4 = inject_id_into_insert("bills", "UPDATE bills SET total_amount = %s WHERE id = %s", "3", (100.0, 3))
+        self.assertEqual(q4, "UPDATE bills SET total_amount = %s WHERE id = %s")
+        self.assertEqual(p4, (100.0, 3))
+        
+        # 5. Missing record_id
+        q5, p5 = inject_id_into_insert("bills", "INSERT INTO bills (invoice_no) VALUES (%s)", None, ("INV-001",))
+        self.assertEqual(q5, "INSERT INTO bills (invoice_no) VALUES (%s)")
+        self.assertEqual(p5, ("INV-001",))
 
     @patch('app.mysql.connector.connect')
     @patch('app.psycopg2.connect')

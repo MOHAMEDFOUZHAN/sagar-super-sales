@@ -831,6 +831,27 @@
             }, 500);
         }
 
+        // --- UNIVERSAL REAL-TIME SOCKET SYNC ---
+        function initSocketIO() {
+            const socket = io();
+            socket.on('connect', () => {
+                console.log('Connected to universal Socket.IO sync server (Stock Transfer)');
+            });
+            socket.on('stock_updated', (data) => {
+                console.log('Universal Stock Update received (Stock Transfer):', data);
+                if (typeof init === 'function') init();
+            });
+        }
+
+        if (typeof io === 'undefined') {
+            const script = document.createElement('script');
+            script.src = '{{ url_for('static', filename='assets/js/socket.io.min.js') }}';
+            script.onload = initSocketIO;
+            document.head.appendChild(script);
+        } else {
+            initSocketIO();
+        }
+
         init();
 
     </script>

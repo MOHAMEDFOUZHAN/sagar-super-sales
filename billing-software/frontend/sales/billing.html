@@ -2192,6 +2192,16 @@
 
 
 
+        function getCartQtyForProduct(product) {
+            if (!product) return 0;
+            const name = product.name;
+            const barcode = product.barcode;
+            const existingItem = items.find(item => 
+                (barcode && item.qr === barcode) || item.name === name
+            );
+            return existingItem ? existingItem.qty : 0;
+        }
+
         function selectProduct(product) {
 
             currentProduct = product;
@@ -2204,7 +2214,8 @@
 
             unitInput.value = product.unit;
 
-            stockInput.value = product.current_stock;
+            const inCartQty = getCartQtyForProduct(product);
+            stockInput.value = product.current_stock - inCartQty;
 
             qtyInput.value = 1;
 
@@ -2403,11 +2414,14 @@
                     tr.style.borderLeft = '4px solid var(--danger)';
                 }
 
+                const remainingStock = (item.stock !== undefined && item.stock !== null) ? (item.stock - item.qty) : null;
+                const stockDisplay = remainingStock !== null ? remainingStock : '-';
+
                 tr.innerHTML = `
                     <td>${index + 1}</td>
                     <td>${item.qr || '-'}</td>
                     <td>${item.name}</td>
-                    <td>${isOutOfStock ? `<span style="color: var(--danger); font-weight: bold;"><i class="fa-solid fa-triangle-exclamation"></i> ${item.stock}</span>` : (item.stock || '-')}</td>
+                    <td>${isOutOfStock ? `<span style="color: var(--danger); font-weight: bold;"><i class="fa-solid fa-triangle-exclamation"></i> ${stockDisplay}</span>` : stockDisplay}</td>
                     <td>${item.unit || 'PCS'}</td>
                     <td>${item.qty}</td>
                     <td>${item.rate.toFixed(2)}</td>
@@ -3191,7 +3205,8 @@
                     if (updatedStock !== null) {
                         currentProduct.current_stock = updatedStock;
                         if (typeof stockInput !== 'undefined' && stockInput) {
-                            stockInput.value = updatedStock;
+                            const inCartQty = getCartQtyForProduct(currentProduct);
+                            stockInput.value = updatedStock - inCartQty;
                         }
                     }
                 }

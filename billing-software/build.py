@@ -19,6 +19,7 @@ PyInstaller.__main__.run([
     '--icon', 'frontend/images/app_icon.ico',
     '--add-data', 'frontend;frontend',
     '--add-data', 'database;database',
+    '--add-data', '.env;.',
     '--hidden-import', 'engineio.async_drivers.threading',
     '--hidden-import', 'simple_websocket',
     '--hidden-import', 'wsproto',
