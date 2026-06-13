@@ -875,7 +875,7 @@
 
                             <td style="color: var(--accent); font-weight: 800;">\u20B9${r.tsc_amount.toFixed(2)}</td>
 
-                            <td><span class="stat-badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted);">${r.payment_mode || ''}</span></td>
+                            <td><span class="stat-badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted);">${r.payment_mode === 'CREDIT' ? 'OTHER' : (r.payment_mode || '')}</span></td>
 
                         </tr>
 
@@ -899,7 +899,7 @@
 
                 if (r.tsc_amount > 0) {
 
-                    const pMode = r.payment_mode || 'UNKNOWN';
+                    const pMode = r.payment_mode === 'CREDIT' ? 'OTHER' : (r.payment_mode || 'UNKNOWN');
                     modeData[pMode] = (modeData[pMode] || 0) + r.tsc_amount;
 
                 }

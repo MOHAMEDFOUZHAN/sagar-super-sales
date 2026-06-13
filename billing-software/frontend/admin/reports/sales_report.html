@@ -361,7 +361,8 @@
 
                 filtered.forEach(item => {
 
-                    const mode = (item.payment_mode || 'CASH').toUpperCase();
+                    let mode = (item.payment_mode || 'CASH').toUpperCase();
+                    if (mode === 'CREDIT') mode = 'OTHER';
 
                     if (!grouped[mode]) grouped[mode] = [];
 
@@ -377,7 +378,16 @@
 
 
 
-                Object.keys(grouped).sort().forEach(mode => {
+                const modeOrder = ['CASH', 'CARD', 'UPI'];
+                const sortedModes = Object.keys(grouped).sort((a, b) => {
+                    let idxA = modeOrder.indexOf(a.toUpperCase());
+                    let idxB = modeOrder.indexOf(b.toUpperCase());
+                    if (idxA === -1) idxA = 999;
+                    if (idxB === -1) idxB = 999;
+                    return idxA - idxB;
+                });
+
+                sortedModes.forEach(mode => {
 
                     const headerRow = document.createElement('tr');
 

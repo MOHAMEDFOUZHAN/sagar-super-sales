@@ -413,7 +413,7 @@
 
                     <td>${timeStr}</td>
 
-                    <td><span class="badge">${d.payment_mode}</span></td>
+                    <td><span class="badge">${d.payment_mode === 'CREDIT' ? 'OTHER' : d.payment_mode}</span></td>
 
                     <td style="text-align: right; font-weight:700;">\u20B9${d.total_amount.toFixed(2)}</td>
 

@@ -434,8 +434,13 @@ tr:hover td {
     }
 
     /* Ensure totals don't get cut off */
-    tfoot, tr.total-row {
-        display: table-row-group !important;
+    tfoot {
+        display: table-footer-group !important;
+        break-inside: avoid;
+    }
+
+    tr.total-row {
+        display: table-row !important;
         break-inside: avoid;
     }
 

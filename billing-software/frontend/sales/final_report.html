@@ -1554,7 +1554,7 @@
 
                 sBody.innerHTML = '';
 
-                ['CASH', 'CARD', 'UPI', 'CREDIT'].forEach(mode => {
+                ['CASH', 'CARD', 'UPI'].forEach(mode => {
 
                     const amount = data.sales[mode.toLowerCase() + '_sales'] || 0;
 
@@ -2032,7 +2032,7 @@
 
 
 
-                const payments = ['CASH', 'CARD', 'UPI', 'CREDIT'].map(mode => {
+                const payments = ['CASH', 'CARD', 'UPI'].map(mode => {
 
                     const row = Array.from(document.querySelectorAll('#salesTableBody tr')).find(tr => tr.innerText.includes(mode));
 

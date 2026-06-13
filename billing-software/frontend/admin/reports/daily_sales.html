@@ -258,8 +258,6 @@
 
                             <th>CARD</th>
 
-                            <th>SALES</th>
-
                             <th>OILS</th>
 
                             <th>SPICES</th>
@@ -279,6 +277,8 @@
                             <th>FJ</th>
 
                             <th>VARKEY</th>
+
+                            <th>SALES</th>
 
                         </tr>
 
@@ -419,8 +419,6 @@
 
                         <td class="amount-cell">${d.card.toFixed(0)}</td>
 
-                        <td class="amount-cell" style="font-weight:bold;">${d.total_sales.toFixed(0)}</td>
-
                         <td class="amount-cell">${c['OILS'].toFixed(0)}</td>
 
                         <td class="amount-cell">${c['SPICES'].toFixed(0)}</td>
@@ -440,6 +438,8 @@
                         <td class="amount-cell">${c['FJ'].toFixed(0)}</td>
 
                         <td class="amount-cell">${c['VARKEY'].toFixed(0)}</td>
+
+                        <td class="amount-cell" style="font-weight:bold;">${d.total_sales.toFixed(0)}</td>
 
                     `;
 
@@ -461,8 +461,6 @@
 
                         <td class="amount-cell">${grandTotals.card.toFixed(0)}</td>
 
-                        <td class="amount-cell">${grandTotals.sales.toFixed(0)}</td>
-
                         <td class="amount-cell">${grandTotals.oils.toFixed(0)}</td>
 
                         <td class="amount-cell">${grandTotals.spices.toFixed(0)}</td>
@@ -482,6 +480,8 @@
                         <td class="amount-cell">${grandTotals.fj.toFixed(0)}</td>
 
                         <td class="amount-cell">${grandTotals.varkey.toFixed(0)}</td>
+
+                        <td class="amount-cell" style="font-weight:bold;">${grandTotals.sales.toFixed(0)}</td>
 
                     </tr>
 

@@ -186,7 +186,7 @@
 
                 </div>
 
-                <button class="btn btn-secondary" onclick="loadData()">
+                <button class="btn btn-primary" onclick="loadData()">
 
                     <i class="fa-solid fa-sync"></i> REFRESH
 
@@ -347,15 +347,26 @@
 
                 const tr = document.createElement('tr');
 
+                const isGM = item.unit === 'GM';
+                const closingDisplay = isGM ? (item.closing / 1000).toFixed(3) + ' KG' : item.closing + ' ' + (item.unit || 'PCS');
+                
+                let outgoingDisplay = '';
+                const outgoingVal = item.outgoing === "" ? 0 : parseFloat(item.outgoing);
+                if (outgoingVal === 0) {
+                    outgoingDisplay = isGM ? '0.000 KG' : '0';
+                } else {
+                    outgoingDisplay = isGM ? (outgoingVal / 1000).toFixed(3) + ' KG' : outgoingVal + ' ' + (item.unit || 'PCS');
+                }
+
                 tr.innerHTML = `
 
                     <td class="col-code">${item.code || '-'}</td>
 
                     <td style="font-weight: 600;">${item.product_name}</td>
 
-                    <td class="col-closing">${item.closing}</td>
+                    <td class="col-closing">${closingDisplay}</td>
 
-                    <td class="col-outgoing">${item.outgoing || '-'}</td>
+                    <td class="col-outgoing">${outgoingDisplay}</td>
 
                     <td class="no-print" style="text-align: center;">
 

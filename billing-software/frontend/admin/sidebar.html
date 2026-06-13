@@ -81,7 +81,7 @@
 {% set is_masters_active = request.endpoint in ['admin_products', 'admin_categories', 'admin_users'] %}
 {% set is_stock_active = request.endpoint in ['admin_stock_manage', 'admin_stock_transfer'] or 'stock_manage' in request.endpoint or 'stock_transfer' in request.endpoint %}
 {% set is_reports_active = 'billwise_sales' in request.endpoint or 'sales_report' in request.endpoint or 'daily_sales' in request.endpoint or 'detail_sales' in request.endpoint or 'total_sales' in request.endpoint or 'daily_stock' in request.endpoint or 'daily_position' in request.endpoint or 'cancelled_report' in request.endpoint or 'transfer_report' in request.endpoint or 'counter_wise' in request.endpoint or 'online_sales' in request.endpoint or 'final_report' in request.endpoint or 'final_sales_report' in request.endpoint or 'reports_expenses' in request.endpoint or 'reports_correction' in request.endpoint or 'change_sales' in request.endpoint or 'reports_cash' in request.endpoint or 'counter_sales' in request.endpoint or 'online_sales_reports' in request.endpoint or 'online_sales_invoices' in request.endpoint or 'final_report_admin' in request.endpoint %}
-{% set is_system_active = request.endpoint in ['admin_returns', 'admin_maintenance', 'admin_maintenance_health', 'admin_failover_sync'] or 'admin_returns' in request.endpoint or 'admin_maintenance' in request.endpoint or 'admin_maintenance_health' in request.endpoint or 'admin_failover_sync' in request.endpoint %}
+{% set is_system_active = request.endpoint in ['admin_returns', 'admin_maintenance', 'admin_maintenance_health', 'admin_failover_sync', 'admin_network_diagnostics'] or 'admin_returns' in request.endpoint or 'admin_maintenance' in request.endpoint or 'admin_maintenance_health' in request.endpoint or 'admin_failover_sync' in request.endpoint or 'admin_network_diagnostics' in request.endpoint %}
 
 <nav class="sidebar">
     <div class="brand maple-pro-font" style="font-size: 1.8rem; letter-spacing: -0.5px; font-weight: 800;">
@@ -324,6 +324,12 @@
                     <a href="{{ url_for('admin_failover_sync') }}"
                         class="nav-link {{ 'active' if 'admin_failover_sync' in request.endpoint else '' }}">
                         <i class="fa-solid fa-sync"></i> Failover & Sync
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('admin_network_diagnostics') }}"
+                        class="nav-link {{ 'active' if 'admin_network_diagnostics' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-network-wired"></i> Network Diagnostics
                     </a>
                 </li>
             </ul>

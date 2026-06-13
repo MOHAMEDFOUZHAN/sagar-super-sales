@@ -339,7 +339,7 @@
 
                         <td>${dateTime}</td>
 
-                        <td class="col-method"><span class="badge" style="background: rgba(255,255,255,0.05);">${b.payment_mode}</span></td>
+                        <td class="col-method"><span class="badge" style="background: rgba(255,255,255,0.05);">${b.payment_mode === 'CREDIT' ? 'OTHER' : b.payment_mode}</span></td>
 
                         <td class="amount-cell">\u20B9${amt.toFixed(2)}</td>
 

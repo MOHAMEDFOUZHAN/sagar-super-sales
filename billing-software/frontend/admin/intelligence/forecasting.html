@@ -944,7 +944,8 @@
                 reason = `<span style="color: var(--warning); font-weight: 700;"><i class="fa-solid fa-clock"></i> Warning Threshold</span> &bull; `;
             }
 
-            reason += `Selling at <strong>${dailyRate} ${item.unit}/day</strong>`;
+            const dailyRateText = item.unit === 'GM' ? (dailyRate / 1000).toFixed(3) + ' KG' : dailyRate + ' ' + item.unit;
+            reason += `Selling at <strong>${dailyRateText}/day</strong>`;
             if (item.has_history) {
                 reason += ` (scaled by <strong>${mult}x</strong> via <em>${scenarioLabel}</em>)`;
             } else if (mult > 1.0) {
@@ -1013,15 +1014,15 @@
                     </td>
                     <td>
                         <div style="font-family: monospace; font-size: 0.95rem; font-weight: 700; color: ${item.status === 'Urgent' ? 'var(--danger)' : 'var(--warning)'};">
-                            ${item.current_stock} ${item.unit}
+                            ${item.unit === 'GM' ? (item.current_stock / 1000).toFixed(3) + ' KG' : item.current_stock + ' ' + item.unit}
                         </div>
                         <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 3px;">
-                            Min. Safety: ${item.min_threshold} ${item.unit}
+                            Min. Safety: ${item.unit === 'GM' ? (item.min_threshold / 1000).toFixed(3) + ' KG' : item.min_threshold + ' ' + item.unit}
                         </div>
                     </td>
                     <td>
                         <div style="color: var(--success); font-weight: 800; font-size: 1rem;">
-                            + ${reorderQty} ${item.unit}
+                            + ${item.unit === 'GM' ? (reorderQty / 1000).toFixed(3) + ' KG' : reorderQty + ' ' + item.unit}
                         </div>
                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 3px; font-family: monospace;">
                             Est. Cost: <span style="color: white; font-weight: 600;">\u20B9${estCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

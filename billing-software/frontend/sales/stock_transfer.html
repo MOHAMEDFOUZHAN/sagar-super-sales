@@ -373,6 +373,8 @@
 
                     div.style.borderBottom = '1px solid var(--glass-border)';
 
+                    const stockText = p.unit === 'GM' ? (p.current_stock / 1000).toFixed(3) + ' KG' : p.current_stock + ' ' + (p.unit || 'PCS');
+
                     div.innerHTML = `
 
                         <div style="font-weight: 600;">${p.name}</div>
@@ -381,7 +383,7 @@
 
                             <span>${p.barcode || 'No Barcode'}</span>
 
-                            <span style="color: var(--accent);">Stock: ${p.current_stock}</span>
+                            <span style="color: var(--accent);">Stock: ${stockText}</span>
 
                         </div>
 
@@ -419,7 +421,8 @@
 
             document.getElementById('tProduct').value = p.id;
 
-            document.getElementById('selectedProductName').innerText = `${p.name} (Qty: ${p.current_stock})`;
+            const stockText = p.unit === 'GM' ? (p.current_stock / 1000).toFixed(3) + ' KG' : p.current_stock + ' ' + (p.unit || 'PCS');
+            document.getElementById('selectedProductName').innerText = `${p.name} (Qty: ${stockText})`;
 
             document.getElementById('selectedProductDisplay').style.display = 'block';
 
@@ -427,7 +430,18 @@
 
             document.getElementById('pSearch').value = '';
 
-            document.getElementById('tQty').focus();
+            const qtyInput = document.getElementById('tQty');
+            if (p.unit === 'GM') {
+                qtyInput.setAttribute('step', '0.001');
+                qtyInput.setAttribute('min', '0.001');
+                qtyInput.value = '1.000';
+            } else {
+                qtyInput.removeAttribute('step');
+                qtyInput.setAttribute('min', '1');
+                qtyInput.value = '1';
+            }
+
+            qtyInput.focus();
 
         }
 
@@ -444,12 +458,13 @@
         function addItemToList() {
 
             const pid = document.getElementById('tProduct').value;
-
-            const qty = parseInt(document.getElementById('tQty').value);
-
-            if (!pid || !qty || qty <= 0) return;
-
             const product = productsMap[pid];
+            if (!product) return;
+
+            const qtyVal = parseFloat(document.getElementById('tQty').value) || 0;
+            if (qtyVal <= 0) return;
+
+            const qty = product.unit === 'GM' ? Math.round(qtyVal * 1000) : Math.round(qtyVal);
 
             const existing = transferItems.find(item => item.id == pid);
 
@@ -465,7 +480,9 @@
 
                     name: product.name,
 
-                    qty: qty
+                    qty: qty,
+
+                    unit: product.unit || 'PCS'
 
                 });
 
@@ -523,11 +540,12 @@
 
                 const tr = document.createElement('tr');
 
+                const qtyText = item.unit === 'GM' ? (item.qty / 1000).toFixed(3) + ' KG' : item.qty + ' ' + item.unit;
                 tr.innerHTML = `
 
                     <td>${item.name}</td>
 
-                    <td style="text-align: center; font-weight: 700;">${item.qty}</td>
+                    <td style="text-align: center; font-weight: 700;">${qtyText}</td>
 
                     <td style="text-align: center;">
 
@@ -587,7 +605,7 @@
 
                         to_location: toLoc,
 
-                        items: transferItems
+                        items: transferItems.map(item => ({ id: item.id, qty: item.qty }))
 
                     })
 
@@ -607,7 +625,8 @@
                         items: transferItems.map(item => ({
                             product_barcode: productsMap[item.id] ? productsMap[item.id].barcode : '-',
                             product_name: item.name,
-                            qty: item.qty
+                            qty: item.qty,
+                            unit: item.unit
                         }))
                     };
 
@@ -709,14 +728,16 @@
             </tr>
         </thead>
         <tbody>
-            ${g.items.map((item, index) => `
+            ${g.items.map((item, index) => {
+                const qtyText = item.unit === 'GM' ? (parseFloat(item.qty) / 1000).toFixed(3) + ' KG' : parseFloat(item.qty).toLocaleString() + ' ' + (item.unit || 'PCS');
+                return `
                 <tr>
                     <td>${index + 1}</td>
                     <td style="font-family: monospace;">${item.product_barcode || '-'}</td>
                     <td style="font-weight: bold;">${item.product_name}</td>
-                    <td style="text-align: right; font-weight: bold;">${parseFloat(item.qty).toLocaleString()}</td>
-                </tr>
-            `).join('')}
+                    <td style="text-align: right; font-weight: bold;">${qtyText}</td>
+                </tr>`;
+            }).join('')}
         </tbody>
     </table>
     
@@ -788,17 +809,19 @@
             </tr>
         </thead>
         <tbody>
-            ${g.items.map(item => `
+            ${g.items.map(item => {
+                const qtyText = item.unit === 'GM' ? (parseFloat(item.qty) / 1000).toFixed(3) + ' KG' : parseFloat(item.qty).toLocaleString() + ' ' + (item.unit || 'PCS');
+                return `
                 <tr>
                     <td style="vertical-align: top;">${item.product_barcode || '-'}</td>
                     <td style="vertical-align: top; font-weight: bold; word-break: break-all;">
                         ${item.product_name}
                     </td>
                     <td class="text-right bold" style="vertical-align: top;">
-                        ${parseFloat(item.qty).toLocaleString()}
+                        ${qtyText}
                     </td>
-                </tr>
-            `).join('')}
+                </tr>`;
+            }).join('')}
         </tbody>
     </table>
     <div class="separator"></div>

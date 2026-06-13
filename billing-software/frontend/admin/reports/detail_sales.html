@@ -461,7 +461,7 @@
 
                 // CUSTOM PERCENTAGE CALCULATION (From Photo Logic)
 
-                // Formula: (BIZ + TSC) / (Net Sales dropped last two digits)
+                // Formula: (BIZ + TSC) / (Net Sales dropped last two digits) with truncation to 2 decimals
 
                 let netBase = Math.floor(netSales / 100);
 
@@ -469,7 +469,8 @@
 
                 if (netBase > 0) {
 
-                    totalPercentage = (totalBiz + totalTsc) / netBase;
+                    let rawPercentage = (totalBiz + totalTsc) / netBase;
+                    totalPercentage = Math.floor(rawPercentage * 100) / 100;
 
                 }
 

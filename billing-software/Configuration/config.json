@@ -11,5 +11,5 @@
     "SERVER_PORT": 5004,
     "WAITRESS_THREADS": 50,
     "SCAN_MODE": "manual",
-    "DATABASE_MODE": "failover"
+    "DATABASE_MODE": "local"
 }

@@ -290,7 +290,7 @@
 
                         <div class="summary-row">
 
-                            <div class="summary-label">OTHER SALES (UPI/CARD/CREDIT)</div>
+                            <div class="summary-label">OTHER SALES (UPI/CARD)</div>
 
                             <div class="summary-value" id="valOtherSales">&#8377;0.00</div>
 
@@ -507,7 +507,15 @@
 
                         item.className = 'expense-item';
 
-                        item.innerHTML = `<span><i class="fa-solid fa-user" style="margin-right: 5px;"></i> ${c.counter.toUpperCase()}</span><span style="font-weight:bold;color:var(--text-main);">\u20B9${c.amount.toFixed(2)}</span>`;
+                        let extraHtml = '';
+                        let cName = c.counter.toLowerCase();
+                        if (cName === 'counter' || cName.includes('counter1') || cName.includes('counter2')) {
+                            extraHtml = `<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;"><i class="fa-solid fa-droplet" style="color:var(--accent);"></i> Oil Sales: \u20B9${c.oil_sales.toFixed(2)}</div>`;
+                        } else if (cName.includes('counter3') || cName.includes('counter4')) {
+                            extraHtml = `<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;"><i class="fa-solid fa-cookie" style="color:var(--warning);"></i> Chocolates: \u20B9${c.choco_sales.toFixed(2)}</div>`;
+                        }
+
+                        item.innerHTML = `<div><span><i class="fa-solid fa-user" style="margin-right: 5px;"></i> ${c.counter.toUpperCase()}</span>${extraHtml}</div><span style="font-weight:bold;color:var(--text-main);">\u20B9${c.amount.toFixed(2)}</span>`;
 
                         counterBody.appendChild(item);
 

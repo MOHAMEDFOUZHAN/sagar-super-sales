@@ -379,9 +379,7 @@
 
 
 
-            // Stats
-
-            let total = 0, cash = 0, upi = 0, card = 0, credit = 0;
+            let total = 0, cash = 0, upi = 0, card = 0;
 
             const tableBody = document.querySelector('#salesTable tbody');
 
@@ -402,8 +400,6 @@
                     else if (modeUpper === 'UPI') upi += b.total_amount;
 
                     else if (modeUpper === 'CARD') card += b.total_amount;
-
-                    else if (modeUpper === 'CREDIT') credit += b.total_amount;
 
                 }
 
@@ -467,9 +463,9 @@
 
             document.getElementById('statCash').innerText = '\u20B9' + cash.toLocaleString(undefined, { minimumFractionDigits: 2 });
 
-            // Show combined digital/credit stats or separate as needed. Using digital + card + credit for statUPI.
+            // Show combined digital stats. Using digital + card for statUPI.
 
-            document.getElementById('statUPI').innerText = '\u20B9' + (upi + card + credit).toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('statUPI').innerText = '\u20B9' + (upi + card).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
             document.getElementById('printDateRange').innerText = `Period: ${new Date(start).toLocaleDateString()} to ${new Date(end).toLocaleDateString()}`;
 

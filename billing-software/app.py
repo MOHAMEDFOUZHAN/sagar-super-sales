@@ -11,6 +11,7 @@ if sys.platform == "win32":
     
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, Response
 import mysql.connector
+import mysql.connector.locales.eng
 from mysql.connector import pooling
 import datetime
 import sys
@@ -20,6 +21,20 @@ import queue
 import time
 from config import Config
 from backend.sales import create_bill
+from backend.network_diagnostics import (
+    get_network_interfaces,
+    scan_local_network,
+    get_cached_scan_results,
+    save_device_label,
+    get_live_traffic,
+    get_bandwidth_by_device,
+    scan_ports,
+    get_wifi_info,
+    check_dns_gateway_health,
+    generate_system_alerts,
+    load_alerts_log,
+    is_admin
+)
 from thermal_printer import print_thermal_bill, print_closure_report
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -231,10 +246,11 @@ def perform_database_sync(mysql_conn, pg_conn):
                 pg_cur.execute("""
                     INSERT INTO bills (invoice_no, bill_date, total_amount, payment_mode, tsc_percent, tsc_amount, status, source_bill_id, discount, created_by)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
                 """, (bill['invoice_no'], bill_date_str, bill['total_amount'], bill['payment_mode'], 
                       bill['tsc_percent'], bill['tsc_amount'], bill['status'], bill['source_bill_id'], bill['discount'], bill['created_by']))
                 
-                new_bill_id = pg_cur.lastrowid
+                new_bill_id = pg_cur.fetchone()[0]
 
                 for item in items:
                     pg_cur.execute("""
@@ -1268,7 +1284,7 @@ class PostgreSQLProxyConnection:
 
 
 def get_cloud_db_connection_direct():
-    global DB_STATUS, CLOUD_IS_ALIVE
+    global DB_STATUS, CLOUD_IS_ALIVE, LAST_CONNECTION_ERROR
     try:
         pool = get_pg_pool()
         if pool:
@@ -1288,6 +1304,7 @@ def get_cloud_db_connection_direct():
         return PostgreSQLProxyConnection(raw_pg_conn)
     except Exception as pg_err:
         err_msg = f"[CRITICAL ERROR] Supabase Connection Failed: {pg_err}"
+        LAST_CONNECTION_ERROR = f"Cloud Supabase Error: {pg_err}"
         print(err_msg)
         log_error(err_msg)
         CLOUD_IS_ALIVE = False
@@ -1317,7 +1334,7 @@ class SyncProxyCursor:
                     if tbl_lower == 'bills':
                         # Parse columns to find invoice_no index
                         import re
-                        cols_match = re.search(r"INSERT\s+INTO\s+bills\s*\(([^)]+)\)", query_upper)
+                        cols_match = re.search(r"INSERT\s+INTO\s+bills\s*\(([^)]+)\)", query_upper, re.IGNORECASE)
                         if cols_match:
                             cols = [c.strip().strip('"`[]') for c in cols_match.group(1).split(',')]
                             try:
@@ -1329,7 +1346,7 @@ class SyncProxyCursor:
                     else:
                         # For child tables, get bill_id and fetch invoice_no from bills table
                         import re
-                        cols_match = re.search(r"INSERT\s+INTO\s+" + tbl_lower + r"\s*\(([^)]+)\)", query_upper)
+                        cols_match = re.search(r"INSERT\s+INTO\s+" + tbl_lower + r"\s*\(([^)]+)\)", query_upper, re.IGNORECASE)
                         if cols_match:
                             cols = [c.strip().strip('"`[]') for c in cols_match.group(1).split(',')]
                             try:
@@ -1400,6 +1417,51 @@ class SyncProxyCursor:
                     
             self._parent.enqueue_change(table_name, rec_id, op_type, query, params, invoice_no=invoice_no)
             
+    def executemany(self, query, seq_of_params):
+        res = self._cursor.executemany(query, seq_of_params)
+        
+        # Intercept write queries for synchronization
+        query_upper = query.upper().strip()
+        is_write = any(query_upper.startswith(op) for op in ("INSERT ", "UPDATE ", "DELETE "))
+        is_sync_queue = "SYNC_QUEUE" in query_upper
+        
+        if is_write and not is_sync_queue:
+            table_name = self._parent._extract_table_name(query)
+            op_type = "INSERT" if query_upper.startswith("INSERT ") else ("UPDATE" if query_upper.startswith("UPDATE ") else "DELETE")
+            
+            for params in seq_of_params:
+                invoice_no = None
+                if table_name.lower() in ('bills', 'bill_items', 'returns_log', 'stock_movements'):
+                    if op_type == 'INSERT':
+                        if table_name.lower() == 'bills':
+                            import re
+                            cols_match = re.search(r"INSERT\s+INTO\s+bills\s*\(([^)]+)\)", query_upper, re.IGNORECASE)
+                            if cols_match:
+                                cols = [c.strip().strip('"`[]') for c in cols_match.group(1).split(',')]
+                                try:
+                                    inv_idx = cols.index('INVOICE_NO')
+                                    if params and inv_idx < len(params):
+                                        invoice_no = params[inv_idx]
+                                except ValueError:
+                                    pass
+                        else:
+                            import re
+                            cols_match = re.search(r"INSERT\s+INTO\s+" + table_name.lower() + r"\s*\(([^)]+)\)", query_upper, re.IGNORECASE)
+                            if cols_match:
+                                cols = [c.strip().strip('"`[]') for c in cols_match.group(1).split(',')]
+                                try:
+                                    bill_id_idx = cols.index('BILL_ID')
+                                    if params and bill_id_idx < len(params):
+                                        local_bill_id = params[bill_id_idx]
+                                        temp_cur = self._parent._conn.cursor()
+                                        temp_cur.execute("SELECT invoice_no FROM bills WHERE id = %s", (local_bill_id,))
+                                        row_res = temp_cur.fetchone()
+                                        if row_res:
+                                            invoice_no = row_res[0]
+                                        temp_cur.close()
+                                except:
+                                    pass
+                self._parent.enqueue_change(table_name, None, op_type, query, params, invoice_no=invoice_no)
         return res
 
     def fetchone(self):
@@ -1492,10 +1554,14 @@ class SyncProxyConnection:
 
 
 # Mode Manager status variables
-SYNC_SYSTEM_MODE = "LOCAL_PRIMARY" # "LOCAL_PRIMARY", "CLOUD_FAILOVER", "RESTORING"
+if getattr(Config, 'DATABASE_MODE', 'failover') == 'cloud':
+    SYNC_SYSTEM_MODE = "CLOUD_FAILOVER"
+else:
+    SYNC_SYSTEM_MODE = "LOCAL_PRIMARY"
 MYSQL_HEALTH_RETRIES = 0
 MAX_MYSQL_HEALTH_RETRIES = 3
 SYNC_LOGS = []
+LAST_CONNECTION_ERROR = None
 
 def log_sync_event(event_type, message):
     global SYNC_LOGS
@@ -2013,6 +2079,36 @@ def db_sync_monitor_loop():
         time.sleep(3)
 
 
+def get_local_db_connection():
+    global MYSQL_IS_ALIVE, DB_STATUS
+    try:
+        pool = db_pool
+        if pool:
+            conn = pool.get_connection()
+            conn.autocommit = Config.MYSQL_AUTOCOMMIT
+            cursor = conn.cursor()
+            cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+            cursor.close()
+            MYSQL_IS_ALIVE = True
+            return SyncProxyConnection(conn, is_pg=False)
+        conn = mysql.connector.connect(
+            host=Config.MYSQL_HOST,
+            port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER,
+            password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DB,
+            connection_timeout=2,
+            autocommit=Config.MYSQL_AUTOCOMMIT,
+        )
+        cursor = conn.cursor()
+        cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+        cursor.close()
+        MYSQL_IS_ALIVE = True
+        return SyncProxyConnection(conn, is_pg=False)
+    except Exception as e:
+        MYSQL_IS_ALIVE = False
+        return None
+
 def get_db_connection():
     global DB_STATUS, MYSQL_IS_ALIVE, CLOUD_IS_ALIVE, SYNC_SYSTEM_MODE
     
@@ -2062,7 +2158,8 @@ def get_db_connection():
 
 
 def get_login_db_connection():
-    global DB_STATUS, MYSQL_IS_ALIVE, SYNC_SYSTEM_MODE
+    global DB_STATUS, MYSQL_IS_ALIVE, SYNC_SYSTEM_MODE, LAST_CONNECTION_ERROR
+    LAST_CONNECTION_ERROR = None
     
     if SYNC_SYSTEM_MODE == "CLOUD_FAILOVER":
         return get_cloud_db_connection_direct()
@@ -2085,6 +2182,7 @@ def get_login_db_connection():
         return conn
     except Exception as e:
         log_error(f"[LOGIN DB ERROR] Local MySQL: {e}")
+        LAST_CONNECTION_ERROR = f"Local MySQL Error: {e}"
         MYSQL_IS_ALIVE = False
         
     return get_cloud_db_connection_direct()
@@ -2133,12 +2231,16 @@ def manage_server_ip():
                 json.dump(config_data, f, indent=4)
         
         # 3. Reset DB Pool to force reconnect
-        global db_pool
+        global db_pool, SYNC_SYSTEM_MODE
         db_pool = None 
+        if new_mode == 'cloud':
+            SYNC_SYSTEM_MODE = "CLOUD_FAILOVER"
+        else:
+            SYNC_SYSTEM_MODE = "LOCAL_PRIMARY"
         
         return jsonify({
             'status': 'success', 
-            'message': f'Server configuration updated (IP: {new_ip}, Mode: {new_mode}). Please restart if connection fails.'
+            'message': f'Server configuration updated (IP: {new_ip}, Mode: {new_mode}). Settings applied instantly.'
             })
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
@@ -2360,7 +2462,8 @@ def wipe_both_databases():
 def fetch_database_size_kb(cursor):
     global DB_STATUS
     try:
-        if DB_STATUS == "cloud":
+        is_pg = "psycopg2" in str(type(cursor._cursor)) if hasattr(cursor, '_cursor') else ("psycopg2" in str(type(cursor)))
+        if DB_STATUS == "cloud" or is_pg:
             cursor.execute("SELECT pg_database_size(current_database()) / 1024.0 AS size_kb")
             row = cursor.fetchone()
             if row is not None:
@@ -3315,7 +3418,13 @@ def login():
             else:
                 flash('Invalid credentials. Please try again.', 'error')
         else:
-            flash('Database connection failed. Please check if the server PC MySQL is running.', 'error')
+            global LAST_CONNECTION_ERROR
+            if LAST_CONNECTION_ERROR:
+                flash(f'Database connection failed! ({LAST_CONNECTION_ERROR})', 'error')
+            elif SYNC_SYSTEM_MODE == "CLOUD_FAILOVER":
+                flash('Database connection failed! (Could not connect to Supabase Cloud. Check internet connection.)', 'error')
+            else:
+                flash('Database connection failed. Please check if the server PC MySQL is running.', 'error')
             
     return render_template('login.html', current_host=Config.MYSQL_HOST)
 
@@ -4876,6 +4985,160 @@ def get_online_sales_cloud_api():
 def admin_returns():
     return render_template('admin/returns.html')
 
+@app.route('/admin/network-diagnostics')
+def admin_network_diagnostics():
+    return render_template('admin/network_diagnostics.html')
+
+@app.route('/api/admin/network/interfaces')
+def api_network_interfaces():
+    try:
+        return jsonify(get_network_interfaces())
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/network/scan')
+def api_network_scan():
+    try:
+        return jsonify(scan_local_network())
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/network/save-label', methods=['POST'])
+def api_network_save_label():
+    try:
+        data = request.json or {}
+        ip = data.get('ip')
+        label = data.get('label')
+        if not ip or not label:
+            return jsonify({'status': 'error', 'message': 'IP and label are required'}), 400
+        save_device_label(ip, label)
+        return jsonify({'status': 'success', 'message': 'Device label saved successfully'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/network/traffic')
+def api_network_traffic():
+    try:
+        return jsonify(get_live_traffic())
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/network/bandwidth')
+def api_network_bandwidth():
+    try:
+        return jsonify(get_bandwidth_by_device())
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/network/port-scan')
+def api_network_port_scan():
+    try:
+        target_ip = request.args.get('ip')
+        if not target_ip:
+            return jsonify({'status': 'error', 'message': 'Target IP is required'}), 400
+        return jsonify(scan_ports(target_ip))
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/network/alerts')
+def api_network_alerts():
+    try:
+        interfaces = get_network_interfaces()
+        scanned_ips = get_cached_scan_results()
+        health = check_dns_gateway_health()
+        alerts = generate_system_alerts(interfaces, scanned_ips, health)
+        return jsonify(alerts)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/network/wifi')
+def api_network_wifi():
+    try:
+        return jsonify(get_wifi_info())
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/network/health-check')
+def api_network_health_check():
+    try:
+        return jsonify(check_dns_gateway_health())
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/network/export-report')
+def api_network_export_report():
+    try:
+        interfaces = get_network_interfaces()
+        scanned = get_cached_scan_results()
+        wifi = get_wifi_info()
+        health = check_dns_gateway_health()
+        alerts = load_alerts_log()
+        
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        report = []
+        report.append("=========================================")
+        report.append("    MAPLE PRO NETWORK DIAGNOSTIC REPORT   ")
+        report.append(f"    Generated: {timestamp}")
+        report.append("=========================================\n")
+        
+        report.append("--- GATEWAY & DNS HEALTH ---")
+        for key, val in health.items():
+            if not key.endswith("_color") and not key.endswith("_latency"):
+                lat = health.get(f"{key}_latency", "N/A")
+                report.append(f" {key.upper()}: {val.upper()} ({lat})")
+        report.append("")
+        
+        report.append("--- WI-FI STATISTICS ---")
+        if wifi.get("connected"):
+            report.append(f" SSID: {wifi.get('ssid')}")
+            report.append(f" Band: {wifi.get('band')}")
+            report.append(f" Channel: {wifi.get('channel')}")
+            report.append(f" Signal: {wifi.get('signal')}% ({wifi.get('signal_dbm')} dBm)")
+            report.append(f" Tx/Rx Rates: {wifi.get('rate_tx')} / {wifi.get('rate_rx')}")
+        else:
+            report.append(" Wi-Fi Status: Disconnected / Not Available")
+        report.append("")
+        
+        report.append("--- NETWORK INTERFACES ---")
+        for nic in interfaces:
+            report.append(f" Interface: {nic['name']}")
+            report.append(f"   IP Address: {nic['ip']}")
+            report.append(f"   MAC Address: {nic['mac']}")
+            report.append(f"   Status: {nic['status']}")
+            report.append(f"   Negotiated Speed: {nic['speed_label']}")
+            report.append(f"   Live Traffic (Tx/Rx): {nic['tx_rate']} KB/s / {nic['rx_rate']} KB/s")
+            report.append("")
+            
+        report.append("--- LOCAL IP NETWORK SCAN (LAST CACHED) ---")
+        if not scanned:
+            report.append(" No scan results available. Run scan from dashboard.")
+        else:
+            report.append(f" {'IP Address':<16} {'MAC Address':<18} {'VendorPrefix':<15} {'Device Label':<20} {'Status':<8} {'Ping':<8}")
+            report.append(" " + "-"*85)
+            for dev in scanned:
+                status = "ONLINE" if dev['online'] else "OFFLINE"
+                ping = f"{dev['latency']} ms" if dev['online'] else "N/A"
+                report.append(f" {dev['ip']:<16} {dev['mac']:<18} {dev['vendor']:<15} {dev['label']:<20} {status:<8} {ping:<8}")
+        report.append("")
+        
+        report.append("--- ACTIVE EVENT ALERTS & HISTORY ---")
+        if not alerts:
+            report.append(" No alerts recorded in history.")
+        else:
+            for alert in alerts[:30]:
+                report.append(f" [{alert['timestamp']}] [{alert['severity']}] {alert['source']}: {alert['message']}")
+                report.append(f"   Action: {alert['action']}")
+                report.append("")
+                
+        report_text = "\n".join(report)
+        return Response(
+            report_text,
+            mimetype="text/plain",
+            headers={"Content-disposition": f"attachment; filename=Network_Report_{time.strftime('%Y%m%d_%H%M%S')}.txt"}
+        )
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/admin/maintenance')
 def admin_maintenance():
     return render_template('admin/maintenance.html')
@@ -5221,13 +5484,13 @@ def get_closure_report():
                 SUM(total_amount) as total_sales,
                 SUM(CASE WHEN UPPER(payment_mode) = 'CASH' THEN total_amount ELSE 0 END) as cash_sales,
                 SUM(CASE WHEN UPPER(payment_mode) = 'CARD' THEN total_amount ELSE 0 END) as card_sales,
-                SUM(CASE WHEN UPPER(payment_mode) = 'UPI' THEN total_amount ELSE 0 END) as upi_sales,
-                SUM(CASE WHEN UPPER(payment_mode) = 'CREDIT' THEN total_amount ELSE 0 END) as credit_sales
+                SUM(CASE WHEN UPPER(payment_mode) = 'UPI' THEN total_amount ELSE 0 END) as upi_sales
             FROM bills 
             WHERE DATE(bill_date) = %s AND status != 'Cancelled'{user_filter}
         """, tuple(query_params))
         sales = cursor.fetchone()
         for k in sales: sales[k] = float(sales[k] or 0)
+        sales['credit_sales'] = 0.0
         sales['avg_bill'] = sales['total_sales'] / sales['bill_count'] if sales['bill_count'] > 0 else 0
 
         # 2. Bizz Charges (80/20 split)
@@ -5265,6 +5528,14 @@ def get_closure_report():
             if not c['category']: c['category'] = 'General'
             c['category_sales'] = float(c['category_sales'] or 0)
             c['percent'] = (c['category_sales'] / sales['total_sales'] * 100) if sales['total_sales'] > 0 else 0
+
+        # Ensure OILS and CHOCOLATES always appear
+        cat_names = [c['category'].upper() for c in categories]
+        if 'OILS' not in cat_names:
+            categories.append({'category': 'OILS', 'category_sales': 0.0, 'percent': 0.0})
+            
+        if not any(name.startswith('CHOCO') for name in cat_names):
+            categories.append({'category': 'CHOCOLATES', 'category_sales': 0.0, 'percent': 0.0})
 
         # 5. Expenses
         cursor.execute("SELECT * FROM expenses WHERE DATE(expense_date) = %s", (report_date,))
@@ -5310,6 +5581,26 @@ def get_closure_report():
         counter_breakdown = cursor.fetchall()
         for c in counter_breakdown:
             c['amount'] = float(c['amount'] or 0)
+            
+            # Fetch Oil sales for this counter
+            cursor.execute(f"""
+                SELECT SUM(bi.amount) as cat_sales
+                FROM bills b
+                JOIN bill_items bi ON b.id = bi.bill_id
+                LEFT JOIN products p ON bi.product_name = p.name
+                WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled' AND b.created_by = %s AND p.category = %s
+            """, (query_params[0], c['counter'], 'OILS'))
+            c['oil_sales'] = float((cursor.fetchone() or {}).get('cat_sales') or 0)
+
+            # Fetch Chocolate sales for this counter
+            cursor.execute(f"""
+                SELECT SUM(bi.amount) as cat_sales
+                FROM bills b
+                JOIN bill_items bi ON b.id = bi.bill_id
+                LEFT JOIN products p ON bi.product_name = p.name
+                WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled' AND b.created_by = %s AND p.category LIKE 'CHOCO%%'
+            """, (query_params[0], c['counter']))
+            c['choco_sales'] = float((cursor.fetchone() or {}).get('cat_sales') or 0)
 
         conn.close()
         return jsonify({
@@ -5350,12 +5641,12 @@ def get_closure_range_report():
             SUM(total_amount) as total_sales,
             SUM(CASE WHEN UPPER(payment_mode) = 'CASH' THEN total_amount ELSE 0 END) as cash_sales,
             SUM(CASE WHEN UPPER(payment_mode) = 'CARD' THEN total_amount ELSE 0 END) as card_sales,
-            SUM(CASE WHEN UPPER(payment_mode) = 'UPI' THEN total_amount ELSE 0 END) as upi_sales,
-            SUM(CASE WHEN UPPER(payment_mode) = 'CREDIT' THEN total_amount ELSE 0 END) as credit_sales
+            SUM(CASE WHEN UPPER(payment_mode) = 'UPI' THEN total_amount ELSE 0 END) as upi_sales
         FROM bills 
         WHERE DATE(bill_date) BETWEEN %s AND %s AND status != 'Cancelled'
     """, (start_date, end_date))
     sales_summary = cursor.fetchone()
+    sales_summary['credit_sales'] = 0.0
     
     for key in sales_summary:
         if sales_summary[key] is None: sales_summary[key] = 0
@@ -5855,12 +6146,13 @@ def get_daily_position_report():
             p.name as product_name, 
             p.current_stock as closing,
             COALESCE(SUM(CASE WHEN DATE(b.bill_date) = CURDATE() AND b.status != 'Cancelled' THEN bi.qty ELSE 0 END), 0) as outgoing,
-            p.category
+            p.category,
+            p.unit as unit
         FROM daily_position_list dp
         JOIN products p ON dp.barcode = p.barcode
         LEFT JOIN bill_items bi ON p.name = bi.product_name
         LEFT JOIN bills b ON bi.bill_id = b.id
-        GROUP BY p.barcode, p.name, p.current_stock, p.category
+        GROUP BY p.barcode, p.name, p.current_stock, p.category, p.unit
         ORDER BY (p.barcode + 0), p.barcode
     """
     cursor.execute(query)
@@ -5870,6 +6162,7 @@ def get_daily_position_report():
     for row in data:
         row['closing'] = float(row['closing'] or 0)
         row['outgoing'] = float(row['outgoing'] or 0)
+        row['unit'] = row.get('unit') or 'PCS'
         if row['outgoing'] == 0: row['outgoing'] = ""
         
     return jsonify(data)
@@ -6088,7 +6381,10 @@ def load_reprocess_cart():
 @app.route('/api/products')
 def search_products():
     q = request.args.get('q', '')
-    conn = get_db_connection()
+    # Query local database first for scanning speed (in milliseconds)
+    conn = get_local_db_connection()
+    if not conn:
+        conn = get_db_connection()
     if not conn: return jsonify([])
     cursor = conn.cursor(dictionary=True)
     
@@ -6147,22 +6443,48 @@ def save_bill():
         """, (invoice_no, bill_dt, total, data['payment_mode'], tsc_percent, tsc_amount, status, data.get('source_bill_id'), discount, session.get('username', 'SYSTEM')))
         bill_id = cursor.lastrowid
         
-        for item in data['items']:
-            cursor.execute("SELECT current_stock, barcode FROM products WHERE name = %s FOR UPDATE", (item['name'],))
-            prod = cursor.fetchone()
-            if not prod: raise Exception(f"Product not found: {item['name']}")
+        # Batch pre-fetch all item stocks to save network round-trips (essential for cloud failover speed)
+        items = data.get('items', [])
+        if items:
+            product_names = list(set(item['name'] for item in items if item.get('name')))
+            if product_names:
+                format_strings = ','.join(['%s'] * len(product_names))
+                cursor.execute(f"SELECT name, current_stock FROM products WHERE name IN ({format_strings}) FOR UPDATE", tuple(product_names))
+                rows = cursor.fetchall()
+                stock_map = {row[0]: float(row[1]) for row in rows}
+            else:
+                stock_map = {}
+        else:
+            stock_map = {}
+
+        bill_items_data = []
+        for item in items:
+            name = item['name']
+            if name not in stock_map:
+                raise Exception(f"Product not found: {name}")
                 
-            available_stock = float(prod[0])
+            available_stock = stock_map[name]
             demanded_qty = float(item['qty'])
             if available_stock < demanded_qty:
-                raise Exception(f"Insufficient stock for {item['name']}. Available: {available_stock}")
-
+                raise Exception(f"Insufficient stock for {name}. Available: {available_stock}")
+                
             bizz_percent = float(item.get('bizz', 0))
             bizz_amt = (float(item['amount']) * bizz_percent) / 100
-            cursor.execute("""
+            
+            bill_items_data.append((bill_id, name, item['qty'], item['rate'], item['amount'], bizz_percent, bizz_amt))
+            
+            # Update local memory map so consecutive duplicate items check correctly
+            stock_map[name] -= demanded_qty
+            
+        # 1. Batch insert bill items in a single query
+        if bill_items_data:
+            cursor.executemany("""
                 INSERT INTO bill_items (bill_id, product_name, qty, rate, amount, bizz_percent, bizz_amount) 
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (bill_id, item['name'], item['qty'], item['rate'], item['amount'], bizz_percent, bizz_amt))
+            """, bill_items_data)
+
+        # 2. Update product stocks
+        for item in items:
             cursor.execute("UPDATE products SET current_stock = current_stock - %s WHERE name = %s", (item['qty'], item['name']))
         
         log_audit(cursor, 'CREATE_BILL', 'bills', bill_id, None, f"Invoice: {invoice_no}, Total: {total}")
@@ -6193,18 +6515,17 @@ def save_bill():
 def api_print_thermal():
     data = request.json
     try:
-        # Expected keys: items, bill_no, bill_date, bill_time, bill_type
-        success = print_thermal_bill(
-            items=data['items'],
-            bill_no=data['bill_no'],
-            bill_date=data['bill_date'],
-            bill_time=data['bill_time'],
-            bill_type=data['bill_type']
-        )
-        if success:
-            return jsonify({'status': 'success', 'message': 'Thermal bill printed.'})
-        else:
-            return jsonify({'status': 'error', 'message': 'Printing failed.'}), 500
+        # Spool printing asynchronously in a background thread to prevent UI delays
+        def bg_print():
+            print_thermal_bill(
+                items=data['items'],
+                bill_no=data['bill_no'],
+                bill_date=data['bill_date'],
+                bill_time=data['bill_time'],
+                bill_type=data['bill_type']
+            )
+        threading.Thread(target=bg_print, daemon=True).start()
+        return jsonify({'status': 'success', 'message': 'Thermal print job spooled.'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -6212,11 +6533,9 @@ def api_print_thermal():
 def api_print_closure():
     data = request.json
     try:
-        success = print_closure_report(data)
-        if success:
-            return jsonify({'status': 'success', 'message': 'Closure report printed.'})
-        else:
-            return jsonify({'status': 'error', 'message': 'Printing failed.'}), 500
+        # Spool closure printing asynchronously in a background thread
+        threading.Thread(target=print_closure_report, args=(data,), daemon=True).start()
+        return jsonify({'status': 'success', 'message': 'Closure print job spooled.'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -6832,7 +7151,14 @@ def inventory_categories(cat_id=None):
 @app.route('/api/inventory/products', methods=['GET', 'POST', 'DELETE'])
 @app.route('/api/inventory/products/<int:prod_id>', methods=['DELETE'])
 def inventory_products(prod_id=None):
-    conn = get_db_connection()
+    # Retrieve product catalog locally for maximum rendering speed (milliseconds)
+    if request.method == 'GET':
+        conn = get_local_db_connection()
+        if not conn:
+            conn = get_db_connection()
+    else:
+            conn = get_db_connection()
+        
     if not conn: return jsonify([])
     cursor = conn.cursor(dictionary=True)
     
@@ -7102,12 +7428,15 @@ if __name__ == '__main__':
     try:
         host = Config.SERVER_HOST if Config.SERVER_HOST != '0.0.0.0' else '127.0.0.1'
         url = f"http://{host}:{Config.SERVER_PORT}/"
-        if webview:
+        if webview and not os.environ.get("NO_WEBVIEW"):
             print("Launching Desktop Window...")
             webview.create_window("MaplePro - Billing System", url, width=1280, height=800, min_size=(1024, 768))
             webview.start()
         else:
-            webbrowser.open(url)
+            if not os.environ.get("NO_WEBVIEW"):
+                webbrowser.open(url)
+            else:
+                print("Headless mode: Webview bypassed, server running...")
             while True: time.sleep(100)
     except Exception as e:
         print(f"Webview setup failed: {e}")

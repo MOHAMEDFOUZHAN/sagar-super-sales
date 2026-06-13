@@ -208,7 +208,8 @@
                 // Group by Payment Mode
                 const grouped = {};
                 filtered.forEach(item => {
-                    const mode = (item.payment_mode || 'OTHER').toUpperCase();
+                    let mode = (item.payment_mode || 'OTHER').toUpperCase();
+                    if (mode === 'CREDIT') mode = 'OTHER';
                     if (!grouped[mode]) grouped[mode] = [];
                     grouped[mode].push(item);
                 });
@@ -220,7 +221,14 @@
                 let grandQty = 0;
                 let grandBiz = 0;
 
-                const modes = Object.keys(grouped).sort();
+                const modeOrder = ['CASH', 'CARD', 'UPI'];
+                const modes = Object.keys(grouped).sort((a, b) => {
+                    let idxA = modeOrder.indexOf(a.toUpperCase());
+                    let idxB = modeOrder.indexOf(b.toUpperCase());
+                    if (idxA === -1) idxA = 999;
+                    if (idxB === -1) idxB = 999;
+                    return idxA - idxB;
+                });
 
                 modes.forEach(mode => {
                     // Header for Payment Mode

@@ -471,6 +471,10 @@
 
                 div.className = 'shopping-list-item';
 
+                const isGM = item.unit === 'GM';
+                const stockText = isGM ? (item.stock / 1000).toFixed(3) + ' KG' : item.stock + ' ' + (item.unit || 'PCS');
+                const thresholdText = isGM ? (item.min_threshold / 1000).toFixed(3) + ' KG' : item.min_threshold;
+
                 div.innerHTML = `
 
                     <div style="flex: 1;">
@@ -483,9 +487,9 @@
 
                     <div style="text-align: right;">
 
-                        <div style="color: var(--danger); font-weight: 800;">${item.stock} ${item.unit} Left</div>
+                        <div style="color: var(--danger); font-weight: 800;">${stockText} Left</div>
 
-                        <div style="font-size: 0.65rem; color: var(--text-muted);">Threshold: ${item.min_threshold}</div>
+                        <div style="font-size: 0.65rem; color: var(--text-muted);">Threshold: ${thresholdText}</div>
 
                     </div>
 

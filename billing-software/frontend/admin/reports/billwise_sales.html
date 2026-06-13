@@ -150,6 +150,36 @@
 
         }
 
+        .badge-cash {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10b981 !important;
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+
+        .badge-card {
+            background: rgba(59, 130, 246, 0.15);
+            color: #3b82f6 !important;
+            border: 1px solid rgba(59, 130, 246, 0.25);
+        }
+
+        .badge-upi {
+            background: rgba(139, 92, 246, 0.15);
+            color: #8b5cf6 !important;
+            border: 1px solid rgba(139, 92, 246, 0.25);
+        }
+
+        .badge-credit {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b !important;
+            border: 1px solid rgba(245, 158, 11, 0.25);
+        }
+
+        .badge-other {
+            background: rgba(156, 163, 175, 0.15);
+            color: #9ca3af !important;
+            border: 1px solid rgba(156, 163, 175, 0.25);
+        }
+
     </style>
 
 </head>
@@ -254,6 +284,8 @@
 
                                 <th>DATE/TIME</th>
 
+                                <th>PAYMENT MODE</th>
+
                                 <th class="amount-cell">GROSS (&#8377;)</th>
 
                                 <th class="amount-cell">DISCOUNT (&#8377;)</th>
@@ -274,7 +306,7 @@
 
                             <tr style="background: rgba(255,255,255,0.05); font-weight: 800;">
 
-                                <td colspan="2">TOTAL</td>
+                                <td colspan="3">TOTAL</td>
 
                                 <td id="totalGross" class="amount-cell">0.00</td>
 
@@ -310,6 +342,17 @@
 
 
     <script>
+
+        function getModeBadge(mode) {
+            if (!mode) return `<span class="badge badge-other">-</span>`;
+            let modeUpper = mode.toUpperCase();
+            if (modeUpper === 'CREDIT') modeUpper = 'OTHER';
+            let badgeClass = 'badge-other';
+            if (modeUpper === 'CASH') badgeClass = 'badge-cash';
+            else if (modeUpper === 'CARD') badgeClass = 'badge-card';
+            else if (modeUpper === 'UPI') badgeClass = 'badge-upi';
+            return `<span class="badge ${badgeClass}">${modeUpper}</span>`;
+        }
 
         const now = new Date();
 
@@ -427,6 +470,8 @@
 
                         <td>${dateTime}</td>
 
+                        <td>${getModeBadge(b.payment_mode)}</td>
+
                         <td class="amount-cell">\u20B9${gross.toFixed(2)}</td>
 
                         <td class="amount-cell">\u20B9${discount.toFixed(2)}</td>
@@ -451,7 +496,7 @@
 
                 if (filtered.length === 0) {
 
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted);">No transactions found for this date.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">No transactions found for this date.</td></tr>';
 
                 }
 

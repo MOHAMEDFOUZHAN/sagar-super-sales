@@ -1396,8 +1396,6 @@
 
                             <option value="CARD">CARD</option>
 
-                            <option value="CREDIT">CREDIT </option>
-
                         </select>
 
                     </div>
@@ -2309,7 +2307,11 @@
 
             if (totalQty > stockAvailable) {
 
-                alert(`Insufficient Stock! Available: ${stockAvailable}, Already in cart: ${currentQtyInCart}, Requested: ${qtyToAdd}`);
+                const isGM = (currentProduct && currentProduct.unit === 'GM') || (unitInput.value === 'GM');
+                const availableDisplay = isGM ? (stockAvailable / 1000).toFixed(3) + ' KG' : stockAvailable;
+                const inCartDisplay = isGM ? (currentQtyInCart / 1000).toFixed(3) + ' KG' : currentQtyInCart;
+                const requestedDisplay = isGM ? (qtyToAdd / 1000).toFixed(3) + ' KG' : qtyToAdd;
+                alert(`Insufficient Stock! Available: ${availableDisplay}, Already in cart: ${inCartDisplay}, Requested: ${requestedDisplay}`);
 
                 return;
 
@@ -2415,7 +2417,7 @@
                 }
 
                 const remainingStock = (item.stock !== undefined && item.stock !== null) ? (item.stock - item.qty) : null;
-                const stockDisplay = remainingStock !== null ? remainingStock : '-';
+                const stockDisplay = remainingStock !== null ? (item.unit === 'GM' ? (remainingStock / 1000).toFixed(3) + ' KG' : remainingStock) : '-';
 
                 tr.innerHTML = `
                     <td>${index + 1}</td>

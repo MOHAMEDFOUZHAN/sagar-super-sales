@@ -261,8 +261,7 @@
             </div>
 
             <div class="form-group mb-20">
-                <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Adjustment
-                    Quantity</label>
+                <label id="adjQtyLabel" style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Adjustment Quantity</label>
                 <input type="number" id="adjQty" class="input-dark" min="1" value="1"
                     style="font-size: 1.5rem; text-align: center; font-weight: 800; color: var(--primary);">
             </div>
@@ -295,7 +294,7 @@
             tbody.innerHTML = '';
 
             data.forEach(p => {
-                const isLow = p.current_stock <= 25;
+                const isLow = p.current_stock <= (p.min_threshold || 25);
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td style="font-family: monospace; color: var(--accent);">${p.barcode || '-'}</td>
@@ -310,7 +309,7 @@
                         </span>
                     </td>
                     <td style="text-align: right; font-weight: 800; font-size: 1.1rem; color: ${isLow ? 'var(--danger)' : 'var(--text-main)'};">
-                        ${p.current_stock}
+                        ${p.unit === 'GM' ? (p.current_stock / 1000).toFixed(3) + ' KG' : p.current_stock + ' ' + (p.unit || 'PCS')}
                     </td>
                     <td style="text-align: right;">
                         <button class="btn btn-primary" style="padding: 8px 16px; font-size: 0.7rem;" onclick='openAdjust(${JSON.stringify(p)})'>
@@ -328,11 +327,30 @@
             renderStock(filtered);
         }
 
+        let currentProductUnit = 'PCS';
+
         function openAdjust(p) {
+            currentProductUnit = p.unit || 'PCS';
             document.getElementById('adjId').value = p.id;
             document.getElementById('adjProduct').innerText = p.name;
-            document.getElementById('adjStock').innerText = `Current Ledger: ${p.current_stock} ${p.unit}`;
-            document.getElementById('adjQty').value = 1;
+            
+            const qtyInput = document.getElementById('adjQty');
+            const qtyLabel = document.getElementById('adjQtyLabel');
+            
+            if (currentProductUnit === 'GM') {
+                document.getElementById('adjStock').innerText = `Current Ledger: ${(p.current_stock / 1000).toFixed(3)} KG`;
+                qtyLabel.innerText = "Adjustment Quantity (KG)";
+                qtyInput.setAttribute('step', '0.001');
+                qtyInput.setAttribute('min', '0.001');
+                qtyInput.value = '1.000';
+            } else {
+                document.getElementById('adjStock').innerText = `Current Ledger: ${p.current_stock} ${currentProductUnit}`;
+                qtyLabel.innerText = "Adjustment Quantity";
+                qtyInput.removeAttribute('step');
+                qtyInput.setAttribute('min', '1');
+                qtyInput.value = '1';
+            }
+            
             document.getElementById('adjReason').value = '';
             setMode('add');
             modal.style.display = 'flex';
@@ -362,10 +380,12 @@
         async function submitAdjustment() {
             const id = document.getElementById('adjId').value;
             const mode = document.getElementById('adjMode').value;
-            const qty = parseInt(document.getElementById('adjQty').value);
+            const qtyVal = parseFloat(document.getElementById('adjQty').value);
             const reason = document.getElementById('adjReason').value || 'System Adjustment';
 
-            if (!qty || qty <= 0) return;
+            if (!qtyVal || qtyVal <= 0) return;
+
+            const qty = currentProductUnit === 'GM' ? Math.round(qtyVal * 1000) : Math.round(qtyVal);
 
             const res = await fetch('/api/inventory/stock-adjust', {
                 method: 'POST',

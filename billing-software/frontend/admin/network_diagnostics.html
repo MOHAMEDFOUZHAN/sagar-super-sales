@@ -1,0 +1,1853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Command Center - Maple Pro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        :root {
+            --cyan-glow: rgba(6, 182, 212, 0.4);
+            --blue-glow: rgba(59, 130, 246, 0.4);
+            --green-glow: rgba(16, 185, 129, 0.4);
+        }
+
+        .diagnostics-container {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        /* Top Summary / Control Bar */
+        .control-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 16px 24px;
+            border-radius: var(--radius-lg);
+            backdrop-filter: blur(20px);
+        }
+
+        .summary-widgets {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 5px;
+        }
+
+        .summary-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.3s var(--ease-out);
+        }
+
+        .summary-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .summary-card i {
+            font-size: 1.8rem;
+            color: var(--primary);
+            filter: drop-shadow(0 0 8px var(--primary-glow));
+        }
+
+        .summary-card.active-alerts i {
+            color: var(--danger);
+            filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.4));
+        }
+
+        .summary-card.wifi-widget i {
+            color: var(--accent);
+            filter: drop-shadow(0 0 8px var(--cyan-glow));
+        }
+
+        .summary-details h4 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .summary-details div {
+            font-size: 1.3rem;
+            font-weight: 800;
+        }
+
+        /* Tabs Navigation */
+        .tab-nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 2px;
+        }
+
+        .tab-nav {
+            display: flex;
+            gap: 8px;
+            list-style: none;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 14px 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: var(--radius-md) var(--radius-md) 0 0;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            position: relative;
+        }
+
+        .tab-btn:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .tab-btn.active {
+            color: #818cf8;
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--primary);
+            box-shadow: 0 -2px 10px var(--primary-glow);
+        }
+
+        /* Tab Content Panes */
+        .tab-pane {
+            display: none;
+            animation: fadeIn 0.4s var(--ease-out);
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Grid layouts inside tabs */
+        .two-col-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+        }
+
+        @media (max-width: 1024px) {
+            .two-col-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Sub-cards / Panels */
+        .sub-panel {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel-header-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-header-flex h3 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Visual Speed Bar */
+        .speed-bar-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+
+        .speed-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.8s ease;
+        }
+
+        /* Interface List Styling */
+        .nic-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.3s;
+        }
+
+        .nic-card:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .nic-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nic-title {
+            font-weight: 700;
+            font-size: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nic-status-badge {
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 700;
+        }
+
+        .nic-details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .nic-detail-item strong {
+            color: var(--text-main);
+        }
+
+        /* Wi-Fi & Gateway Health grids */
+        .gateway-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+
+        .gateway-node {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: var(--radius-md);
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .gateway-node-name {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+        }
+
+        .gateway-node-name i {
+            font-size: 1.1rem;
+        }
+
+        .latency-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        /* IP Scanner Styles */
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .dot-green { background-color: var(--success); box-shadow: 0 0 8px var(--success); }
+        .dot-red { background-color: var(--danger); box-shadow: 0 0 8px var(--danger); }
+        .dot-amber { background-color: var(--warning); box-shadow: 0 0 8px var(--warning); }
+        .dot-gray { background-color: var(--text-muted); }
+
+        .search-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        /* Live Traffic layouts */
+        .charts-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+        }
+
+        @media (max-width: 900px) {
+            .charts-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .traffic-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .traffic-stat-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            text-align: center;
+        }
+
+        .traffic-stat-card .val {
+            font-size: 1.6rem;
+            font-weight: 800;
+            margin-top: 5px;
+        }
+
+        .traffic-stat-card.rx .val { color: var(--accent); }
+        .traffic-stat-card.tx .val { color: var(--success); }
+
+        /* Port Scanner styling */
+        .port-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .port-tile {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 16px;
+            border-radius: var(--radius-md);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s;
+        }
+
+        .port-tile.closed { border-left: 4px solid var(--text-muted); opacity: 0.65; }
+        .port-tile.open-expected { border-left: 4px solid var(--success); background: rgba(16, 185, 129, 0.04); }
+        .port-tile.open-risky { border-left: 4px solid var(--danger); background: rgba(239, 68, 68, 0.06); animation: pulse-border 2s infinite; }
+        .port-tile.open-warning { border-left: 4px solid var(--warning); background: rgba(245, 158, 11, 0.05); }
+
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2); }
+            70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .port-num { font-size: 1.3rem; font-weight: 800; }
+        .port-status { font-size: 0.7rem; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em; padding: 2px 6px; border-radius: 4px; }
+        .port-status.open { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+        .port-status.closed { background: rgba(255, 255, 255, 0.08); color: var(--text-muted); }
+        .port-label { font-size: 0.75rem; color: var(--text-muted); }
+
+        /* Privilege warning notice */
+        .privilege-notice {
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+            padding: 16px 20px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+        }
+
+        .privilege-notice i { font-size: 1.4rem; }
+
+        /* Alerts Timeline */
+        .alerts-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .alert-item {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius-md);
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.3s;
+        }
+
+        .alert-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .alert-item.severity-ERROR { border-left-color: var(--danger); background: rgba(239, 68, 68, 0.02); }
+        .alert-item.severity-WARN { border-left-color: var(--warning); background: rgba(245, 158, 11, 0.02); }
+        .alert-item.severity-INFO { border-left-color: var(--accent); background: rgba(6, 182, 212, 0.02); }
+
+        .alert-content-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .alert-meta {
+            display: flex;
+            gap: 12px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            align-items: center;
+        }
+
+        .alert-severity-tag {
+            text-transform: uppercase;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+        }
+
+        .severity-ERROR .alert-severity-tag { color: var(--danger); }
+        .severity-WARN .alert-severity-tag { color: var(--warning); }
+        .severity-INFO .alert-severity-tag { color: var(--accent); }
+
+        .alert-message {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        /* Modal custom dialog styling */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(2, 6, 23, 0.85);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(8px);
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #1e293b;
+            border: 1px solid var(--glass-border);
+            width: 90%;
+            max-width: 500px;
+            border-radius: var(--radius-lg);
+            padding: 30px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+            animation: modalSlide 0.3s var(--ease-out);
+        }
+
+        @keyframes modalSlide {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: white;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        /* Action Buttons */
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.75rem;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            color: white;
+        }
+
+        .btn-outline:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Diagnostic details panel */
+        .diagnose-box {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-md);
+            padding: 18px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #d1d5db;
+        }
+
+        .diagnose-step {
+            margin-bottom: 12px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .diagnose-step-num {
+            background: var(--primary);
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>Network Command Center</h1>
+                <p style="color: var(--text-muted);">Real-time local network diagnostic terminal and hardware controller.</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); padding: 8px 14px; border-radius: var(--radius-sm); font-size: 0.85rem;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-muted); font-weight: 600;">
+                        <input type="checkbox" id="autoRefreshToggle" checked style="accent-color: var(--primary);"> Auto Refresh
+                    </label>
+                    <span style="color: rgba(255,255,255,0.1);">|</span>
+                    <select id="refreshInterval" style="background: transparent; border: none; color: var(--text-main); font-weight: 700; outline: none; cursor: pointer;">
+                        <option value="1000">1s</option>
+                        <option value="5000" selected>5s</option>
+                        <option value="30000">30s</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-outline" id="btnRefreshAll" onclick="refreshAllTelemetry()">
+                    <i class="fa-solid fa-sync" id="refreshAllIcon"></i> REFRESH ALL
+                </button>
+                <button class="btn btn-primary" onclick="exportNetworkReport()">
+                    <i class="fa-solid fa-file-export"></i> EXPORT REPORT
+                </button>
+            </div>
+        </header>
+
+        <div class="diagnostics-container">
+            <!-- Top Summary Bar -->
+            <div class="summary-widgets">
+                <div class="summary-card">
+                    <i class="fa-solid fa-desktop"></i>
+                    <div class="summary-details">
+                        <h4>LAN Subnet Devices</h4>
+                        <div id="summaryDevices">Checking...</div>
+                    </div>
+                </div>
+                <div class="summary-card">
+                    <i class="fa-solid fa-gauge"></i>
+                    <div class="summary-details">
+                        <h4>Net Bandwidth (Rx / Tx)</h4>
+                        <div id="summarySpeed" style="font-size: 1.15rem; font-weight: 800;">0.00 / 0.00 KB/s</div>
+                    </div>
+                </div>
+                <div class="summary-card wifi-widget">
+                    <i class="fa-solid fa-wifi" id="summaryWifiIcon"></i>
+                    <div class="summary-details">
+                        <h4>Wi-Fi Quality</h4>
+                        <div id="summaryWifi">N/A</div>
+                    </div>
+                </div>
+                <div class="summary-card active-alerts" id="alertsSummaryCard" style="cursor: pointer;" onclick="switchTab('alerts')">
+                    <i class="fa-solid fa-bell"></i>
+                    <div class="summary-details">
+                        <h4>Active Alerts</h4>
+                        <div id="summaryAlerts" style="color: var(--danger);">0 Warnings</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs Navigation -->
+            <div class="tab-nav-container">
+                <ul class="tab-nav">
+                    <li>
+                        <button class="tab-btn active" onclick="switchTab('interfaces')">
+                            <i class="fa-solid fa-network-wired"></i> Interfaces
+                        </button>
+                    </li>
+                    <li>
+                        <button class="tab-btn" onclick="switchTab('scanner')">
+                            <i class="fa-solid fa-users-viewfinder"></i> IP Scanner
+                        </button>
+                    </li>
+                    <li>
+                        <button class="tab-btn" onclick="switchTab('traffic')">
+                            <i class="fa-solid fa-chart-area"></i> Traffic Analytics
+                        </button>
+                    </li>
+                    <li>
+                        <button class="tab-btn" onclick="switchTab('bandwidth')">
+                            <i class="fa-solid fa-server"></i> Bandwidth Sockets
+                        </button>
+                    </li>
+                    <li>
+                        <button class="tab-btn" onclick="switchTab('portscan')">
+                            <i class="fa-solid fa-shield-halved"></i> Port Scanner
+                        </button>
+                    </li>
+                    <li>
+                        <button class="tab-btn" onclick="switchTab('alerts')">
+                            <i class="fa-solid fa-circle-exclamation"></i> Alerts & Log
+                        </button>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Tab Content Panes -->
+            
+            <!-- Pane 1: Interfaces -->
+            <div class="tab-pane active" id="pane-interfaces">
+                <div class="two-col-grid">
+                    <div class="sub-panel">
+                        <div class="panel-header-flex">
+                            <h3><i class="fa-solid fa-ethernet" style="color: var(--primary);"></i> Network Interface Cards (NICs)</h3>
+                            <span class="badge badge-success" id="interfacesCount">0 Active</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 15px;" id="interfacesList">
+                            <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                                <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 10px;"></i><br>
+                                Reading network hardware config...
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 25px;">
+                        <!-- Default Gateway & DNS Health -->
+                        <div class="sub-panel">
+                            <h3><i class="fa-solid fa-tower-broadcast" style="color: var(--accent);"></i> Gateway & DNS Health</h3>
+                            <div class="gateway-grid">
+                                <div class="gateway-node">
+                                    <div class="gateway-node-name">
+                                        <i class="fa-solid fa-router" style="color: var(--text-muted);" id="nodeIconGateway"></i> Default Gateway
+                                    </div>
+                                    <span class="latency-badge dot-gray" id="nodeGateway">Checking...</span>
+                                </div>
+                                <div class="gateway-node">
+                                    <div class="gateway-node-name">
+                                        <i class="fa-solid fa-globe" style="color: var(--text-muted);" id="nodeIconGoogle"></i> Google DNS (8.8.8.8)
+                                    </div>
+                                    <span class="latency-badge dot-gray" id="nodeGoogle">Checking...</span>
+                                </div>
+                                <div class="gateway-node">
+                                    <div class="gateway-node-name">
+                                        <i class="fa-solid fa-globe" style="color: var(--text-muted);" id="nodeIconCloudflare"></i> Cloudflare DNS (1.1.1.1)
+                                    </div>
+                                    <span class="latency-badge dot-gray" id="nodeCloudflare">Checking...</span>
+                                </div>
+                            </div>
+                            <div id="dnsFailureWarning" style="display: none; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); color: var(--danger); padding: 12px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 600;">
+                                <i class="fa-solid fa-triangle-exclamation"></i> DNS Failure — LAN is working but Internet connection is down!
+                            </div>
+                            <div id="routerOfflineWarning" style="display: none; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); color: var(--danger); padding: 12px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 600;">
+                                <i class="fa-solid fa-triangle-exclamation"></i> Router offline — All network billing counters will lose connectivity!
+                            </div>
+                        </div>
+
+                        <!-- Wi-Fi Details Card -->
+                        <div class="sub-panel">
+                            <h3><i class="fa-solid fa-wifi" style="color: var(--accent);"></i> Wi-Fi Signal Monitor</h3>
+                            <div style="display: flex; flex-direction: column; gap: 12px;" id="wifiDetailsPanel">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+                                    <span style="color: var(--text-muted);">Connection Status:</span>
+                                    <strong id="wifiStatus">Disconnected</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+                                    <span style="color: var(--text-muted);">SSID (Network):</span>
+                                    <strong id="wifiSSID">N/A</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+                                    <span style="color: var(--text-muted);">Band & Channel:</span>
+                                    <strong id="wifiBand">N/A</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.9rem;">
+                                    <span style="color: var(--text-muted);">Negotiated Rate (Tx/Rx):</span>
+                                    <strong id="wifiRates">N/A</strong>
+                                </div>
+                                <div style="margin-top: 5px;">
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px;">
+                                        <span style="color: var(--text-muted);">Signal Strength (dBm):</span>
+                                        <strong id="wifiSignalDbm">0% (-100 dBm)</strong>
+                                    </div>
+                                    <div class="speed-bar-container" style="height: 10px;">
+                                        <div class="speed-bar-fill" id="wifiSignalFill" style="width: 0%; background: linear-gradient(90deg, var(--danger), var(--success));"></div>
+                                    </div>
+                                </div>
+                                <div id="wifiSignalWarning" style="display: none; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.2); color: var(--warning); padding: 10px; border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: 600;">
+                                    <i class="fa-solid fa-circle-exclamation"></i> Low Signal (&lt; -70 dBm) — Likely cause of high pings or disconnection at Wi-Fi counters!
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pane 2: IP Scanner -->
+            <div class="tab-pane" id="pane-scanner">
+                <div class="sub-panel">
+                    <div class="panel-header-flex">
+                        <h3><i class="fa-solid fa-network-wired" style="color: var(--primary);"></i> Local Subnet Scanner</h3>
+                        <button class="btn btn-primary btn-sm" id="btnScanSubnet" onclick="triggerSubnetScan()">
+                            <i class="fa-solid fa-magnifying-glass" id="scanBtnIcon"></i> SCAN SUBNET (192.168.1.1-254)
+                        </button>
+                    </div>
+
+                    <div class="search-row">
+                        <i class="fa-solid fa-filter" style="color: var(--text-muted);"></i>
+                        <input type="text" id="scannerSearch" class="input-dark" placeholder="Filter devices by IP, MAC, Label, or Vendor Prefix..." oninput="filterScannerTable()">
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 80px;">Status</th>
+                                    <th>IP Address</th>
+                                    <th>Physical (MAC) Address</th>
+                                    <th>MAC Vendor Prefix</th>
+                                    <th>Device Name/Label</th>
+                                    <th>Response Latency</th>
+                                    <th style="width: 100px; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scannerTableBody">
+                                <tr>
+                                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                                        <i class="fa-solid fa-circle-info" style="font-size: 1.2rem; margin-bottom: 8px;"></i><br>
+                                        No active scan cache. Click <strong>Scan Subnet</strong> to sweep the local subnet network.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pane 3: Traffic Analytics -->
+            <div class="tab-pane" id="pane-traffic">
+                <div class="sub-panel">
+                    <h3><i class="fa-solid fa-chart-area" style="color: var(--accent);"></i> System Network Telemetry</h3>
+                    <div class="charts-row">
+                        <div style="background: rgba(0,0,0,0.15); border: 1px solid var(--glass-border); padding: 20px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 10px;">
+                            <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-muted);">60-Second Scrolling Bandwidth Graph</div>
+                            <canvas id="trafficGraph" height="300" style="width: 100%; border: 1px solid rgba(255,255,255,0.03); background: rgba(0,0,0,0.2); border-radius: 8px;"></canvas>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.15); border: 1px solid var(--glass-border); padding: 20px; border-radius: var(--radius-md); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 15px;">
+                            <div style="font-weight: 600; font-size: 0.9rem; color: var(--text-muted); text-align: left; width: 100%;">Protocol Distribution</div>
+                            <canvas id="protocolChart" width="180" height="180" style="max-width: 180px; max-height: 180px;"></canvas>
+                            <div id="protocolLegend" style="display: flex; flex-direction: column; gap: 6px; width: 100%; font-size: 0.8rem; color: var(--text-muted);">
+                                <!-- Legend items here -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="traffic-stats-grid">
+                        <div class="traffic-stat-card rx">
+                            <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Download Speed</h4>
+                            <div class="val" id="trafficSpeedRx">0.0 MB/s</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">Peak: <span id="trafficPeakRx" style="color: white; font-weight: 700;">0.0 MB/s</span></div>
+                        </div>
+                        <div class="traffic-stat-card tx">
+                            <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Upload Speed</h4>
+                            <div class="val" id="trafficSpeedTx">0.0 MB/s</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">Peak: <span id="trafficPeakTx" style="color: white; font-weight: 700;">0.0 MB/s</span></div>
+                        </div>
+                        <div class="traffic-stat-card">
+                            <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Session Total Download</h4>
+                            <div class="val" id="trafficTotalRx" style="color: var(--primary);">0.00 MB</div>
+                        </div>
+                        <div class="traffic-stat-card">
+                            <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Session Total Upload</h4>
+                            <div class="val" id="trafficTotalTx" style="color: var(--secondary);">0.00 MB</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pane 4: Bandwidth Sockets -->
+            <div class="tab-pane" id="pane-bandwidth">
+                <div class="sub-panel">
+                    <h3><i class="fa-solid fa-server" style="color: var(--primary);"></i> Bandwidth Consumption by Connected Device</h3>
+                    
+                    <div id="adminRequiredNotice" class="privilege-notice" style="display: none;">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <div>
+                            <strong>Administrator Privileges Missing!</strong><br>
+                            To map network sockets directly to Windows executable processes (`netstat -bn`), this billing software requires Administrator rights. Running in user mode fallback (`netstat -an`).
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 2fr 1.2fr; gap: 25px;">
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Remote IP Address</th>
+                                        <th>Device Label Name</th>
+                                        <th style="width: 100px; text-align: center;">Sockets</th>
+                                        <th>Mapped Executable</th>
+                                        <th>Consumption (Est. MB)</th>
+                                        <th style="width: 100px;">Threat Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bandwidthTableBody">
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                                            <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 8px;"></i><br>
+                                            Mapping local socket endpoints...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div style="background: rgba(0,0,0,0.15); border: 1px solid var(--glass-border); padding: 20px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 15px;">
+                            <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-main);">Consumption Visual Share</div>
+                            <div id="bandwidthBarsContainer" style="display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto; padding-right: 5px;">
+                                <!-- Bar widgets will be drawn here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pane 5: Port Scanner -->
+            <div class="tab-pane" id="pane-portscan">
+                <div class="sub-panel">
+                    <div class="panel-header-flex">
+                        <h3><i class="fa-solid fa-shield-halved" style="color: var(--primary);"></i> Threaded Port Security Scanner</h3>
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <input type="text" id="portScanIP" class="input-dark" style="max-width: 200px; padding: 8px 14px;" placeholder="Target IP (e.g. 192.168.1.1)">
+                            <button class="btn btn-primary btn-sm" id="btnScanPorts" onclick="triggerPortScan()">
+                                <i class="fa-solid fa-magnifying-glass-chart" id="portScanIcon"></i> SCAN PORTS
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; background: rgba(0,0,0,0.15); border: 1px solid var(--glass-border); padding: 12px 18px; border-radius: var(--radius-sm); margin-bottom: 10px;">
+                        <strong>Network Security Advice:</strong> Billing terminals should only expose expected web/database endpoints. Standard ports (80, 443, 3306, 8080) are categorized as <span style="color: var(--success); font-weight: 700;">Expected Open</span> if active. Vulnerable control ports (21 FTP, 23 Telnet, 445 SMB, 3389 RDP) will trigger a <span style="color: var(--danger); font-weight: 700;">Security Threat Risk Alert</span> if left open.
+                    </div>
+
+                    <div class="port-grid" id="portScanGrid">
+                        <!-- Port tiles go here -->
+                        <div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 40px;">
+                            <i class="fa-solid fa-circle-question" style="font-size: 1.5rem; margin-bottom: 8px;"></i><br>
+                            Enter an IP Address above and click <strong>Scan Ports</strong>.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pane 6: Alerts & Log -->
+            <div class="tab-pane" id="pane-alerts">
+                <div class="sub-panel">
+                    <div class="panel-header-flex">
+                        <h3><i class="fa-solid fa-list-ul" style="color: var(--danger);"></i> Alert Event & Diagnosis Log</h3>
+                        <button class="btn btn-outline btn-sm" onclick="clearAlertHistory()">
+                            <i class="fa-solid fa-trash-can"></i> CLEAR LOG
+                        </button>
+                    </div>
+
+                    <div class="alerts-timeline" id="alertsTimeline">
+                        <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                            <i class="fa-solid fa-check-circle" style="font-size: 1.5rem; color: var(--success); margin-bottom: 10px;"></i><br>
+                            All systems operational. No active hardware or ping alerts.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Label Assignment Modal -->
+    <div class="modal" id="labelModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Device Custom Label</h3>
+                <button class="modal-close" onclick="closeLabelModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="form-group">
+                <label for="labelModalIP">IP Address</label>
+                <input type="text" id="labelModalIP" class="input-dark" readonly style="opacity: 0.6; cursor: not-allowed;">
+            </div>
+            <div class="form-group">
+                <label for="labelModalInput">Assigned Custom Label Name</label>
+                <input type="text" id="labelModalInput" class="input-dark" placeholder="e.g. Printer / Server / Front Billing Counter">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-outline" onclick="closeLabelModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="submitCustomLabel()">Save Custom Label</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diagnosis / Action Modal -->
+    <div class="modal" id="diagnoseModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-heart-pulse" style="color: var(--danger);"></i> IT Autopilot Diagnosis</h3>
+                <button class="modal-close" onclick="closeDiagnoseModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div>
+                    <h4 style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase;">Alert Cause</h4>
+                    <div id="diagnoseCause" style="font-weight: 700; color: white; margin-top: 4px; font-size: 1.05rem;">-</div>
+                </div>
+                <div>
+                    <h4 style="font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase;">Troubleshooting Recommendation</h4>
+                    <div class="diagnose-box" id="diagnoseBox">
+                        <!-- Diagnostic recommendation text -->
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 25px;">
+                <button class="btn btn-primary" onclick="closeDiagnoseModal()">Acknowledge & Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charting & Data Sync Scripts -->
+    <script>
+        // Tab switching logic
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-pane').forEach(pane => {
+                pane.classList.remove('active');
+            });
+
+            // Find matching tab button and pane
+            const targetBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => 
+                btn.getAttribute('onclick').includes(`'${tabId}'`)
+            );
+            if (targetBtn) targetBtn.classList.add('active');
+            
+            const paneEl = document.getElementById(`pane-${tabId}`);
+            if (paneEl) paneEl.classList.add('active');
+
+            // Resize canvases to fit window dimensions properly
+            if (tabId === 'traffic') {
+                resizeCanvas('trafficGraph');
+                resizeCanvas('protocolChart');
+            }
+        }
+
+        function resizeCanvas(id) {
+            const canvas = document.getElementById(id);
+            if (!canvas) return;
+            const parent = canvas.parentElement;
+            canvas.style.width = '100%';
+            canvas.width = parent.clientWidth - 40;
+        }
+
+        // Live Traffic Graph Telemetry Buffer
+        const graphBufferLength = 60;
+        const rxHistory = Array(graphBufferLength).fill(0);
+        const txHistory = Array(graphBufferLength).fill(0);
+        let rxTotalSession = 0.0; // MB
+        let txTotalSession = 0.0; // MB
+        let peakRx = 0.0; // MB/s
+        let peakTx = 0.0; // MB/s
+        let lastTrafficTimestamp = null;
+        let lastRxBytes = null;
+        let lastTxBytes = null;
+        let selectedInterval = 5000;
+        let timerId = null;
+
+        // Colors
+        const rxColor = '#06b6d4'; // Cyan
+        const txColor = '#10b981'; // Green
+        const gridColor = 'rgba(255,255,255,0.04)';
+        const labelFont = '10px Inter, sans-serif';
+
+        function drawTrafficGraph() {
+            const canvas = document.getElementById('trafficGraph');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // Determine max value in buffer for auto scaling y axis
+            const maxVal = Math.max(1.0, ...rxHistory, ...txHistory);
+            const padding = 30;
+            const graphWidth = w - padding * 2;
+            const graphHeight = h - padding * 2;
+
+            // Draw grid lines
+            ctx.strokeStyle = gridColor;
+            ctx.lineWidth = 1;
+            const yLines = 5;
+            for (let i = 0; i <= yLines; i++) {
+                const y = padding + (graphHeight / yLines) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(w - padding, y);
+                ctx.stroke();
+
+                // Draw Y labels
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = labelFont;
+                ctx.textAlign = 'right';
+                const rateVal = (maxVal - (maxVal / yLines) * i).toFixed(1);
+                ctx.fillText(rateVal + " MB/s", padding - 6, y + 4);
+            }
+
+            // Draw X grid lines
+            const xLines = 6;
+            for (let i = 0; i <= xLines; i++) {
+                const x = padding + (graphWidth / xLines) * i;
+                ctx.beginPath();
+                ctx.moveTo(x, padding);
+                ctx.lineTo(x, h - padding);
+                ctx.stroke();
+
+                // Draw X labels
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = labelFont;
+                ctx.textAlign = 'center';
+                const sec = (60 - (60 / xLines) * i);
+                ctx.fillText(sec + "s ago", x, h - padding + 15);
+            }
+
+            // Draw Download rate line (filled area)
+            ctx.strokeStyle = rxColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let i = 0; i < graphBufferLength; i++) {
+                const x = padding + (graphWidth / (graphBufferLength - 1)) * i;
+                const y = padding + graphHeight - (rxHistory[i] / maxVal) * graphHeight;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Fill Download
+            ctx.fillStyle = 'rgba(6, 182, 212, 0.08)';
+            ctx.beginPath();
+            ctx.moveTo(padding, padding + graphHeight);
+            for (let i = 0; i < graphBufferLength; i++) {
+                const x = padding + (graphWidth / (graphBufferLength - 1)) * i;
+                const y = padding + graphHeight - (rxHistory[i] / maxVal) * graphHeight;
+                ctx.lineTo(x, y);
+            }
+            ctx.lineTo(padding + graphWidth, padding + graphHeight);
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw Upload rate line
+            ctx.strokeStyle = txColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let i = 0; i < graphBufferLength; i++) {
+                const x = padding + (graphWidth / (graphBufferLength - 1)) * i;
+                const y = padding + graphHeight - (txHistory[i] / maxVal) * graphHeight;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Fill Upload
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.05)';
+            ctx.beginPath();
+            ctx.moveTo(padding, padding + graphHeight);
+            for (let i = 0; i < graphBufferLength; i++) {
+                const x = padding + (graphWidth / (graphBufferLength - 1)) * i;
+                const y = padding + graphHeight - (txHistory[i] / maxVal) * graphHeight;
+                ctx.lineTo(x, y);
+            }
+            ctx.lineTo(padding + graphWidth, padding + graphHeight);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // Draw Protocol breakdown donut chart
+        let currentProtocols = { "Billing HTTP/S": 40, "Local Database": 30, "Cloud database": 20, "Other / Internet": 10 };
+        function drawProtocolChart() {
+            const canvas = document.getElementById('protocolChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, 180, 180);
+
+            const colors = ['#6366f1', '#10b981', '#ec4899', '#f59e0b'];
+            let total = 0;
+            const entries = Object.entries(currentProtocols);
+            entries.forEach(e => total += e[1]);
+
+            if (total === 0) return;
+
+            let startAngle = -Math.PI / 2;
+            const centerX = 90;
+            const centerY = 90;
+            const outerRadius = 75;
+            const innerRadius = 50;
+
+            entries.forEach((entry, idx) => {
+                const val = entry[1];
+                const sliceAngle = (val / total) * (Math.PI * 2);
+                const color = colors[idx % colors.length];
+
+                // Outer Arc
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, outerRadius, startAngle, startAngle + sliceAngle, false);
+                ctx.arc(centerX, centerY, innerRadius, startAngle + sliceAngle, startAngle, true);
+                ctx.closePath();
+                ctx.fill();
+
+                startAngle += sliceAngle;
+            });
+
+            // Center Text
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText("TCP Sockets", centerX, centerY - 5);
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '10px Inter, sans-serif';
+            ctx.fillText(total + " Active", centerX, centerY + 10);
+
+            // Draw Legend
+            const legend = document.getElementById('protocolLegend');
+            if (legend) {
+                legend.innerHTML = '';
+                entries.forEach((entry, idx) => {
+                    const color = colors[idx % colors.length];
+                    const pct = total > 0 ? Math.round((entry[1] / total) * 100) : 0;
+                    legend.innerHTML += `
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 4px;">
+                            <span style="display:flex; align-items:center; gap: 8px;">
+                                <span style="width: 8px; height: 8px; background: ${color}; border-radius: 50%;"></span>
+                                ${entry[0]}
+                            </span>
+                            <span style="font-weight: 700; color: white;">${pct}%</span>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        // Fetch Interfaces
+        async function fetchInterfaces() {
+            try {
+                const res = await fetch('/api/admin/network/interfaces');
+                const data = await res.json();
+                const countBadge = document.getElementById('interfacesCount');
+                const list = document.getElementById('interfacesList');
+                
+                if (data.status === 'error') {
+                    list.innerHTML = `<div style="color: var(--danger); text-align: center; padding: 20px;">Error reading interfaces: ${data.message}</div>`;
+                    return;
+                }
+
+                let activeCount = 0;
+                list.innerHTML = '';
+                
+                data.forEach(nic => {
+                    if (nic.is_loopback) return;
+                    if (nic.is_up) activeCount++;
+                    
+                    // Warning style check
+                    let badgeClass = nic.is_up ? 'badge-success' : 'badge-danger';
+                    if (nic.severity === 'WARN') {
+                        badgeClass = 'badge-warning';
+                    }
+
+                    list.innerHTML += `
+                        <div class="nic-card">
+                            <div class="nic-header">
+                                <div class="nic-title">
+                                    <i class="${nic.is_wireless ? 'fa-solid fa-wifi' : 'fa-solid fa-network-wired'}" style="color: ${nic.is_up ? 'var(--primary)' : 'var(--text-muted)'};"></i>
+                                    ${nic.name}
+                                </div>
+                                <span class="nic-status-badge ${badgeClass}">${nic.status}</span>
+                            </div>
+                            <div class="nic-details-grid">
+                                <div class="nic-detail-item">IP Address: <strong>${nic.ip}</strong></div>
+                                <div class="nic-detail-item">MAC Address: <strong>${nic.mac}</strong></div>
+                                <div class="nic-detail-item">Speed Negotiated: <strong>${nic.speed_label}</strong></div>
+                                <div class="nic-detail-item">Activity Rate (Rx/Tx): <strong>${nic.rx_rate.toFixed(1)} / ${nic.tx_rate.toFixed(1)} KB/s</strong></div>
+                            </div>
+                            <div>
+                                <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted); margin-bottom:2px;">
+                                    <span>Negotiated Speed Efficiency</span>
+                                    <span>${nic.speed_pct.toFixed(0)}%</span>
+                                </div>
+                                <div class="speed-bar-container">
+                                    <div class="speed-bar-fill" style="width: ${nic.speed_pct}%; background: ${nic.severity === 'WARN' ? 'var(--warning)' : nic.is_up ? 'linear-gradient(90deg, var(--primary), var(--accent))' : 'var(--text-muted)'};"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                countBadge.innerText = `${activeCount} Active`;
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Fetch Live Traffic Sockets
+        async function fetchTraffic() {
+            try {
+                const res = await fetch('/api/admin/network/traffic');
+                const data = await res.json();
+                if (data.status === 'error') return;
+
+                const currentTimestamp = data.timestamp;
+                const bytesSent = data.bytes_sent;
+                const bytesRecv = data.bytes_recv;
+
+                if (lastTrafficTimestamp !== null && lastRxBytes !== null && lastTxBytes !== null) {
+                    const dt = currentTimestamp - lastTrafficTimestamp;
+                    if (dt > 0) {
+                        const rxMbps = ((bytesRecv - lastRxBytes) / 1024 / 1024) / dt; // MB/s
+                        const txMbps = ((bytesSent - lastTxBytes) / 1024 / 1024) / dt; // MB/s
+
+                        // Shift history buffer and push new measurements
+                        rxHistory.shift();
+                        rxHistory.push(rxMbps);
+
+                        txHistory.shift();
+                        txHistory.push(txMbps);
+
+                        // Accumulate totals
+                        rxTotalSession += rxMbps * dt;
+                        txTotalSession += txMbps * dt;
+
+                        // Peaks
+                        if (rxMbps > peakRx) peakRx = rxMbps;
+                        if (txMbps > peakTx) peakTx = txMbps;
+
+                        // UI Display
+                        document.getElementById('trafficSpeedRx').innerText = rxMbps.toFixed(2) + " MB/s";
+                        document.getElementById('trafficSpeedTx').innerText = txMbps.toFixed(2) + " MB/s";
+                        document.getElementById('trafficPeakRx').innerText = peakRx.toFixed(2) + " MB/s";
+                        document.getElementById('trafficPeakTx').innerText = peakTx.toFixed(2) + " MB/s";
+                        document.getElementById('trafficTotalRx').innerText = rxTotalSession.toFixed(2) + " MB";
+                        document.getElementById('trafficTotalTx').innerText = txTotalSession.toFixed(2) + " MB";
+
+                        document.getElementById('summarySpeed').innerText = `${(rxMbps * 1024).toFixed(0)} / ${(txMbps * 1024).toFixed(0)} KB/s`;
+
+                        drawTrafficGraph();
+                    }
+                }
+
+                lastTrafficTimestamp = currentTimestamp;
+                lastRxBytes = bytesRecv;
+                lastTxBytes = bytesSent;
+
+                currentProtocols = data.protocols;
+                drawProtocolChart();
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Fetch Wi-Fi stats
+        async function fetchWifiInfo() {
+            try {
+                const res = await fetch('/api/admin/network/wifi');
+                const data = await res.json();
+                
+                const summary = document.getElementById('summaryWifi');
+                const summaryIcon = document.getElementById('summaryWifiIcon');
+                const status = document.getElementById('wifiStatus');
+                const ssid = document.getElementById('wifiSSID');
+                const band = document.getElementById('wifiBand');
+                const rates = document.getElementById('wifiRates');
+                const signalDbm = document.getElementById('wifiSignalDbm');
+                const fill = document.getElementById('wifiSignalFill');
+                const warn = document.getElementById('wifiSignalWarning');
+
+                if (data.connected) {
+                    status.innerText = "Connected";
+                    ssid.innerText = data.ssid;
+                    band.innerText = `${data.band} (Channel ${data.channel})`;
+                    rates.innerText = `${data.rate_tx} / ${data.rate_rx}`;
+                    signalDbm.innerText = `${data.signal}% (${data.signal_dbm} dBm)`;
+                    fill.style.width = `${data.signal}%`;
+                    
+                    summary.innerText = `${data.signal}% (${data.signal_dbm} dBm)`;
+                    if (data.signal_color === 'green') {
+                        summary.style.color = 'var(--success)';
+                        summaryIcon.style.color = 'var(--success)';
+                        warn.style.display = 'none';
+                    } else if (data.signal_color === 'amber') {
+                        summary.style.color = 'var(--warning)';
+                        summaryIcon.style.color = 'var(--warning)';
+                        warn.style.display = 'none';
+                    } else {
+                        summary.style.color = 'var(--danger)';
+                        summaryIcon.style.color = 'var(--danger)';
+                        warn.style.display = 'block';
+                    }
+                } else {
+                    status.innerText = "Disconnected";
+                    ssid.innerText = "N/A";
+                    band.innerText = "N/A";
+                    rates.innerText = "N/A";
+                    signalDbm.innerText = "N/A";
+                    fill.style.width = "0%";
+                    warn.style.display = 'none';
+                    
+                    summary.innerText = "Offline";
+                    summary.style.color = 'var(--text-muted)';
+                    summaryIcon.style.color = 'var(--text-muted)';
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Fetch DNS & Gateway health
+        async function fetchHealthCheck() {
+            try {
+                const res = await fetch('/api/admin/network/health-check');
+                const data = await res.json();
+                
+                const setNode = (id, latencyId, iconId, key) => {
+                    const el = document.getElementById(id);
+                    const latEl = document.getElementById(latencyId);
+                    const iconEl = document.getElementById(iconId);
+                    const status = data[key];
+                    const lat = data[`${key}_latency`];
+                    const color = data[`${key}_color`];
+
+                    latEl.innerText = lat === 'N/A' ? 'Offline' : lat;
+                    latEl.className = `latency-badge dot-${color}`;
+                    
+                    if (status === 'online') {
+                        iconEl.style.color = color === 'green' ? 'var(--success)' : 'var(--warning)';
+                    } else {
+                        iconEl.style.color = 'var(--danger)';
+                    }
+                };
+
+                setNode('nodeGateway', 'nodeGateway', 'nodeIconGateway', 'gateway');
+                setNode('nodeGoogle', 'nodeGoogle', 'nodeIconGoogle', 'dns_google');
+                setNode('nodeCloudflare', 'nodeCloudflare', 'nodeIconCloudflare', 'dns_cloudflare');
+
+                const gatewayOffline = data.gateway === 'offline';
+                const dnsOffline = data.dns_google === 'offline' && data.dns_cloudflare === 'offline';
+
+                document.getElementById('routerOfflineWarning').style.display = gatewayOffline ? 'block' : 'none';
+                document.getElementById('dnsFailureWarning').style.display = (!gatewayOffline && dnsOffline) ? 'block' : 'none';
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Fetch Bandwidth Socket mappings
+        async function fetchBandwidth() {
+            try {
+                const res = await fetch('/api/admin/network/bandwidth');
+                const data = await res.json();
+                
+                const tableBody = document.getElementById('bandwidthTableBody');
+                const bars = document.getElementById('bandwidthBarsContainer');
+                const notice = document.getElementById('adminRequiredNotice');
+
+                if (data.status === 'error') {
+                    tableBody.innerHTML = `<tr><td colspan="6" style="color:var(--danger); text-align:center;">Error mapping sockets: ${data.message}</td></tr>`;
+                    return;
+                }
+
+                // Show admin privilege alert notice if backend says admin is false
+                notice.style.display = data.admin ? 'none' : 'flex';
+
+                tableBody.innerHTML = '';
+                bars.innerHTML = '';
+
+                if (data.devices.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="6" style="color:var(--text-muted); text-align:center;">No active TCP endpoints found.</td></tr>`;
+                    return;
+                }
+
+                const maxMb = Math.max(1.0, ...data.devices.map(d => d.mb));
+
+                data.devices.forEach(device => {
+                    const statusBadge = device.alert 
+                        ? '<span class="badge badge-danger">High Risk</span>' 
+                        : '<span class="badge badge-success">Normal</span>';
+                    
+                    tableBody.innerHTML += `
+                        <tr style="${device.alert ? 'background: rgba(239,68,68,0.03);' : ''}">
+                            <td><strong>${device.ip}</strong></td>
+                            <td>${device.label}</td>
+                            <td style="text-align: center;">${device.connections}</td>
+                            <td><code>${device.process}</code></td>
+                            <td><strong>${device.mb.toFixed(1)} MB</strong></td>
+                            <td>${statusBadge}</td>
+                        </tr>
+                    `;
+
+                    // Bars
+                    const pct = (device.mb / maxMb) * 100;
+                    bars.innerHTML += `
+                        <div>
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:3px;">
+                                <span style="font-weight:600; color:${device.alert ? 'var(--danger)' : 'white'};">${device.ip} (${device.label})</span>
+                                <strong>${device.mb.toFixed(1)} MB</strong>
+                            </div>
+                            <div class="speed-bar-container">
+                                <div class="speed-bar-fill" style="width: ${pct}%; background: ${device.alert ? 'var(--danger)' : 'var(--primary)'};"></div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Local Subnet Device Scan
+        let localScanResults = [];
+        async function triggerSubnetScan() {
+            const btn = document.getElementById('btnScanSubnet');
+            const icon = document.getElementById('scanBtnIcon');
+            const tbody = document.getElementById('scannerTableBody');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> SCANNING Subnet...';
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align:center; padding: 40px; color:var(--text-muted);">
+                        <i class="fa-solid fa-circle-notch fa-spin" style="font-size:1.8rem; color:var(--primary); margin-bottom:12px;"></i><br>
+                        Pinging 254 local nodes in parallel. Please wait ~5 seconds...
+                    </td>
+                </tr>
+            `;
+
+            try {
+                const res = await fetch('/api/admin/network/scan');
+                const data = await res.json();
+                
+                if (data.status === 'error') {
+                    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--danger); text-align:center;">Scan failed: ${data.message}</td></tr>`;
+                } else {
+                    localScanResults = data;
+                    renderScannerTable();
+                    
+                    // Update Summary widget
+                    const onlineCount = data.filter(d => d.online).length;
+                    document.getElementById('summaryDevices').innerText = `${onlineCount} Online / ${data.length} Total`;
+                    
+                    // Fetch alerts again to catch device updates
+                    fetchAlerts();
+                }
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="7" style="color:var(--danger); text-align:center;">Network error during scan.</td></tr>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> SCAN SUBNET (192.168.1.1-254)';
+            }
+        }
+
+        function renderScannerTable() {
+            const tbody = document.getElementById('scannerTableBody');
+            tbody.innerHTML = '';
+
+            if (localScanResults.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:30px;">No scan results. Click scan.</td></tr>`;
+                return;
+            }
+
+            localScanResults.forEach(dev => {
+                const statusDot = dev.online 
+                    ? `<span class="dot dot-green"></span>` 
+                    : `<span class="dot dot-gray"></span>`;
+                
+                const pingClass = dev.online ? `dot-${dev.ping_color}` : '';
+                const latencyText = dev.online ? `${dev.latency} ms` : 'N/A';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="text-align: center;">${statusDot}</td>
+                        <td><strong>${dev.ip}</strong></td>
+                        <td><code>${dev.mac}</code></td>
+                        <td>${dev.vendor}</td>
+                        <td>
+                            <span style="font-weight:700;">${dev.label}</span>
+                        </td>
+                        <td>
+                            <span class="latency-badge ${pingClass}">${latencyText}</span>
+                        </td>
+                        <td style="text-align: center;">
+                            <button class="btn btn-outline btn-sm" onclick="openLabelModal('${dev.ip}', '${dev.label}')" style="padding: 4px 10px;">
+                                <i class="fa-solid fa-pen"></i> Label
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function filterScannerTable() {
+            const q = document.getElementById('scannerSearch').value.toLowerCase();
+            const rows = document.querySelectorAll('#scannerTableBody tr');
+            
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                if (text.includes(q)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        // Custom device label modal
+        function openLabelModal(ip, currentLabel) {
+            document.getElementById('labelModalIP').value = ip;
+            document.getElementById('labelModalInput').value = currentLabel;
+            document.getElementById('labelModal').classList.add('show');
+        }
+
+        function closeLabelModal() {
+            document.getElementById('labelModal').classList.remove('show');
+        }
+
+        async function submitCustomLabel() {
+            const ip = document.getElementById('labelModalIP').value;
+            const label = document.getElementById('labelModalInput').value;
+
+            try {
+                const res = await fetch('/api/admin/network/save-label', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip: ip, label: label })
+                });
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    // Update label locally in scan results array
+                    const dev = localScanResults.find(d => d.ip === ip);
+                    if (dev) dev.label = label;
+                    renderScannerTable();
+                    closeLabelModal();
+                } else {
+                    alert("Failed to save label: " + data.message);
+                }
+            } catch (err) {
+                alert("Network error saving label.");
+            }
+        }
+
+        // Port Scanner
+        async function triggerPortScan() {
+            const ip = document.getElementById('portScanIP').value.trim();
+            if (!ip) {
+                alert("Please enter a valid IP address to scan.");
+                return;
+            }
+
+            const btn = document.getElementById('btnScanPorts');
+            const grid = document.getElementById('portScanGrid');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> SCANNING...';
+            grid.innerHTML = `
+                <div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-muted);">
+                    <i class="fa-solid fa-circle-notch fa-spin" style="font-size:1.5rem; color:var(--primary); margin-bottom:10px;"></i><br>
+                    Running multi-threaded port check on ${ip}...
+                </div>
+            `;
+
+            try {
+                const res = await fetch(`/api/admin/network/port-scan?ip=${ip}`);
+                const data = await res.json();
+                
+                grid.innerHTML = '';
+                
+                data.forEach(tile => {
+                    let securityClass = 'closed';
+                    let statusLabel = 'Closed';
+
+                    if (tile.status === 'open') {
+                        statusLabel = 'Open';
+                        if (tile.security === 'expected') securityClass = 'open-expected';
+                        else if (tile.security === 'risky') securityClass = 'open-risky';
+                        else securityClass = 'open-warning';
+                    }
+
+                    let warningIcon = '';
+                    if (tile.security === 'risky' && tile.status === 'open') {
+                        warningIcon = '<i class="fa-solid fa-triangle-exclamation" style="color:var(--danger); font-size: 0.9rem;" title="Security Threat: Risky service exposed!"></i>';
+                    }
+
+                    grid.innerHTML += `
+                        <div class="port-tile ${securityClass}">
+                            <div style="display:flex; align-items:center; gap: 6px;">
+                                <span class="port-num">${tile.port}</span>
+                                ${warningIcon}
+                            </div>
+                            <span class="port-status ${tile.status}">${statusLabel}</span>
+                            <span class="port-label">${tile.label}</span>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                grid.innerHTML = `<div style="grid-column:1/-1; color:var(--danger); text-align:center;">Port scan failed. Check target endpoint.</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-magnifying-glass-chart"></i> SCAN PORTS';
+            }
+        }
+
+        // Alerts Event Log
+        let activeAlertsBuffer = [];
+        async function fetchAlerts() {
+            try {
+                const res = await fetch('/api/admin/network/alerts');
+                const data = await res.json();
+                
+                const list = document.getElementById('alertsTimeline');
+                const summary = document.getElementById('summaryAlerts');
+                const summaryCard = document.getElementById('alertsSummaryCard');
+
+                list.innerHTML = '';
+                activeAlertsBuffer = data;
+
+                // Severity counts
+                const errors = data.filter(a => a.severity === 'ERROR').length;
+                const warnings = data.filter(a => a.severity === 'WARN').length;
+                
+                if (errors > 0) {
+                    summary.innerText = `${errors} Errors / ${warnings} Warns`;
+                    summary.style.color = 'var(--danger)';
+                    summaryCard.style.background = 'rgba(239, 68, 68, 0.08)';
+                    summaryCard.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                } else if (warnings > 0) {
+                    summary.innerText = `${warnings} Warnings`;
+                    summary.style.color = 'var(--warning)';
+                    summaryCard.style.background = 'rgba(245, 158, 11, 0.08)';
+                    summaryCard.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+                } else {
+                    summary.innerText = '0 Warnings';
+                    summary.style.color = 'var(--success)';
+                    summaryCard.style.background = 'var(--glass-bg)';
+                    summaryCard.style.borderColor = 'var(--glass-border)';
+                }
+
+                if (data.length === 0) {
+                    list.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                            <i class="fa-solid fa-check-circle" style="font-size: 1.5rem; color: var(--success); margin-bottom: 10px;"></i><br>
+                            All systems operational. No active hardware or ping alerts.
+                        </div>
+                    `;
+                    return;
+                }
+
+                data.forEach((alert, idx) => {
+                    list.innerHTML += `
+                        <div class="alert-item severity-${alert.severity}">
+                            <div class="alert-content-wrapper">
+                                <div class="alert-meta">
+                                    <span class="alert-severity-tag">${alert.severity}</span>
+                                    <span>•</span>
+                                    <span>${alert.timestamp}</span>
+                                    <span>•</span>
+                                    <span>Source: ${alert.source}</span>
+                                </div>
+                                <div class="alert-message">${alert.message}</div>
+                            </div>
+                            <button class="btn btn-outline btn-sm" onclick="openDiagnoseModal(${idx})" style="padding: 6px 14px;">
+                                <i class="fa-solid fa-stethoscope"></i> Diagnose
+                            </button>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Diagnose Alert Recommendation Modal
+        function openDiagnoseModal(idx) {
+            const alert = activeAlertsBuffer[idx];
+            if (!alert) return;
+
+            document.getElementById('diagnoseCause').innerText = alert.message;
+            
+            const steps = alert.action.split('.').filter(s => s.trim().length > 0);
+            const box = document.getElementById('diagnoseBox');
+            box.innerHTML = '';
+
+            steps.forEach((step, sIdx) => {
+                box.innerHTML += `
+                    <div class="diagnose-step">
+                        <span class="diagnose-step-num">${sIdx + 1}</span>
+                        <div>${step.trim()}.</div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('diagnoseModal').classList.add('show');
+        }
+
+        function closeDiagnoseModal() {
+            document.getElementById('diagnoseModal').classList.remove('show');
+        }
+
+        // Export Report Trigger
+        function exportNetworkReport() {
+            window.location.href = '/api/admin/network/export-report';
+        }
+
+        // Refresh all telemetry functions manually
+        async function refreshAllTelemetry() {
+            const icon = document.getElementById('refreshAllIcon');
+            icon.classList.add('fa-spin');
+
+            await Promise.all([
+                fetchInterfaces(),
+                fetchTraffic(),
+                fetchWifiInfo(),
+                fetchHealthCheck(),
+                fetchBandwidth(),
+                fetchAlerts()
+            ]);
+
+            setTimeout(() => icon.classList.remove('fa-spin'), 600);
+        }
+
+        // Auto Refresh Manager
+        function startAutoRefreshTimer() {
+            if (timerId) clearInterval(timerId);
+            
+            const checked = document.getElementById('autoRefreshToggle').checked;
+            const interval = parseInt(document.getElementById('refreshInterval').value);
+
+            if (checked) {
+                timerId = setInterval(async () => {
+                    // Poll Traffic every tick
+                    fetchTraffic();
+                    
+                    // Poll health and interfaces based on interval match or logic
+                    if (interval === 1000) {
+                        fetchInterfaces();
+                        fetchWifiInfo();
+                        fetchHealthCheck();
+                        fetchBandwidth();
+                        fetchAlerts();
+                    } else {
+                        // Poll interfaces, wifi, health, alerts, bandwidth at standard steps
+                        fetchInterfaces();
+                        fetchWifiInfo();
+                        fetchHealthCheck();
+                        fetchBandwidth();
+                        fetchAlerts();
+                    }
+                }, interval);
+            }
+        }
+
+        // Setup Event Listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load initial telemetry data
+            refreshAllTelemetry();
+
+            // Set up auto-refresh listeners
+            document.getElementById('autoRefreshToggle').addEventListener('change', startAutoRefreshTimer);
+            document.getElementById('refreshInterval').addEventListener('change', startAutoRefreshTimer);
+            
+            // Start the interval timer
+            startAutoRefreshTimer();
+        });
+    </script>
+</body>
+</html>

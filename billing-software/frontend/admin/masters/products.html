@@ -288,13 +288,13 @@
                     </div>
 
                     <div class="form-group">
-                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Min stock
+                        <label id="min_threshold_label" style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Min stock
                             Threshold</label>
                         <input type="number" id="min_threshold" class="input-dark" value="25">
                     </div>
 
                     <div class="form-group">
-                        <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Initial Stock (Qty)</label>
+                        <label id="current_stock_label" style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Initial Stock (Qty)</label>
                         <input type="number" id="current_stock" class="input-dark" value="0" placeholder="0">
                     </div>
 
@@ -378,12 +378,32 @@
             renderTable(filtered);
         }
 
+        function updateStockLabelsAndFields(unit) {
+            const stockLabel = document.getElementById('current_stock_label');
+            const minLabel = document.getElementById('min_threshold_label');
+            const stockInput = document.getElementById('current_stock');
+            const minInput = document.getElementById('min_threshold');
+            
+            if (unit === 'GM') {
+                if (stockLabel) stockLabel.innerText = "Initial Stock (KG)";
+                if (minLabel) minLabel.innerText = "Min stock Threshold (KG)";
+                stockInput.setAttribute('step', '0.001');
+                minInput.setAttribute('step', '0.001');
+            } else {
+                if (stockLabel) stockLabel.innerText = "Initial Stock (Qty)";
+                if (minLabel) minLabel.innerText = "Min stock Threshold";
+                stockInput.removeAttribute('step');
+                minInput.removeAttribute('step');
+            }
+        }
+
         function openModal() {
             document.getElementById('productForm').reset();
             document.getElementById('productId').value = '';
             document.getElementById('modalTitle').innerText = 'Register New Product';
             document.getElementById('productModal').style.display = 'flex';
             document.getElementById('price_per_kg_group').style.display = 'none';
+            updateStockLabelsAndFields('PCS');
         }
 
         function closeModal() {
@@ -399,10 +419,21 @@
             document.getElementById('bizz').value = p.bizz || 0;
             document.getElementById('unit').value = p.unit || 'PCS';
             document.getElementById('expiry_date').value = p.expiry_date || '';
-            document.getElementById('min_threshold').value = p.min_threshold || 25;
-            document.getElementById('current_stock').value = p.current_stock || 0;
+            
+            const stockInput = document.getElementById('current_stock');
+            const minInput = document.getElementById('min_threshold');
+            if (p.unit === 'GM') {
+                stockInput.value = (p.current_stock / 1000).toFixed(3);
+                minInput.value = (p.min_threshold / 1000).toFixed(3);
+            } else {
+                stockInput.value = p.current_stock || 0;
+                minInput.value = p.min_threshold || 25;
+            }
+            
             document.getElementById('modalTitle').innerText = 'Refine Product Specs';
             document.getElementById('productModal').style.display = 'flex';
+            
+            updateStockLabelsAndFields(p.unit || 'PCS');
             
             const priceKgGroup = document.getElementById('price_per_kg_group');
             const priceKgInput = document.getElementById('price_per_kg');
@@ -418,6 +449,13 @@
         async function saveProduct(e) {
             e.preventDefault();
             const id = document.getElementById('productId').value;
+            const unit = document.getElementById('unit').value;
+            const rawStock = parseFloat(document.getElementById('current_stock').value) || 0;
+            const rawMin = parseFloat(document.getElementById('min_threshold').value) || 25;
+
+            const current_stock = unit === 'GM' ? Math.round(rawStock * 1000) : Math.round(rawStock);
+            const min_threshold = unit === 'GM' ? Math.round(rawMin * 1000) : Math.round(rawMin);
+
             const data = {
                 id: id ? parseInt(id) : null,
                 barcode: document.getElementById('barcode').value,
@@ -425,10 +463,10 @@
                 category: document.getElementById('category').value,
                 price: parseFloat(document.getElementById('price').value),
                 bizz: parseFloat(document.getElementById('bizz').value),
-                unit: document.getElementById('unit').value,
+                unit: unit,
                 expiry_date: document.getElementById('expiry_date').value || null,
-                min_threshold: parseInt(document.getElementById('min_threshold').value) || 25,
-                current_stock: parseFloat(document.getElementById('current_stock').value) || 0
+                min_threshold: min_threshold,
+                current_stock: current_stock
             };
 
             const res = await fetch('/api/inventory/products', {
@@ -456,7 +494,9 @@
         const priceInput = document.getElementById('price');
 
         unitSelect.addEventListener('change', () => {
-            if (unitSelect.value === 'GM') {
+            const unit = unitSelect.value;
+            updateStockLabelsAndFields(unit);
+            if (unit === 'GM') {
                 priceKgGroup.style.display = 'block';
                 if (priceInput.value) {
                     priceKgInput.value = (parseFloat(priceInput.value) * 1000).toFixed(2);

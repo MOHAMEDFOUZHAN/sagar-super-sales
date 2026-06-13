@@ -235,10 +235,7 @@
     <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
 </footer>
 </main>
-
-
-
-    <script>
+    <script>
 
         let productsData = [];
 
@@ -320,6 +317,7 @@
 
                     div.style.borderBottom = '1px solid var(--glass-border)';
 
+                    const stockText = p.unit === 'GM' ? (p.current_stock / 1000).toFixed(3) + ' KG' : p.current_stock + ' ' + (p.unit || 'PCS');
                     div.innerHTML = `
 
                         <div style="font-weight: 600;">${p.name}</div>
@@ -328,7 +326,7 @@
 
                             <span>${p.barcode || 'No Barcode'}</span>
 
-                            <span style="color: var(--accent);">Stock: ${p.current_stock}</span>
+                            <span style="color: var(--accent);">Stock: ${stockText}</span>
 
                         </div>
 
@@ -372,7 +370,8 @@
 
             document.getElementById('tProduct').value = p.id;
 
-            document.getElementById('selectedProductName').innerText = `${p.name} (Qty: ${p.current_stock})`;
+            const stockText = p.unit === 'GM' ? (p.current_stock / 1000).toFixed(3) + ' KG' : p.current_stock + ' ' + (p.unit || 'PCS');
+            document.getElementById('selectedProductName').innerText = `${p.name} (Qty: ${stockText})`;
 
             document.getElementById('selectedProductDisplay').style.display = 'block';
 
@@ -380,7 +379,18 @@
 
             document.getElementById('pSearch').value = '';
 
-            document.getElementById('tQty').focus();
+            const qtyInput = document.getElementById('tQty');
+            if (p.unit === 'GM') {
+                qtyInput.setAttribute('step', '0.001');
+                qtyInput.setAttribute('min', '0.001');
+                qtyInput.value = '1.000';
+            } else {
+                qtyInput.removeAttribute('step');
+                qtyInput.setAttribute('min', '1');
+                qtyInput.value = '1';
+            }
+
+            qtyInput.focus();
 
         }
 
@@ -401,18 +411,13 @@
         function addItemToList() {
 
             const pid = document.getElementById('tProduct').value;
-
-            const qty = parseInt(document.getElementById('tQty').value);
-
-
-
-            if (!pid || !qty || qty <= 0) return;
-
-
-
             const product = productsMap[pid];
+            if (!product) return;
 
+            const qtyVal = parseFloat(document.getElementById('tQty').value) || 0;
+            if (qtyVal <= 0) return;
 
+            const qty = product.unit === 'GM' ? Math.round(qtyVal * 1000) : Math.round(qtyVal);
 
             // Check if already in list
 
@@ -430,7 +435,9 @@
 
                     name: product.name,
 
-                    qty: qty
+                    qty: qty,
+
+                    unit: product.unit || 'PCS'
 
                 });
 
@@ -500,11 +507,12 @@
 
                 const tr = document.createElement('tr');
 
+                const qtyText = item.unit === 'GM' ? (item.qty / 1000).toFixed(3) + ' KG' : item.qty + ' ' + item.unit;
                 tr.innerHTML = `
 
                     <td>${item.name}</td>
 
-                    <td style="text-align: center; font-weight: 700;">${item.qty}</td>
+                    <td style="text-align: center; font-weight: 700;">${qtyText}</td>
 
                     <td style="text-align: center;">
 
@@ -573,7 +581,7 @@
 
                         to_location: toLoc,
 
-                        items: transferItems
+                        items: transferItems.map(item => ({ id: item.id, qty: item.qty }))
 
                     })
 
