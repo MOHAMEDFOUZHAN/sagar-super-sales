@@ -20,7 +20,28 @@ def calculate_tsc(total):
 def reserve_invoice_number(cursor, bill_time):
     # Use a fixed date to keep a global continuous sequence
     global_seq_key = datetime.date(2000, 1, 1)
-    
+
+    parent_conn = getattr(cursor, '_parent', None)
+    if getattr(parent_conn, 'is_pg', False):
+        cursor.execute(
+            """
+            INSERT INTO bill_sequences (seq_date, last_value)
+            VALUES (%s, 1)
+            ON CONFLICT (seq_date)
+            DO UPDATE SET last_value = bill_sequences.last_value + 1,
+                          updated_at = CURRENT_TIMESTAMP
+            RETURNING last_value
+            """,
+            (global_seq_key,)
+        )
+        sequence_row = cursor.fetchone()
+        sequence_value = int(
+            sequence_row.get('last_value')
+            if isinstance(sequence_row, dict)
+            else sequence_row[0]
+        )
+        return f"SS-{sequence_value}"
+
     cursor.execute(
         """
         INSERT INTO bill_sequences (seq_date, last_value)

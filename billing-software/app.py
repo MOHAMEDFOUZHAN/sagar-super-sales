@@ -2039,6 +2039,7 @@ def db_sync_monitor_loop():
     
     try:
         ensure_sync_queue_tables()
+        ensure_billing_performance_indexes()
     except Exception as e:
         log_sync_event("INIT_ERROR", f"Failed to initialize sync tables: {e}")
         
@@ -2088,6 +2089,7 @@ def get_local_db_connection():
             conn.autocommit = Config.MYSQL_AUTOCOMMIT
             cursor = conn.cursor()
             cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+            cursor.execute("SET SESSION innodb_lock_wait_timeout = 5")
             cursor.close()
             MYSQL_IS_ALIVE = True
             return SyncProxyConnection(conn, is_pg=False)
@@ -2102,6 +2104,7 @@ def get_local_db_connection():
         )
         cursor = conn.cursor()
         cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+        cursor.execute("SET SESSION innodb_lock_wait_timeout = 5")
         cursor.close()
         MYSQL_IS_ALIVE = True
         return SyncProxyConnection(conn, is_pg=False)
@@ -2134,6 +2137,7 @@ def get_db_connection():
             )
             cursor = conn.cursor()
             cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+            cursor.execute("SET SESSION innodb_lock_wait_timeout = 5")
             cursor.close()
             MYSQL_IS_ALIVE = True
             DB_STATUS = "local"
@@ -2143,6 +2147,7 @@ def get_db_connection():
             conn.autocommit = Config.MYSQL_AUTOCOMMIT
             cursor = conn.cursor()
             cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+            cursor.execute("SET SESSION innodb_lock_wait_timeout = 5")
             cursor.close()
             MYSQL_IS_ALIVE = True
             DB_STATUS = "local"
@@ -2155,6 +2160,64 @@ def get_db_connection():
             return SyncProxyConnection(conn, is_pg=True)
             
     return None
+
+
+RETRYABLE_DB_ERROR_CODES = {1205, 1213, 2006, 2013, 2055}
+RETRYABLE_DB_ERROR_TEXT = (
+    'deadlock',
+    'lock wait timeout',
+    'lost connection',
+    'server has gone away',
+    'connection timed out',
+    'wait operation timed out',
+)
+
+
+def is_retryable_db_error(exc):
+    errno = getattr(exc, 'errno', None)
+    if errno in RETRYABLE_DB_ERROR_CODES:
+        return True
+    message = str(exc).lower()
+    return any(token in message for token in RETRYABLE_DB_ERROR_TEXT)
+
+
+def ensure_billing_performance_indexes():
+    index_statements = (
+        "CREATE INDEX idx_bills_date_status_created_by ON bills (bill_date, status, created_by)",
+        "CREATE INDEX idx_bill_items_bill_id ON bill_items (bill_id)",
+        "CREATE INDEX idx_bill_items_product_name ON bill_items (product_name)",
+        "CREATE INDEX idx_stock_movements_bill_id ON stock_movements (bill_id)",
+        "CREATE INDEX idx_returns_log_bill_id ON returns_log (bill_id)",
+        "CREATE INDEX idx_expenses_date_group ON expenses (expense_date, expense_group)",
+        "CREATE INDEX idx_sync_queue_status_id ON sync_queue (status, id)",
+        "CREATE INDEX idx_sync_queue_invoice_status ON sync_queue (invoice_no, status)",
+    )
+    conn = None
+    cursor = None
+    try:
+        conn = mysql.connector.connect(
+            host=Config.MYSQL_HOST,
+            port=Config.MYSQL_PORT,
+            user=Config.MYSQL_USER,
+            password=Config.MYSQL_PASSWORD,
+            database=Config.MYSQL_DB,
+            connection_timeout=2,
+            autocommit=True,
+        )
+        cursor = conn.cursor()
+        for statement in index_statements:
+            try:
+                cursor.execute(statement)
+            except mysql.connector.Error as e:
+                if e.errno not in (1061, 1146, 1072):
+                    print(f"[Startup] Index skipped: {e}")
+    except Exception as e:
+        print(f"[Startup] Billing index check skipped: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 def get_login_db_connection():
@@ -3373,6 +3436,7 @@ def process_seed_item(cursor, code, name, rate, bizz, category):
 # Check database before first request
 with app.app_context():
     check_and_init_db()
+    ensure_billing_performance_indexes()
     try:
         import threading
         threading.Thread(target=ensure_cloud_tables, daemon=True).start()
@@ -5475,69 +5539,109 @@ def get_closure_report():
     user_filter = ""
     query_params = [report_date]
     if session.get('role') == 'sales':
-        user_filter = " AND created_by = %s"
+        user_filter = " AND b.created_by = %s"
         query_params.append(session.get('username'))
 
+    # Category-specific filtering based on Counter
+    username = session.get('username', '').lower()
+    cat_filter = ""
+    if username in ['counter1', 'counter2']:
+        cat_filter = " AND (p.category LIKE '%OIL%')"
+    elif username in ['counter3', 'counter4']:
+        cat_filter = " AND (p.category LIKE '%CHOCO%')"
+
     try:
-        # 1. Sales Summary
-        cursor.execute(f"""
-            SELECT 
-                COUNT(*) as bill_count,
-                SUM(total_amount) as total_sales,
-                SUM(CASE WHEN UPPER(payment_mode) = 'CASH' THEN total_amount ELSE 0 END) as cash_sales,
-                SUM(CASE WHEN UPPER(payment_mode) = 'CARD' THEN total_amount ELSE 0 END) as card_sales,
-                SUM(CASE WHEN UPPER(payment_mode) = 'UPI' THEN total_amount ELSE 0 END) as upi_sales
-            FROM bills 
-            WHERE DATE(bill_date) = %s AND status != 'Cancelled'{user_filter}
-        """, tuple(query_params))
+        # 1. Sales Summary (Filtered by Category if Counter)
+        if cat_filter:
+            cursor.execute(f"""
+                SELECT 
+                    COUNT(DISTINCT b.id) as bill_count,
+                    SUM(bi.amount) as total_sales,
+                    SUM(CASE WHEN UPPER(b.payment_mode) = 'CASH' THEN bi.amount ELSE 0 END) as cash_sales,
+                    SUM(CASE WHEN UPPER(b.payment_mode) = 'CARD' THEN bi.amount ELSE 0 END) as card_sales,
+                    SUM(CASE WHEN UPPER(b.payment_mode) = 'UPI' THEN bi.amount ELSE 0 END) as upi_sales
+                FROM bill_items bi
+                JOIN bills b ON bi.bill_id = b.id
+                LEFT JOIN products p ON bi.product_name = p.name
+                WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter}{cat_filter}
+            """, tuple(query_params))
+        else:
+            cursor.execute(f"""
+                SELECT 
+                    COUNT(*) as bill_count,
+                    SUM(total_amount) as total_sales,
+                    SUM(CASE WHEN UPPER(payment_mode) = 'CASH' THEN total_amount ELSE 0 END) as cash_sales,
+                    SUM(CASE WHEN UPPER(payment_mode) = 'CARD' THEN total_amount ELSE 0 END) as card_sales,
+                    SUM(CASE WHEN UPPER(payment_mode) = 'UPI' THEN total_amount ELSE 0 END) as upi_sales
+                FROM bills b
+                WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter.replace('b.', '')}
+            """, tuple(query_params))
+            
         sales = cursor.fetchone()
         for k in sales: sales[k] = float(sales[k] or 0)
         sales['credit_sales'] = 0.0
         sales['avg_bill'] = sales['total_sales'] / sales['bill_count'] if sales['bill_count'] > 0 else 0
 
-        # 2. Bizz Charges (80/20 split)
+        # 2. Bizz Charges (Filtered by Category if Counter)
         cursor.execute(f"""
             SELECT SUM(bi.bizz_amount) as total_bizz
             FROM bill_items bi
             JOIN bills b ON bi.bill_id = b.id
-            WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter}
+            LEFT JOIN products p ON bi.product_name = p.name
+            WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter}{cat_filter}
         """, tuple(query_params))
         total_biz = float(cursor.fetchone()['total_bizz'] or 0)
         biz_80 = total_biz * 0.8
         biz_20 = total_biz * 0.2
 
-        # 3. TSC (80/20 split)
-        cursor.execute(f"""
-            SELECT SUM(tsc_amount) as total_tsc
-            FROM bills
-            WHERE DATE(bill_date) = %s AND status != 'Cancelled'{user_filter}
-        """, tuple(query_params))
+        # 3. TSC (80/20 split) - TSC is generally on the total bill, but for departmental reports, 
+        # we calculate it proportionally to the departmental sales if a filter is active.
+        if cat_filter:
+            cursor.execute(f"""
+                SELECT SUM(bi.amount * (b.tsc_percent / 100)) as total_tsc
+                FROM bill_items bi
+                JOIN bills b ON bi.bill_id = b.id
+                LEFT JOIN products p ON bi.product_name = p.name
+                WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter}{cat_filter}
+            """, tuple(query_params))
+        else:
+            cursor.execute(f"""
+                SELECT SUM(tsc_amount) as total_tsc
+                FROM bills b
+                WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter.replace('b.', '')}
+            """, tuple(query_params))
+        
         total_tsc = float(cursor.fetchone()['total_tsc'] or 0)
         tsc_80 = total_tsc * 0.8
         tsc_20 = total_tsc * 0.2
 
-        # 4. Categories
+        # 4. Categories (Filtered)
         cursor.execute(f"""
             SELECT p.category, SUM(bi.amount) as category_sales
             FROM bill_items bi
             JOIN bills b ON bi.bill_id = b.id
             LEFT JOIN products p ON bi.product_name = p.name
-            WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter}
+            WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter}{cat_filter}
             GROUP BY p.category
         """, tuple(query_params))
         categories = cursor.fetchall()
+
         for c in categories:
             if not c['category']: c['category'] = 'General'
             c['category_sales'] = float(c['category_sales'] or 0)
             c['percent'] = (c['category_sales'] / sales['total_sales'] * 100) if sales['total_sales'] > 0 else 0
 
-        # Ensure OILS and CHOCOLATES always appear
+        # Ensure relevant categories appear
         cat_names = [c['category'].upper() for c in categories]
-        if 'OILS' not in cat_names:
+        if username in ['counter1', 'counter2'] and 'OILS' not in cat_names:
             categories.append({'category': 'OILS', 'category_sales': 0.0, 'percent': 0.0})
-            
-        if not any(name.startswith('CHOCO') for name in cat_names):
+        elif username in ['counter3', 'counter4'] and not any('CHOCO' in name for name in cat_names):
             categories.append({'category': 'CHOCOLATES', 'category_sales': 0.0, 'percent': 0.0})
+        elif username not in ['counter1', 'counter2', 'counter3', 'counter4']:
+            if 'OILS' not in cat_names:
+                categories.append({'category': 'OILS', 'category_sales': 0.0, 'percent': 0.0})
+            if not any('CHOCO' in name for name in cat_names):
+                categories.append({'category': 'CHOCOLATES', 'category_sales': 0.0, 'percent': 0.0})
 
         # 5. Expenses
         cursor.execute("SELECT * FROM expenses WHERE DATE(expense_date) = %s", (report_date,))
@@ -5567,11 +5671,16 @@ def get_closure_report():
             denoms = cursor.fetchall()
 
         u = session.get('username', 'SYSTEM')
-        counter_type = "All-in-One Sales"
-        if u.lower() in ['counter3', 'counter4']:
-            counter_type = "Chocolate Section"
-        elif u.lower() in ['counter', 'counter1', 'counter2']:
-            counter_type = "General Items"
+        u_lower = u.lower()
+        counter_type = "CONSOLIDATED REPORT"
+        if u_lower in ['counter1', 'counter2']:
+            counter_type = f"OIL SECTION - Counter {u_lower.replace('counter', '')}"
+        elif u_lower in ['counter3', 'counter4']:
+            counter_type = f"CHOCOLATE SECTION - Counter {u_lower.replace('counter', '')}"
+        elif u_lower == 'counter':
+            counter_type = "OIL SECTION"
+        elif u_lower.startswith('counter'):
+            counter_type = f"Counter {u_lower.replace('counter', '')}"
 
         # 7. Counter Breakdown
         cursor.execute(f"""
@@ -6426,117 +6535,58 @@ def search_products():
 @app.route('/api/save-bill', methods=['POST'])
 def save_bill():
     data = request.json
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        total = float(data['total'])
-        discount = float(data.get('discount', 0))
-        tsc_percent = 0
-        if total >= 10000: tsc_percent = 3.0
-        elif total >= 7000: tsc_percent = 2.5
-        elif total >= 5000: tsc_percent = 2.0
-        elif total >= 2500: tsc_percent = 1.5
-        elif total >= 1000: tsc_percent = 1.0
-        tsc_amount = (total * tsc_percent) / 100
+    username = session.get('username', 'SYSTEM')
+    max_attempts = 3
+    last_error = None
 
-        status = 'PAID'
-        if data.get('is_correction'): status = 'CORRECTION'
-            
-        # Continuous Global sequence (Does not reset daily)
-        global_key = datetime.date(2000, 1, 1)
-        
-        # Note: `last_value` is backtick-quoted because it is a reserved keyword in MySQL 8.0.
-        # The PostgreSQL proxy translator automatically converts backticks to double-quotes.
-        cursor.execute("SELECT `last_value` FROM bill_sequences WHERE seq_date = %s FOR UPDATE", (global_key,))
-        res = cursor.fetchone()
-        
-        if res:
-            next_val = res[0] + 1
-            cursor.execute("UPDATE bill_sequences SET `last_value` = %s WHERE seq_date = %s", (next_val, global_key))
-        else:
-            # Initialize global sequence if not exists
-            cursor.execute("SELECT COUNT(*) FROM bills")
-            current_bills = cursor.fetchone()[0]
-            next_val = current_bills + 1
-            cursor.execute("INSERT INTO bill_sequences (seq_date, `last_value`) VALUES (%s, %s)", (global_key, next_val))
-            
-        invoice_no = f"SS-{next_val}"
+    for attempt in range(1, max_attempts + 1):
+        conn = None
+        try:
+            conn = get_db_connection()
+            if not conn:
+                raise RuntimeError('Database connection failed.')
 
-        bill_dt = datetime.datetime.now()
+            result = create_bill(conn, data, username, log_audit)
+            bill_id = result['bill_id']
+            invoice_no = result['invoice_no']
+            bill_dt = datetime.datetime.now()
 
-        cursor.execute("""
-            INSERT INTO bills (invoice_no, bill_date, total_amount, payment_mode, tsc_percent, tsc_amount, status, source_bill_id, discount, created_by) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (invoice_no, bill_dt, total, data['payment_mode'], tsc_percent, tsc_amount, status, data.get('source_bill_id'), discount, session.get('username', 'SYSTEM')))
-        bill_id = cursor.lastrowid
-        
-        # Batch pre-fetch all item stocks to save network round-trips (essential for cloud failover speed)
-        items = data.get('items', [])
-        if items:
-            product_names = list(set(item['name'] for item in items if item.get('name')))
-            if product_names:
-                format_strings = ','.join(['%s'] * len(product_names))
-                cursor.execute(f"SELECT name, current_stock FROM products WHERE name IN ({format_strings}) FOR UPDATE", tuple(product_names))
-                rows = cursor.fetchall()
-                stock_map = {row[0]: float(row[1]) for row in rows}
-            else:
-                stock_map = {}
-        else:
-            stock_map = {}
+            # Keep all slow/non-critical work outside the database transaction.
+            schedule_brain_evolution(bill_id)
+            trigger_immediate_sync()
+            announcer.announce("update")
+            socketio.emit('stock_updated', {'type': 'billing_creation', 'invoice_no': invoice_no})
 
-        bill_items_data = []
-        for item in items:
-            name = item['name']
-            if name not in stock_map:
-                raise Exception(f"Product not found: {name}")
-                
-            available_stock = stock_map[name]
-            demanded_qty = float(item['qty'])
-            if available_stock < demanded_qty:
-                raise Exception(f"Insufficient stock for {name}. Available: {available_stock}")
-                
-            bizz_percent = float(item.get('bizz', 0))
-            bizz_amt = (float(item['amount']) * bizz_percent) / 100
-            
-            bill_items_data.append((bill_id, name, item['qty'], item['rate'], item['amount'], bizz_percent, bizz_amt))
-            
-            # Update local memory map so consecutive duplicate items check correctly
-            stock_map[name] -= demanded_qty
-            
-        # 1. Batch insert bill items in a single query
-        if bill_items_data:
-            cursor.executemany("""
-                INSERT INTO bill_items (bill_id, product_name, qty, rate, amount, bizz_percent, bizz_amount) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, bill_items_data)
+            return jsonify({
+                'status': 'success',
+                'bill_id': bill_id,
+                'invoice_no': invoice_no,
+                'invoice_display': invoice_no,
+                'bill_date': bill_dt.strftime('%d-%m-%Y'),
+                'bill_time': bill_dt.strftime('%I:%M %p'),
+                'duplicate_request': result.get('duplicate_request', False),
+                'attempts': attempt,
+            })
+        except Exception as e:
+            last_error = e
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            if attempt < max_attempts and is_retryable_db_error(e):
+                time.sleep(0.12 * attempt)
+                continue
+            status_code = 409 if is_retryable_db_error(e) else 500
+            return jsonify({'status': 'error', 'message': str(e), 'attempts': attempt}), status_code
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
-        # 2. Update product stocks
-        for item in items:
-            cursor.execute("UPDATE products SET current_stock = current_stock - %s WHERE name = %s", (item['qty'], item['name']))
-        
-        log_audit(cursor, 'CREATE_BILL', 'bills', bill_id, None, f"Invoice: {invoice_no}, Total: {total}")
-        conn.commit(); conn.close()
-        
-        # Asynchronously evolve the brain through the shared background worker.
-        schedule_brain_evolution(bill_id)
-        
-        trigger_immediate_sync()
-        
-        # Trigger Real-time update
-        announcer.announce("update")
-        socketio.emit('stock_updated', {'type': 'billing_creation', 'invoice_no': invoice_no})
-        
-        return jsonify({
-            'status': 'success',
-            'bill_id': bill_id,
-            'invoice_no': invoice_no,
-            'invoice_display': invoice_no,
-            'bill_date': bill_dt.strftime('%d-%m-%Y'),
-            'bill_time': bill_dt.strftime('%I:%M %p'),
-        })
-    except Exception as e:
-        if 'conn' in locals() and conn: conn.rollback(); conn.close()
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    return jsonify({'status': 'error', 'message': str(last_error or 'Bill save failed.'), 'attempts': max_attempts}), 500
 
 @app.route('/api/print-thermal', methods=['POST'])
 def api_print_thermal():
@@ -7175,7 +7225,22 @@ def inventory_categories(cat_id=None):
             if conn: conn.rollback(); conn.close()
             return jsonify({'status': 'error', 'message': str(e)}), 500
 
-@app.route('/api/inventory/products', methods=['GET', 'POST', 'DELETE'])
+@app.route('/api/inventory/next-barcode')
+def get_next_barcode():
+    conn = get_db_connection()
+    if not conn: return jsonify({'status': 'error', 'message': 'DB connection failed'}), 500
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT MAX(CAST(barcode AS UNSIGNED)) as max_bc FROM products WHERE barcode REGEXP '^[0-9]+$'")
+        res = cursor.fetchone()
+        next_bc = (res['max_bc'] or 0) + 1
+        return jsonify({'next_barcode': f"{next_bc:03d}"})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        conn.close()
+
+@app.route('/api/inventory/products', methods=['GET', 'POST'])
 @app.route('/api/inventory/products/<int:prod_id>', methods=['DELETE'])
 def inventory_products(prod_id=None):
     # Retrieve product catalog locally for maximum rendering speed (milliseconds)

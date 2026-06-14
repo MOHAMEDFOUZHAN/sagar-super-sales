@@ -1863,13 +1863,13 @@
 
         function parseWeighingBarcode(barcode) {
 
-            if (barcode.length > 4 && /^\d+$/.test(barcode)) {
+            if (barcode.length > 3 && /^\d+$/.test(barcode)) {
 
                 return {
 
-                    code: barcode.substring(0, 4),
+                    code: barcode.substring(0, 3),
 
-                    weight: parseFloat(barcode.substring(4)) || 0
+                    weight: parseFloat(barcode.substring(3)) || 0
 
                 };
 
@@ -1921,9 +1921,9 @@
 
                         // 2. Fallback: Check if it's a weighing scale barcode (first 4 digits = code)
 
-                        const scannedCode = rawBarcode.substring(0, 4);
+                        const scannedCode = rawBarcode.substring(0, 3);
 
-                        const scannedWeight = parseFloat(rawBarcode.substring(4)) || 0;
+                        const scannedWeight = parseFloat(rawBarcode.substring(3)) || 0;
 
                         
 
@@ -2061,9 +2061,9 @@
 
                     if (!match && rawBarcode.length > 4 && /^\d+$/.test(rawBarcode)) {
 
-                        const scannedCode = rawBarcode.substring(0, 4);
+                        const scannedCode = rawBarcode.substring(0, 3);
 
-                        const scannedWeight = parseFloat(rawBarcode.substring(4)) || 0;
+                        const scannedWeight = parseFloat(rawBarcode.substring(3)) || 0;
 
                         
 
@@ -2425,7 +2425,9 @@
                     <td>${item.name}</td>
                     <td>${isOutOfStock ? `<span style="color: var(--danger); font-weight: bold;"><i class="fa-solid fa-triangle-exclamation"></i> ${stockDisplay}</span>` : stockDisplay}</td>
                     <td>${item.unit || 'PCS'}</td>
-                    <td>${item.qty}</td>
+
+                    <td><input type="number" step="any" class="input-dark" value="${item.qty}" style="padding: 2px 5px; width: 60px; text-align: center; border-color: var(--glass-highlight);" onchange="updateItemQty(${index}, this.value)" onkeydown="if(event.key==='Enter') this.blur()"></td>
+
                     <td>${item.rate.toFixed(2)}</td>
                     <td>${item.bizz}%</td>
                     <td style="font-weight: bold;">${item.amount.toFixed(2)}</td>
@@ -2505,6 +2507,52 @@
         window.removeItem = (index) => {
 
             items.splice(index, 1);
+
+            renderTable();
+
+        };
+
+
+
+        window.updateItemQty = (index, newQty) => {
+
+            newQty = parseFloat(newQty);
+
+            const item = items[index];
+
+            
+
+            if (isNaN(newQty) || newQty <= 0) {
+
+                alert("Please enter a valid quantity greater than 0");
+
+                renderTable();
+
+                return;
+
+            }
+
+
+
+            if (newQty > item.stock) {
+
+                const isGM = item.unit === 'GM';
+
+                const availableDisplay = isGM ? (item.stock / 1000).toFixed(3) + ' KG' : item.stock;
+
+                alert(`Insufficient Stock! Available: ${availableDisplay}`);
+
+                renderTable();
+
+                return;
+
+            }
+
+
+
+            item.qty = newQty;
+
+            item.amount = item.qty * item.rate;
 
             renderTable();
 

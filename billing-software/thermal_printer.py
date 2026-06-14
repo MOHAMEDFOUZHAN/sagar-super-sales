@@ -185,9 +185,13 @@ def build_closure_report(data: dict, width: int = 42) -> bytes:
 
     # Header
     payload += ALIGN_CENTER + BOLD_ON
-    emit("FINAL REPORT")
-    if data.get('counter'):
-        emit(f"COUNTER: {data['counter']}")
+    counter_text = data.get('counter', '')
+    if counter_text and "OIL SECTION" in str(counter_text).upper():
+        emit("OIL SECTION FINAL REPORT")
+    else:
+        emit("FINAL REPORT")
+    if counter_text:
+        emit(f"COUNTER: {counter_text}")
     emit("SAGAR SUPER")
     payload += BOLD_OFF
     emit(f"Date: {data.get('date', '')}")

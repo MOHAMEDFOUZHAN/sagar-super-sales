@@ -889,7 +889,13 @@
 
                     <div style="font-size: 0.85rem; font-weight: 600; color: white;">
 
-                        {% if session.username.startswith('counter') %}Counter - {{ session.username[7:] }}
+                        {% set uname = session.username|default('', true)|lower %}
+
+                        {% if uname in ['counter1', 'counter2'] %}OIL SECTION - Counter {{ uname.replace('counter', '') }}
+
+                        {% elif uname in ['counter3', 'counter4'] %}CHOCOLATE SECTION - Counter {{ uname.replace('counter', '') }}
+
+                        {% elif uname.startswith('counter') %}Counter - {{ uname.replace('counter', '') }}
 
                         {% else %}{{ session.username|capitalize }}{% endif %}
 
@@ -935,11 +941,15 @@
 
             <div>
 
-                <h1 style="font-size: 2.2rem; font-weight: 900; letter-spacing: -2px;">
+                <h1 id="reportMainTitle" style="font-size: 2.2rem; font-weight: 900; letter-spacing: -2px;">
 
-                    {% if session.username.startswith('counter') %}Daily Closure - Counter {{ session.username[7:] }}
+                    {% set uname = session.username|default('', true)|lower %}
 
-                    {% else %}Sales Audit Report{% endif %}
+                    {% if uname in ['counter1', 'counter2'] %}OIL SECTION FINAL REPORT - Counter {{ uname.replace('counter', '') }}
+
+                    {% elif uname in ['counter3', 'counter4'] %}CHOCOLATE SECTION FINAL REPORT - Counter {{ uname.replace('counter', '') }}
+
+                    {% else %}CONSOLIDATED Closure Report{% endif %}
 
                 </h1>
 
@@ -1450,11 +1460,23 @@
 
         const sessionUsername = "{{ session.username|default('', true)|e }}";
 
-        const counterLabel = sessionUsername.toLowerCase().startsWith('counter')
+        let counterLabel = '';
 
-            ? `Counter ${sessionUsername.replace(/^counter[-_\s]?/i, '').trim()}`.trim()
+        const uLower = sessionUsername.toLowerCase();
 
-            : '';
+        if (uLower === 'counter1' || uLower === 'counter2') {
+
+            counterLabel = `OIL SECTION - Counter ${uLower.replace('counter', '')}`;
+
+        } else if (uLower === 'counter3' || uLower === 'counter4') {
+
+            counterLabel = `CHOCOLATE SECTION - Counter ${uLower.replace('counter', '')}`;
+
+        } else if (uLower.startsWith('counter')) {
+
+            counterLabel = `Counter ${uLower.replace('counter', '')}`;
+
+        }
 
 
 
@@ -1516,7 +1538,17 @@
 
                 document.getElementById('displayDate').innerText = new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
-                document.getElementById('genBy').innerText = `ADMIN: ${data.meta.admin} | SYNC TIME: ${data.meta.time}`;
+                const counterType = data.meta.counter_type || counterLabel || 'Sales Counter';
+
+                document.getElementById('genBy').innerText = `SECTION: ${counterType} | SYNC TIME: ${data.meta.time}`;
+
+                if (counterType.toUpperCase().includes('OIL SECTION')) {
+                    document.getElementById('reportMainTitle').innerText = `OIL SECTION FINAL REPORT - Counter ${counterType.replace(/.*Counter\s*/i, '')}`;
+                } else if (counterType.toUpperCase().includes('CHOCOLATE SECTION')) {
+                    document.getElementById('reportMainTitle').innerText = `CHOCOLATE SECTION FINAL REPORT - Counter ${counterType.replace(/.*Counter\s*/i, '')}`;
+                } else {
+                    document.getElementById('reportMainTitle').innerText = `${counterType} Closure Report`;
+                }
 
 
 
@@ -1736,9 +1768,11 @@
 
                 const date = getVal('reportDate');
 
-                const admin = getText('genBy').replace('ADMIN: ', '').split('|')[0].trim();
+                const genByText = getText('genBy');
 
-                const syncTime = getText('genBy').split('SYNC TIME: ')[1] || new Date().toLocaleTimeString();
+                const admin = genByText.includes('ADMIN:') ? genByText.replace('ADMIN: ', '').split('|')[0].trim() : genByText.split('|')[0].trim();
+
+                const syncTime = genByText.split('SYNC TIME: ')[1] || new Date().toLocaleTimeString();
 
                 const branch = document.getElementById('displayBranch').innerText;
 
@@ -1944,9 +1978,9 @@
 
                         <div style="text-align: center; margin-bottom: 20px;">
 
-                            <h3 style="margin: 0; text-transform: uppercase;">Final Report</h3>
+                            <h3 style="margin: 0; text-transform: uppercase;">${counterLabel && counterLabel.toUpperCase().includes('OIL SECTION') ? 'Oil Section Final Report' : 'Final Report'}</h3>
 
-                            ${counterLabel ? `<div style="margin-top: 6px; font-size: 0.95rem; font-weight: 700; text-transform: uppercase;">Counter: ${counterLabel}</div>` : ''}
+                            ${counterLabel ? `<div style="margin-top: 6px; font-size: 0.95rem; font-weight: 700; text-transform: uppercase;">${counterLabel}</div>` : ''}
 
                             <h2 style="margin: 5px 0; text-transform: uppercase;">Sagar Super</h2>
 
@@ -2066,7 +2100,7 @@
 
                 const payload = {
 
-                    counter: counterLabel,
+                    counter: counterLabel || admin,
 
                     date: new Date().toLocaleDateString('en-GB').replace(/\//g, '-'),
 

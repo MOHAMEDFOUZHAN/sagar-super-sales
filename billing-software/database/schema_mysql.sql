@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS bills (
     created_by VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX (bill_date),
+    INDEX idx_bills_date_status_created_by (bill_date, status, created_by),
     INDEX (created_by),
     INDEX (status)
 );
@@ -76,6 +77,7 @@ CREATE TABLE IF NOT EXISTS bill_items (
     amount DECIMAL(10, 2),
     bizz_percent DECIMAL(5, 2),
     bizz_amount DECIMAL(10, 2),
+    INDEX idx_bill_items_bill_id (bill_id),
     INDEX (product_code),
     INDEX (product_name),
     FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE

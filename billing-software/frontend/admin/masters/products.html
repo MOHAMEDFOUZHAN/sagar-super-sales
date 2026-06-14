@@ -397,13 +397,40 @@
             }
         }
 
-        function openModal() {
+        async function openModal() {
+
             document.getElementById('productForm').reset();
+
             document.getElementById('productId').value = '';
+
             document.getElementById('modalTitle').innerText = 'Register New Product';
+
+            
+
+            // Fetch next available 3-digit barcode
+
+            try {
+
+                const res = await fetch('/api/inventory/next-barcode');
+
+                const data = await res.json();
+
+                if (data.next_barcode) {
+
+                    document.getElementById('barcode').value = data.next_barcode;
+
+                }
+
+            } catch (e) { console.error("Failed to fetch next barcode:", e); }
+
+
+
             document.getElementById('productModal').style.display = 'flex';
+
             document.getElementById('price_per_kg_group').style.display = 'none';
+
             updateStockLabelsAndFields('PCS');
+
         }
 
         function closeModal() {

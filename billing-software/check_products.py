@@ -11,11 +11,11 @@ def check_products():
             database=Config.MYSQL_DB
         )
         cursor = conn.cursor()
-        cursor.execute("DESCRIBE products")
-        columns = cursor.fetchall()
-        print("Columns in products table:")
-        for col in columns:
-            print(col)
+        cursor.execute("SELECT barcode, name FROM products LIMIT 20")
+        products = cursor.fetchall()
+        print("\nFirst 20 products:")
+        for p in products:
+            print(f"Barcode: {p[0]}, Name: {p[1]}")
         conn.close()
     except Exception as e:
         print(f"Error: {e}")

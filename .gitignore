@@ -32,3 +32,4 @@ node_modules/
 billing-software/scratch/
 billing-software/out.txt
 
+.aider*
