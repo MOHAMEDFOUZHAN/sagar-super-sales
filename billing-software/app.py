@@ -1503,7 +1503,7 @@ class SyncProxyConnection:
         query_upper = query.upper().strip()
         import re
         if query_upper.startswith("INSERT "):
-            match = re.search(r"INSERT\s+INTO\s+(\w+)", query, re.IGNORECASE)
+            match = re.search(r"INSERT\s+(?:IGNORE\s+)?INTO\s+(\w+)", query, re.IGNORECASE)
             return match.group(1) if match else "unknown"
         elif query_upper.startswith("UPDATE "):
             match = re.search(r"UPDATE\s+(\w+)", query, re.IGNORECASE)
@@ -2529,7 +2529,9 @@ def fetch_brain_state_stats(cursor):
     today_sales = float((today_sales_row[0] if isinstance(today_sales_row, tuple) else today_sales_row.get('SUM(total_amount)', 0)) or 0)
 
     # 7. Monthly expenses
-    cursor.execute("SELECT SUM(amount) FROM expenses WHERE MONTH(expense_date) = MONTH(CURDATE()) AND YEAR(expense_date) = YEAR(CURDATE())")
+    today = datetime.date.today()
+    start_of_month = datetime.date(today.year, today.month, 1)
+    cursor.execute("SELECT SUM(amount) FROM expenses WHERE expense_date >= %s", (start_of_month,))
     monthly_expenses_row = cursor.fetchone()
     monthly_expenses = float((monthly_expenses_row[0] if isinstance(monthly_expenses_row, tuple) else monthly_expenses_row.get('SUM(amount)', 0)) or 0)
 
@@ -5205,7 +5207,7 @@ def get_sales_changes_report():
             FROM returns_log rl
             LEFT JOIN bills b ON rl.bill_id = b.id
             WHERE DATE(rl.return_date) >= %s AND DATE(rl.return_date) <= %s
-            ORDER BY rl.return_date DESC
+            ORDER BY b.id ASC
         """
         cursor.execute(query, (start_date, end_date))
         logs = cursor.fetchall()
@@ -5264,7 +5266,7 @@ def get_corrections_report():
             LEFT JOIN bills b2 ON b1.id = b2.source_bill_id
             WHERE (b1.status IN ('Cancelled', 'RETURNED') OR b1.prev_total > 0)
               AND DATE(b1.bill_date) >= %s AND DATE(b1.bill_date) <= %s
-            ORDER BY b1.bill_date DESC
+            ORDER BY b1.id ASC
         """
         cursor.execute(query, (start_date, end_date))
         data = cursor.fetchall()
@@ -5311,7 +5313,7 @@ def get_detailed_sales_report():
             FROM bill_items bi
             JOIN bills b ON bi.bill_id = b.id
             LEFT JOIN products p ON bi.product_name = p.name
-            ORDER BY b.bill_date DESC
+            ORDER BY b.id ASC
         """
         cursor.execute(query)
         data = cursor.fetchall()
@@ -5354,7 +5356,7 @@ def get_master_report():
         FROM bill_items bi
         JOIN bills b ON bi.bill_id = b.id
         LEFT JOIN products p ON bi.product_name = p.name
-        ORDER BY b.bill_date DESC
+        ORDER BY b.id ASC
     """)
     sales = cursor.fetchall()
     
@@ -5372,12 +5374,12 @@ def get_master_report():
             'Cash' as mode,
             'Paid' as status
         FROM expenses
-        ORDER BY expense_date DESC
+        ORDER BY id ASC
     """)
     expenses = cursor.fetchall()
     
     master = sales + expenses
-    master.sort(key=lambda x: x['date'], reverse=True)
+    master.sort(key=lambda x: (x['date'], x['id']))
     
     for item in master:
         item['amount'] = float(item['amount'] or 0)
@@ -5716,7 +5718,7 @@ def get_counter_wise_report():
             SELECT id, invoice_no, bill_date, total_amount, payment_mode, created_by
             FROM bills
             WHERE DATE(bill_date) = %s AND status != 'Cancelled'
-            ORDER BY created_by, bill_date DESC
+            ORDER BY created_by, id ASC
         """, (report_date,))
         details = cursor.fetchall()
         
@@ -6139,23 +6141,48 @@ def get_daily_position_report():
     if not conn: return jsonify([])
     cursor = conn.cursor(dictionary=True)
     
-    # We join products with the daily_position_list table to get only chosen products
-    query = """
-        SELECT 
-            p.barcode as code, 
-            p.name as product_name, 
-            p.current_stock as closing,
-            COALESCE(SUM(CASE WHEN DATE(b.bill_date) = CURDATE() AND b.status != 'Cancelled' THEN bi.qty ELSE 0 END), 0) as outgoing,
-            p.category,
-            p.unit as unit
-        FROM daily_position_list dp
-        JOIN products p ON dp.barcode = p.barcode
-        LEFT JOIN bill_items bi ON p.name = bi.product_name
-        LEFT JOIN bills b ON bi.bill_id = b.id
-        GROUP BY p.barcode, p.name, p.current_stock, p.category, p.unit
-        ORDER BY (p.barcode + 0), p.barcode
-    """
-    cursor.execute(query)
+    report_date = request.args.get('date')
+    if not report_date:
+        report_date = datetime.date.today().isoformat()
+        
+    is_pg = getattr(conn, 'is_pg', False) or getattr(conn, 'connection_id', '') == 'postgres'
+    
+    if is_pg:
+        # PostgreSQL query - using cast for DATE and conditional regex check for numeric barcode sort
+        query = """
+            SELECT 
+                p.barcode as code, 
+                p.name as product_name, 
+                p.current_stock as closing,
+                COALESCE(SUM(CASE WHEN CAST(b.bill_date AS DATE) = %s AND b.status != 'Cancelled' THEN bi.qty ELSE 0 END), 0) as outgoing,
+                p.category,
+                p.unit as unit
+            FROM daily_position_list dp
+            JOIN products p ON dp.barcode = p.barcode
+            LEFT JOIN bill_items bi ON p.name = bi.product_name
+            LEFT JOIN bills b ON bi.bill_id = b.id
+            GROUP BY p.barcode, p.name, p.current_stock, p.category, p.unit
+            ORDER BY CASE WHEN p.barcode ~ '^[0-9]+$' THEN CAST(p.barcode AS BIGINT) ELSE 0 END, p.barcode
+        """
+    else:
+        # MySQL query - standard CURDATE replaced with input date
+        query = """
+            SELECT 
+                p.barcode as code, 
+                p.name as product_name, 
+                p.current_stock as closing,
+                COALESCE(SUM(CASE WHEN DATE(b.bill_date) = %s AND b.status != 'Cancelled' THEN bi.qty ELSE 0 END), 0) as outgoing,
+                p.category,
+                p.unit as unit
+            FROM daily_position_list dp
+            JOIN products p ON dp.barcode = p.barcode
+            LEFT JOIN bill_items bi ON p.name = bi.product_name
+            LEFT JOIN bills b ON bi.bill_id = b.id
+            GROUP BY p.barcode, p.name, p.current_stock, p.category, p.unit
+            ORDER BY (p.barcode + 0), p.barcode
+        """
+        
+    cursor.execute(query, (report_date,))
     data = cursor.fetchall()
     conn.close()
     
@@ -6830,7 +6857,7 @@ def get_recent_bills():
         
     where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
     
-    query = f"SELECT id, invoice_no, total_amount, bill_date, status, payment_mode FROM bills{where_clause} ORDER BY id DESC LIMIT 50"
+    query = f"SELECT id, invoice_no, total_amount, bill_date, status, payment_mode FROM bills{where_clause} ORDER BY id ASC LIMIT 50"
     cursor.execute(query, tuple(params))
     bills = cursor.fetchall()
     conn.close()
@@ -6883,7 +6910,7 @@ def get_all_bills_api():
     if not conn: return jsonify([])
     cursor = conn.cursor(dictionary=True)
     # Fetching all columns needed by the Bill-wise report
-    cursor.execute("SELECT id, invoice_no, total_amount, bill_date, status, discount, prev_total, source_bill_id, payment_mode, tsc_percent, tsc_amount FROM bills ORDER BY id DESC")
+    cursor.execute("SELECT id, invoice_no, total_amount, bill_date, status, discount, prev_total, source_bill_id, payment_mode, tsc_percent, tsc_amount FROM bills ORDER BY id ASC")
     bills = cursor.fetchall()
     conn.close()
     for b in bills:

@@ -206,7 +206,7 @@
 
         <div class="report-container">
 
-            <div class="filter-panel">
+            <div class="filter-panel" style="display: flex; gap: 15px; align-items: center;">
 
                 <div class="form-group" style="flex: 1;">
 
@@ -214,7 +214,15 @@
 
                 </div>
 
-                <div class="header-info" style="font-weight: 700; color: var(--primary); text-align: right;">
+                <div class="form-group" style="width: 200px; display: flex; align-items: center; gap: 10px;">
+
+                    <label style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; margin-bottom: 0;">Date:</label>
+
+                    <input type="date" id="reportDate" class="input-dark" style="height: 38px;" onchange="loadData()">
+
+                </div>
+
+                <div class="header-info" style="font-weight: 700; color: var(--primary); text-align: right; margin-left: auto;">
 
                     <div id="headerDate" style="font-size: 1.1rem;"></div>
 
@@ -301,11 +309,25 @@
 
         async function loadData() {
 
-            const now = new Date();
+            let dateVal = document.getElementById('reportDate').value;
 
-            const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            if (!dateVal) {
 
-            const dayStr = now.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase();
+                const now = new Date();
+
+                dateVal = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
+                document.getElementById('reportDate').value = dateVal;
+
+            }
+
+
+
+            const selectedDate = new Date(dateVal);
+
+            const dateStr = selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+            const dayStr = selectedDate.toLocaleDateString('en-GB', { weekday: 'long' }).toUpperCase();
 
             
 
@@ -319,7 +341,7 @@
 
             try {
 
-                const res = await fetch('/api/reports/daily-position');
+                const res = await fetch(`/api/reports/daily-position?date=${dateVal}`);
 
                 allData = await res.json();
 
@@ -348,13 +370,15 @@
                 const tr = document.createElement('tr');
 
                 const isGM = item.unit === 'GM';
-                const closingDisplay = isGM ? (item.closing / 1000).toFixed(3) + ' KG' : item.closing + ' ' + (item.unit || 'PCS');
+                let closingDisplay = '';
+                if (item.closing !== "" && item.closing !== 0 && parseFloat(item.closing) !== 0) {
+                    const closingVal = parseFloat(item.closing);
+                    closingDisplay = isGM ? (closingVal / 1000).toFixed(3) + ' KG' : closingVal + ' ' + (item.unit || 'PCS');
+                }
                 
                 let outgoingDisplay = '';
-                const outgoingVal = item.outgoing === "" ? 0 : parseFloat(item.outgoing);
-                if (outgoingVal === 0) {
-                    outgoingDisplay = isGM ? '0.000 KG' : '0';
-                } else {
+                if (item.outgoing !== "" && item.outgoing !== 0 && parseFloat(item.outgoing) !== 0) {
+                    const outgoingVal = parseFloat(item.outgoing);
                     outgoingDisplay = isGM ? (outgoingVal / 1000).toFixed(3) + ' KG' : outgoingVal + ' ' + (item.unit || 'PCS');
                 }
 
