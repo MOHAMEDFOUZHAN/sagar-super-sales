@@ -85,10 +85,7 @@
 
         .print-only-header { display: none; }
 
-        @media print {
-            .low-stock { color: #b91c1c !important; font-weight: 900 !important; }
-            .dynamic-footer, .filter-panel { display: none !important; }
-        }
+        
     </style>
 </head>
 
@@ -150,13 +147,13 @@
             </div>
 
             <div class="print-only-header">
-                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER</h1>
-                <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Daily Stock Status Report</p>
-                <p id="printRunDate" style="margin: 2px 0; font-weight: bold;"></p>
-                <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+            <h1>SAGAR SUPER</h1>
+            <p>Daily Stock Status Report</p>
+            <p id="printDateRange"></p>
+        </div>
             </div>
 
-            <div class="glass-panel" style="padding: 20px;">
+            <div class="glass-panel">
                 <div class="table-wrapper">
                     <table class="stock-table" id="stockTable">
                         <thead>
@@ -197,7 +194,7 @@
             
             const startF = new Date(start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
             const endF = new Date(end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-            document.getElementById('printRunDate').innerText = `Period: ${startF} to ${endF}`;
+            document.getElementById('printDateRange').innerText = `Period: ${startF} to ${endF}`;
 
             const tbody = document.getElementById('stockContent');
             tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</td></tr>';

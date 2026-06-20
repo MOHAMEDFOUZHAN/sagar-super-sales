@@ -166,6 +166,54 @@
             background: rgba(255, 255, 255, 0.05);
             border-color: rgba(255, 255, 255, 0.2);
         }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: var(--success);
+        }
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+        .cloud-warning {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: var(--warning);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-top: 10px;
+            display: none;
+        }
     </style>
 </head>
 
@@ -185,6 +233,33 @@
 
         <div class="sync-container">
             <div class="status-grid">
+                <!-- Cloud Toggle Card -->
+                <div class="status-card">
+                    <div class="card-header-flex">
+                        <h3 style="margin: 0; font-size: 1rem; color: var(--text-muted);">CLOUD SYNC CONTROL</h3>
+                        <span id="cloudToggleStatusText" class="status-badge badge-cloud">Cloud Sync: ON</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px; margin-top: 10px;">
+                        <div class="card-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;">
+                            <i class="fa-solid fa-cloud"></i>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.4rem; font-weight: 800;">Cloud Sync</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Toggle cloud database synchronization.</div>
+                        </div>
+                        <label class="toggle-switch" style="margin-left: auto;">
+                            <input type="checkbox" id="cloudToggle" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div id="cloudWarning" class="cloud-warning">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Running in LOCAL-ONLY mode. No cloud sync will occur.
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.75rem; color: var(--text-muted);">
+                        Mode: <span id="cloudDbMode">Loading...</span> | Sync: <span id="cloudSyncMode">Loading...</span>
+                    </div>
+                </div>
+
                 <!-- System Mode Card -->
                 <div class="status-card">
                     <div class="card-header-flex">
@@ -273,32 +348,51 @@
                 const res = await fetch('/api/admin/sync/status');
                 const data = await res.json();
                 if (data.status === 'success') {
-                    // Update Mode
+                    const dbMode = data.database_mode || 'failover';
                     const mode = data.mode;
                     const modeText = document.getElementById('activeModeText');
                     const modeDesc = modeText.nextElementSibling;
                     const badge = document.getElementById('activeModeBadge');
                     const failoverBtn = document.getElementById('btnToggleFailover');
 
-                    modeText.innerText = mode.replace('_', ' ');
-                    badge.innerText = mode.replace('_', ' ');
-
-                    // Style badge & icon base on mode
-                    if (mode === 'LOCAL_PRIMARY') {
+                    // Disable manual mode switching in local-only or cloud-only mode
+                    if (dbMode === 'local') {
+                        modeText.innerText = 'LOCAL ONLY';
                         badge.className = 'status-badge badge-local';
-                        modeDesc.innerText = 'Local MySQL handles all read/write traffic.';
-                        failoverBtn.innerHTML = '<i class="fa-solid fa-cloud"></i> Force Cloud Failover';
-                        failoverBtn.onclick = () => setSystemMode('CLOUD_FAILOVER');
-                    } else if (mode === 'CLOUD_FAILOVER') {
+                        modeDesc.innerText = 'Local MySQL only - no cloud failover. Select Hybrid mode to enable failover.';
+                        failoverBtn.disabled = true;
+                        failoverBtn.style.opacity = '0.5';
+                        failoverBtn.title = 'Disabled in LOCAL-ONLY mode';
+                    } else if (dbMode === 'cloud') {
+                        modeText.innerText = 'CLOUD ONLY';
                         badge.className = 'status-badge badge-cloud';
-                        modeDesc.innerText = 'Cloud database (Supabase) handles all traffic.';
-                        failoverBtn.innerHTML = '<i class="fa-solid fa-server"></i> Switch to Local Primary';
-                        failoverBtn.onclick = () => setSystemMode('LOCAL_PRIMARY');
-                    } else if (mode === 'RESTORING') {
-                        badge.className = 'status-badge badge-restore';
-                        modeDesc.innerText = 'Applying cloud changes to local MySQL database.';
-                        failoverBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Restoring Data...';
-                        failoverBtn.onclick = null;
+                        modeDesc.innerText = 'Cloud database only - no local fallback. Select Hybrid mode to enable failover.';
+                        failoverBtn.disabled = true;
+                        failoverBtn.style.opacity = '0.5';
+                        failoverBtn.title = 'Disabled in CLOUD-ONLY mode';
+                    } else {
+                        failoverBtn.disabled = false;
+                        failoverBtn.style.opacity = '1';
+                        failoverBtn.title = '';
+                        modeText.innerText = mode.replace('_', ' ');
+                        badge.innerText = mode.replace('_', ' ');
+
+                        if (mode === 'LOCAL_PRIMARY') {
+                            badge.className = 'status-badge badge-local';
+                            modeDesc.innerText = 'Local MySQL handles all read/write traffic.';
+                            failoverBtn.innerHTML = '<i class="fa-solid fa-cloud"></i> Force Cloud Failover';
+                            failoverBtn.onclick = () => setSystemMode('CLOUD_FAILOVER');
+                        } else if (mode === 'CLOUD_FAILOVER') {
+                            badge.className = 'status-badge badge-cloud';
+                            modeDesc.innerText = 'Cloud database (Supabase) handles all traffic.';
+                            failoverBtn.innerHTML = '<i class="fa-solid fa-server"></i> Switch to Local Primary';
+                            failoverBtn.onclick = () => setSystemMode('LOCAL_PRIMARY');
+                        } else if (mode === 'RESTORING') {
+                            badge.className = 'status-badge badge-restore';
+                            modeDesc.innerText = 'Applying cloud changes to local MySQL database.';
+                            failoverBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Restoring Data...';
+                            failoverBtn.onclick = null;
+                        }
                     }
 
                     // Update DB Health Indicators
@@ -393,6 +487,87 @@
         // Load initially and set interval
         loadStatus();
         setInterval(loadStatus, 2000);
+
+        // Cloud Toggle Logic
+        async function loadCloudStatus() {
+            try {
+                const res = await fetch('/api/cloud/status');
+                const data = await res.json();
+                updateCloudToggleUI(data);
+            } catch(e) { console.error('Cloud status error', e); }
+        }
+
+        function updateCloudToggleUI(data) {
+            const toggle = document.getElementById('cloudToggle');
+            const statusText = document.getElementById('cloudToggleStatusText');
+            const warning = document.getElementById('cloudWarning');
+            const dbMode = document.getElementById('cloudDbMode');
+            const syncMode = document.getElementById('cloudSyncMode');
+            
+            const isLocalOnly = data.database_mode === 'local';
+            const isCloudOnly = data.database_mode === 'cloud';
+            
+            if(toggle) {
+                toggle.checked = data.cloud_enabled && !isLocalOnly;
+                toggle.disabled = isLocalOnly;
+                toggle.style.opacity = isLocalOnly ? '0.5' : '1';
+                toggle.title = isLocalOnly ? 'Cloud sync disabled in LOCAL-ONLY mode' : '';
+            }
+            if(statusText) {
+                if (isLocalOnly) {
+                    statusText.textContent = 'Cloud Sync: OFF (Local Only)';
+                    statusText.className = 'status-badge badge-local';
+                } else if (isCloudOnly) {
+                    statusText.textContent = 'Cloud Sync: ON (Cloud Only)';
+                    statusText.className = 'status-badge badge-cloud';
+                } else {
+                    statusText.textContent = data.cloud_enabled ? 'Cloud Sync: ON' : 'Cloud Sync: OFF';
+                    statusText.className = data.cloud_enabled ? 'status-badge badge-cloud' : 'status-badge badge-local';
+                }
+            }
+            // Update warning
+            if(warning) {
+                if (isLocalOnly) {
+                    warning.style.display = 'block';
+                    warning.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> LOCAL-ONLY mode active. Cloud sync is permanently disabled. Select Hybrid mode from Login to enable cloud.';
+                } else if (isCloudOnly) {
+                    warning.style.display = 'block';
+                    warning.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> CLOUD-ONLY mode active. All data goes directly to cloud. Select Hybrid mode for local fallback.';
+                } else if (!data.cloud_enabled) {
+                    warning.style.display = 'block';
+                    warning.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Cloud sync is disabled. Enable it to sync data to Supabase.';
+                } else {
+                    warning.style.display = 'none';
+                }
+            }
+            // Update mode info
+            if(dbMode) dbMode.textContent = data.database_mode || 'N/A';
+            if(syncMode) syncMode.textContent = data.sync_mode || 'N/A';
+        }
+
+        document.getElementById('cloudToggle').addEventListener('change', async function() {
+            if (this.disabled) return;
+            const enabled = this.checked;
+            try {
+                const res = await fetch('/api/cloud/toggle', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({enabled: enabled})
+                });
+                const data = await res.json();
+                if(data.status === 'success') {
+                    updateCloudToggleUI(data);
+                } else {
+                    alert('Failed to toggle cloud: ' + data.message);
+                    this.checked = !enabled;
+                }
+            } catch(e) {
+                alert('Network error toggling cloud');
+                this.checked = !enabled;
+            }
+        });
+
+        loadCloudStatus();
     </script>
 </body>
 

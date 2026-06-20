@@ -179,30 +179,11 @@
             font-size: 1.2rem;
 
         }
+        .print-only-header { display: none; }
 
 
 
-        @media print {
-
-            .report-card {
-
-                border: 1px solid black !important;
-
-                margin: 0 auto !important;
-
-                padding: 10mm !important;
-
-                width: 100% !important;
-
-                max-width: 100% !important;
-
-                box-shadow: none !important;
-
-                break-inside: avoid;
-
-            }
-
-        }
+        
 
     </style>
 
@@ -480,11 +461,7 @@
 
     
 <style>
-    @media print {
-        .dynamic-footer {
-            display: none !important;
-        }
-    }
+    
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
     <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
@@ -527,15 +504,15 @@
 
             // Sales Summary
 
-            const s = data.sales_summary;
+            const s = data.sales;
 
-            document.getElementById('totalSales').innerText = s.total_sales.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('totalSales').innerText = (s.total_sales || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
-            document.getElementById('cashSales').innerText = s.cash_sales.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('cashSales').innerText = (s.cash_sales || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
-            document.getElementById('cardSales').innerText = s.card_sales.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('cardSales').innerText = (s.card_sales || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
-            document.getElementById('upiSales').innerText = s.upi_sales.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('upiSales').innerText = (s.upi_sales || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
 
 
@@ -545,9 +522,9 @@
 
             catRows.innerHTML = '';
 
-            data.category_sales.forEach(c => {
+            (data.categories || []).forEach(c => {
 
-                catRows.innerHTML += `<tr><td class="text-bold">${c.category}</td><td>${c.category_sales.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+                catRows.innerHTML += `<tr><td class="text-bold">${c.category}</td><td>${(c.category_sales || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
 
             });
 
@@ -559,9 +536,9 @@
 
             expRows.innerHTML = '';
 
-            data.office_expenses.forEach(e => {
+            (data.office_expenses || []).forEach(e => {
 
-                expRows.innerHTML += `<tr><td>${e.category.toUpperCase()}</td><td>${e.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+                expRows.innerHTML += `<tr><td>${(e.category || '').toUpperCase()}</td><td>${(e.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
 
             });
 
@@ -569,17 +546,17 @@
 
             // Bizz Breakdown
 
+            const totalBiz = data.biz_charges || 0;
+
+            const biz_83 = totalBiz * 0.83;
+
+            const biz_17 = totalBiz * 0.17;
+
             const bizzRows = document.getElementById('bizzCatRows');
 
             bizzRows.innerHTML = '';
 
-            bizzRows.innerHTML += `<tr><td>BIZ @ 83%</td><td>${data.biz_83.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
-
-            data.bizz_by_cat.forEach(b => {
-
-                bizzRows.innerHTML += `<tr><td>${b.category.toUpperCase()} BIZ</td><td>${b.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
-
-            });
+            bizzRows.innerHTML += `<tr><td>BIZ @ 83%</td><td>${biz_83.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
 
 
 
@@ -587,7 +564,7 @@
 
             const tscRows = document.getElementById('tscRows');
 
-            tscRows.innerHTML = `<tr><td>TSC</td><td>${data.total_tsc.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+            tscRows.innerHTML = `<tr><td>TSC</td><td>${(data.tsc_total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
 
 
 
@@ -597,9 +574,9 @@
 
             shopRows.innerHTML = '';
 
-            data.shop_expenses.forEach(e => {
+            (data.shop_expenses || []).forEach(e => {
 
-                shopRows.innerHTML += `<tr><td>${e.category.toUpperCase()}</td><td>${e.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+                shopRows.innerHTML += `<tr><td>${(e.category || '').toUpperCase()}</td><td>${(e.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
 
             });
 
@@ -607,33 +584,27 @@
 
             // Total Expense
 
-            document.getElementById('totalExpense').innerText = data.total_expenses.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('totalExpense').innerText = (data.total_expenses || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
 
 
             // Godown Biz (17%)
 
-            document.getElementById('godownBiz').innerText = data.biz_17.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('godownBiz').innerText = biz_17.toLocaleString(undefined, { minimumFractionDigits: 2 });
 
 
 
             // Cash Balance
 
-            const bal = data.balance;
+            const bal = data.balance || {};
 
-            document.getElementById('openingBal').innerText = bal.opening_balance.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('openingBal').innerText = (bal.opening_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
-            // (+/- =) logic: Opening + Cash Sales - Total Expenses (Actual Cash out)
+            document.getElementById('closingBal').innerText = (bal.actual_closing || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
-            // But let's simplify to match user's physical sheet if needed. 
+            document.getElementById('cashOff').innerText = (bal.difference || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
-            // In the image, O.B is 12,000, C.B is 12,028. Difference is 28.
-
-            document.getElementById('closingBal').innerText = bal.actual_closing.toLocaleString(undefined, { minimumFractionDigits: 2 });
-
-            document.getElementById('cashOff').innerText = bal.difference.toLocaleString(undefined, { minimumFractionDigits: 2 });
-
-            document.getElementById('totalCF').innerText = '\u20B9' + bal.actual_closing.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('totalCF').innerText = '\u20B9' + (bal.actual_closing || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
 
 

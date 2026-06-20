@@ -247,8 +247,20 @@
 
                     <div class="form-group full-width">
                         <label
-                            style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Classification</label>
-                        <select id="category" class="input-dark"></select>
+                            style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Category</label>
+                        <select id="category" class="input-dark">
+                            <option value="General">-- SELECT CATEGORY --</option>
+                            <option value="OILS">OILS</option>
+                            <option value="SPICES">SPICES</option>
+                            <option value="TEA/COFFEE">TEA/COFFEE</option>
+                            <option value="AROMATICS">AROMATICS</option>
+                            <option value="OTHERS">OTHERS</option>
+                            <option value="FRUIT/JELLY">FRUIT/JELLY</option>
+                            <option value="VARKEY">VARKEY</option>
+                            <option value="CANDIES">CANDIES</option>
+                            <option value="C-MRD">C-MRD</option>
+                            <option value="C-CFC">C-CFC</option>
+                        </select>
                     </div>
 
                     <div class="form-group">
@@ -259,7 +271,7 @@
 
                     <div class="form-group">
                         <label style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Bizz
-                            Reward %</label>
+                            Reward (₹)</label>
                         <input type="number" step="0.01" id="bizz" class="input-dark" value="0">
                     </div>
 
@@ -312,10 +324,8 @@
 
     <script>
         let products = [];
-        let categories = [];
-
         async function init() {
-            await Promise.all([loadProducts(), loadCategories()]);
+            await loadProducts();
         }
 
         async function loadProducts() {
@@ -326,20 +336,7 @@
             } catch (e) { console.error(e); }
         }
 
-        async function loadCategories() {
-            try {
-                const res = await fetch('/api/inventory/categories');
-                categories = await res.json();
-                const select = document.getElementById('category');
-                select.innerHTML = '<option value="General">Uncategorized / General</option>';
-                categories.forEach(c => {
-                    const opt = document.createElement('option');
-                    opt.value = c.name;
-                    opt.innerText = c.name;
-                    select.appendChild(opt);
-                });
-            } catch (e) { console.error(e); }
-        }
+
 
         function renderTable(data) {
             const tbody = document.querySelector('#productsTable tbody');
@@ -352,7 +349,7 @@
                     <td style="font-weight: 600;">${p.name}</td>
                     <td style="color: var(--text-muted); font-size: 0.85rem;">${p.category}</td>
                     <td style="text-align: right; font-weight: 800; color: var(--success);">\u20B9${p.price.toFixed(2)}</td>
-                    <td style="text-align: center;"><span class="badge" style="background: rgba(99,102,241,0.1); color: var(--primary);">${p.bizz || 0}%</span></td>
+                    <td style="text-align: center;"><span class="badge" style="background: rgba(99,102,241,0.1); color: var(--primary);">₹${p.bizz || 0}</span></td>
                     <td style="text-align: right;">
                         <div style="display: flex; justify-content: flex-end; gap: 8px;">
                             <button class="btn" style="padding: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);" onclick='editProduct(${JSON.stringify(p)})'>
@@ -457,7 +454,7 @@
                 minInput.value = p.min_threshold || 25;
             }
             
-            document.getElementById('modalTitle').innerText = 'Refine Product Specs';
+            document.getElementById('modalTitle').innerText = 'Edit Product Specs';
             document.getElementById('productModal').style.display = 'flex';
             
             updateStockLabelsAndFields(p.unit || 'PCS');

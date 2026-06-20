@@ -875,7 +875,81 @@
 
         
 
-        <div style="margin-top: auto; padding-bottom: 15px;">
+                <!-- Database Status Indicator -->
+        <div id="db-status-container" style="padding: 10px 16px; margin-bottom: 8px; border-radius: var(--radius-md); font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); transition: all 0.3s; font-family: 'Inter', sans-serif;">
+            <span style="display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 0.75rem;">
+                <i class="fa-solid fa-database"></i> DB Connection
+            </span>
+            <span id="db-status-badge" style="padding: 4px 10px; border-radius: 20px; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 6px; font-weight: 800;">
+                <span id="db-status-dot" style="width: 6px; height: 6px; border-radius: 50%;"></span>
+                <span id="db-status-text">Checking...</span>
+            </span>
+        </div>
+        <script>
+            (function() {
+                function updateDbStatus() {
+                    fetch("/api/db-status")
+                        .then(res => res.json())
+                        .then(data => {
+                            const badge = document.getElementById("db-status-badge");
+                            const dot = document.getElementById("db-status-dot");
+                            const text = document.getElementById("db-status-text");
+                            const container = document.getElementById("db-status-container");
+                            if (!badge || !dot || !text || !container) return;
+                            
+                            if (data.status === "local") {
+                                container.style.background = "rgba(16, 185, 129, 0.05)";
+                                badge.style.background = "rgba(16, 185, 129, 0.15)";
+                                badge.style.color = "#10b981";
+                                badge.style.border = "1px solid rgba(16, 185, 129, 0.3)";
+                                dot.style.background = "#10b981";
+                                dot.style.boxShadow = "0 0 6px #10b981";
+                                text.innerText = "LOCAL";
+                            } else if (data.status === "local_offline") {
+                                container.style.background = "rgba(239, 68, 68, 0.05)";
+                                badge.style.background = "rgba(239, 68, 68, 0.15)";
+                                badge.style.color = "#ef4444";
+                                badge.style.border = "1px solid rgba(239, 68, 68, 0.3)";
+                                dot.style.background = "#ef4444";
+                                dot.style.boxShadow = "0 0 6px #ef4444";
+                                text.innerText = "LOCAL (OFF)";
+                            } else if (data.status === "cloud") {
+                                container.style.background = "rgba(168, 85, 247, 0.05)";
+                                badge.style.background = "rgba(168, 85, 247, 0.15)";
+                                badge.style.color = "#a855f7";
+                                badge.style.border = "1px solid rgba(168, 85, 247, 0.3)";
+                                dot.style.background = "#a855f7";
+                                dot.style.boxShadow = "0 0 6px #a855f7";
+                                text.innerText = "CLOUD";
+                            } else if (data.status === "cloud_offline") {
+                                container.style.background = "rgba(239, 68, 68, 0.05)";
+                                badge.style.background = "rgba(239, 68, 68, 0.15)";
+                                badge.style.color = "#ef4444";
+                                badge.style.border = "1px solid rgba(239, 68, 68, 0.3)";
+                                dot.style.background = "#ef4444";
+                                dot.style.boxShadow = "0 0 6px #ef4444";
+                                text.innerText = "CLOUD (OFF)";
+                            } else {
+                                container.style.background = "rgba(255, 255, 255, 0.02)";
+                                badge.style.background = "rgba(255, 255, 255, 0.08)";
+                                badge.style.color = "#888";
+                                badge.style.border = "1px solid rgba(255, 255, 255, 0.1)";
+                                dot.style.background = "#888";
+                                dot.style.boxShadow = "none";
+                                text.innerText = "UNKNOWN";
+                            }
+                        })
+                        .catch(() => {
+                            const text = document.getElementById("db-status-text");
+                            if (text) text.innerText = "UNKNOWN";
+                        });
+                }
+                
+                updateDbStatus();
+                setInterval(updateDbStatus, 3000);
+            })();
+        </script>
+<div style="margin-top: auto; padding-bottom: 15px;">
 
             <div style="padding: 12px 16px; margin-bottom: 15px; background: rgba(255,255,255,0.05); border-radius: var(--radius-md); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 12px;">
 
@@ -2183,30 +2257,7 @@
             });
             socket.on('stock_updated', (data) => {
                 console.log('Universal Stock Update received:', data);
-                // Trigger any active page data-loading/rendering functions dynamically!
-                if (typeof initDashboard === 'function') initDashboard();
-                if (typeof loadInventory === 'function') loadInventory();
-                if (typeof loadProducts === 'function') loadProducts();
-                if (typeof loadCategories === 'function') loadCategories();
-                if (typeof loadUsers === 'function') loadUsers();
-                if (typeof fetchStats === 'function') fetchStats();
-                if (typeof fetchSales === 'function') fetchSales();
-                if (typeof loadData === 'function') loadData();
-                if (typeof updateDashboard === 'function') updateDashboard();
-                if (typeof refreshData === 'function') refreshData();
-                if (typeof loadReport === 'function') loadReport();
-                if (typeof loadStoreStatistics === 'function') loadStoreStatistics();
-                if (typeof searchBill === 'function') searchBill();
-                if (typeof loadStock === 'function') loadStock();
-                if (typeof renderList === 'function') renderList();
-                if (typeof fetchTelemetry === 'function') fetchTelemetry();
-                if (typeof fetchForecastData === 'function') fetchForecastData();
-                if (typeof loadIntel === 'function') loadIntel();
-                if (typeof loadInvoices === 'function') loadInvoices();
-                if (typeof loadCounters === 'function') loadCounters();
-                if (typeof fetchBills === 'function') fetchBills();
-                if (typeof loadClosureReport === 'function') loadClosureReport();
-                if (typeof fetchDailySales === 'function') fetchDailySales();
+                loadClosureReport();
             });
         }
 

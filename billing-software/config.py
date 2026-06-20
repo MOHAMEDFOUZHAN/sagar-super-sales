@@ -14,6 +14,7 @@ class Config:
     MYSQL_AUTOCOMMIT = False
     AUTO_START_LARAGON = False
     DATABASE_MODE = 'failover'  # 'local', 'cloud', or 'failover'
+    CLOUD_ENABLED = True  # NEW: Master switch to enable/disable cloud entirely
     
     # Server Connection Configuration
     SERVER_HOST = '0.0.0.0' # Listen on all interfaces so client PCs can connect
@@ -75,7 +76,8 @@ class Config:
                     "SERVER_HOST": cls.SERVER_HOST,
                     "SERVER_PORT": cls.SERVER_PORT,
                     "WAITRESS_THREADS": cls.WAITRESS_THREADS,
-                    "DATABASE_MODE": cls.DATABASE_MODE
+                    "DATABASE_MODE": cls.DATABASE_MODE,
+                    "CLOUD_ENABLED": cls.CLOUD_ENABLED
                 }
                 with open(found_file, 'w') as f:
                     json.dump(sample_data, f, indent=4)
@@ -98,6 +100,7 @@ class Config:
                     cls.WAITRESS_THREADS = int(data.get('WAITRESS_THREADS', cls.WAITRESS_THREADS))
                     cls.SCAN_MODE = data.get('SCAN_MODE', cls.SCAN_MODE)
                     cls.DATABASE_MODE = data.get('DATABASE_MODE', cls.DATABASE_MODE)
+                    cls.CLOUD_ENABLED = bool(data.get('CLOUD_ENABLED', cls.CLOUD_ENABLED))
                 
                 # Store the actual path used for other utilities to reference
                 cls.ACTIVE_CONFIG_PATH = found_file

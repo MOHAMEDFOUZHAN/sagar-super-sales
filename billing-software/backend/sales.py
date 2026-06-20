@@ -44,11 +44,11 @@ def reserve_invoice_number(cursor, bill_time):
 
     cursor.execute(
         """
-        INSERT INTO bill_sequences (seq_date, last_value)
+        INSERT INTO bill_sequences (seq_date, `last_value`)
         VALUES (%s, 1)
-        ON DUPLICATE KEY UPDATE last_value = LAST_INSERT_ID(last_value + 1)
+        ON DUPLICATE KEY UPDATE `last_value` = LAST_INSERT_ID(`last_value` + 1)
         """,
-        (global_seq_key,)
+        (global_seq_key.strftime('%Y-%m-%d'),)
     )
     cursor.execute("SELECT LAST_INSERT_ID()")
     sequence_row = cursor.fetchone()
@@ -60,7 +60,7 @@ def reserve_invoice_number(cursor, bill_time):
     
     # If LAST_INSERT_ID is 0, fallback to current last_value
     if sequence_value == 0:
-        cursor.execute("SELECT last_value FROM bill_sequences WHERE seq_date = %s", (global_seq_key,))
+        cursor.execute("SELECT `last_value` FROM bill_sequences WHERE seq_date = %s", (global_seq_key.strftime('%Y-%m-%d'),))
         fallback_row = cursor.fetchone()
         sequence_value = int(
             fallback_row.get('last_value')
@@ -137,7 +137,7 @@ def create_bill(conn, payload, username, audit_logger):
             rate = round(float(item['rate']), 2)
             amount = round(float(item['amount']), 2)
             bizz_percent = round(float(item.get('bizz', 0) or 0), 2)
-            bizz_amount = round((amount * bizz_percent) / 100, 2)
+            bizz_amount = round(bizz_percent * qty, 2)
             product = locked_products[product_name]
 
             cursor.execute(

@@ -356,8 +356,8 @@ tr:hover td {
    ========================================= */
 @media print {
     @page {
-        size: auto;
-        margin: 10mm;
+        size: A4;
+        margin: 8mm 10mm;
     }
 
     body {
@@ -366,6 +366,7 @@ tr:hover td {
         display: block !important;
         height: auto !important;
         overflow: visible !important;
+        font-size: 10pt !important;
     }
 
     .sidebar, 
@@ -374,7 +375,8 @@ tr:hover td {
     .btn, 
     .filter-section,
     .tab-nav,
-    .hide-on-print {
+    .hide-on-print,
+    .dynamic-footer {
         display: none !important;
     }
 
@@ -400,6 +402,7 @@ tr:hover td {
     .table-wrapper {
         background: none !important;
         padding: 0 !important;
+        margin: 0 !important;
         overflow: visible !important;
     }
 
@@ -407,30 +410,48 @@ tr:hover td {
         width: 100% !important;
         border-collapse: collapse !important;
         table-layout: auto !important;
+        margin: 0 !important;
     }
 
     th, td {
         border: 1px solid #000 !important;
         color: black !important;
-        padding: 6px 10px !important;
-        font-size: 0.85rem !important;
+        padding: 3px 6px !important;
+        font-size: 8pt !important;
         background: transparent !important;
+        line-height: 1.2 !important;
     }
 
     th {
         background: #f1f5f9 !important;
         font-weight: 700 !important;
+        text-transform: uppercase !important;
     }
 
     .amount-cell {
         text-align: right !important;
     }
 
-    /* Keep the print only header visible */
+    /* Print only header styling - making it tighter */
     .print-only-header {
         display: block !important;
         text-align: center;
-        margin-bottom: 20px;
+        margin-bottom: 10px !important;
+        border-bottom: 2px solid #000;
+        padding-bottom: 5px;
+    }
+
+    .print-only-header h1 {
+        font-size: 16pt !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
+    }
+
+    .print-only-header p {
+        font-size: 10pt !important;
+        margin: 2px 0 !important;
+        padding: 0 !important;
     }
 
     /* Ensure totals don't get cut off */
@@ -439,9 +460,10 @@ tr:hover td {
         break-inside: avoid;
     }
 
-    tr.total-row {
+    tr.total-row, tr.mode-group-header {
         display: table-row !important;
         break-inside: avoid;
+        page-break-inside: avoid;
     }
 
     /* Ensure all text elements are readable in black/white */
@@ -455,11 +477,16 @@ tr:hover td {
     /* Ensure totals are bold */
     tfoot td, tr.total-row td, .grand-total, .total-line {
         font-weight: 800 !important;
-        font-size: 1rem !important;
+        font-size: 9pt !important;
     }
 
     tr {
         break-inside: avoid;
         page-break-inside: avoid;
+    }
+
+    /* Hide any chart canvases */
+    canvas {
+        display: none !important;
     }
 }

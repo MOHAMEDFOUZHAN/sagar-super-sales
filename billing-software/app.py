@@ -20,6 +20,29 @@ import json
 import queue
 import time
 from config import Config
+
+def is_cloud_enabled():
+    return getattr(Config, 'CLOUD_ENABLED', True)
+
+def get_effective_mode():
+    """Returns the effective database mode: 'local', 'cloud', or 'failover'."""
+    return getattr(Config, 'DATABASE_MODE', 'failover')
+
+def is_local_only():
+    return get_effective_mode() == 'local'
+
+def is_cloud_only():
+    return get_effective_mode() == 'cloud'
+
+def is_hybrid():
+    return get_effective_mode() == 'failover'
+
+def is_cloud_available():
+    """Cloud is available only when not in local-only mode and cloud is enabled."""
+    if is_local_only():
+        return False
+    return is_cloud_enabled()
+
 from backend.sales import create_bill
 from backend.network_diagnostics import (
     get_network_interfaces,
@@ -167,6 +190,9 @@ def auto_click_ok():
 
 def perform_database_sync(mysql_conn, pg_conn):
     """Bidirectional Sync Engine: Synchronizes counter sales, expenses, and aligns inventory."""
+    if not is_cloud_available():
+        print("[SYNC] Cloud disabled or local-only mode. Skipping sync.")
+        return
     def format_dt_str(val):
         if not val: return None
         if hasattr(val, 'strftime'):
@@ -546,13 +572,46 @@ def update_downtime_risk_prediction():
 
 def self_healing_monitor_loop():
     """Background Daemon: constantly check local stack integrity, auto-repair faults, and sync databases."""
-    global last_system_states
+    global last_system_states, CLOUD_IS_ALIVE, MYSQL_IS_ALIVE
     time.sleep(5)  # Wait for primary Waitress thread initialization
     
     while True:
         mysql_conn = None
         pg_conn = None
         try:
+            mode = get_effective_mode()
+
+            # ── LOCAL ONLY MODE: skip all cloud operations ──
+            if mode == 'local':
+                CLOUD_IS_ALIVE = False
+                check_mysql_health()
+                time.sleep(5)
+                continue
+
+            # ── CLOUD ONLY MODE: skip all local operations ──
+            if mode == 'cloud':
+                MYSQL_IS_ALIVE = False
+                try:
+                    pg_conn = psycopg2.connect(
+                        host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+                        port=6543,
+                        database="postgres",
+                        user="postgres",
+                        password=SUPABASE_PASSWORD,
+                        connect_timeout=3,
+                        sslmode='require'
+                    )
+                    pg_conn.autocommit = True
+                    CLOUD_IS_ALIVE = True
+                    if pg_conn:
+                        try: pg_conn.close()
+                        except: pass
+                        pg_conn = None
+                except:
+                    CLOUD_IS_ALIVE = False
+                time.sleep(5)
+                continue
+
             # 1. Local or Remote MySQL Check (with active metric measurements)
             is_local_host = Config.MYSQL_HOST in ('127.0.0.1', 'localhost')
             
@@ -563,14 +622,19 @@ def self_healing_monitor_loop():
             
             if not SIMULATED_MYSQL_FAILURES:
                 try:
-                    test_conn = mysql.connector.connect(
-                        host=Config.MYSQL_HOST,
-                        port=Config.MYSQL_PORT,
-                        user=Config.MYSQL_USER,
-                        password=Config.MYSQL_PASSWORD,
-                        database=Config.MYSQL_DB,
-                        connection_timeout=2
-                    )
+                    pool = db_pool
+                    if pool:
+                        test_conn = pool.get_connection()
+                    else:
+                        test_conn = mysql.connector.connect(
+                            host=Config.MYSQL_HOST,
+                            port=Config.MYSQL_PORT,
+                            user=Config.MYSQL_USER,
+                            password=Config.MYSQL_PASSWORD,
+                            database=Config.MYSQL_DB,
+                            connection_timeout=2,
+                            ssl_disabled=True
+                        )
                     conn_time = time.time() - start_conn
                     
                     if SIMULATED_MYSQL_DELAY > 0:
@@ -604,7 +668,6 @@ def self_healing_monitor_loop():
             
             mysql_alive = metrics_ok
             
-            global MYSQL_IS_ALIVE
             MYSQL_IS_ALIVE = mysql_alive
             
             if not mysql_alive and last_system_states["mysql"]:
@@ -638,6 +701,29 @@ def self_healing_monitor_loop():
                 last_system_states["mysql"] = True
                 
             # 2. Cloud DB Sync Check
+            if not is_cloud_enabled():
+                cloud_alive = False
+                CLOUD_IS_ALIVE = False
+                if last_system_states["cloud_db"]:
+                    log_healing_event("Cloud Database", "FAULT", "Cloud sync has been manually disabled by user.", "Running in local-only mode. No cloud operations will be attempted.")
+                    last_system_states["cloud_db"] = False
+                # Skip directly to IP check
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    s.connect(("8.8.8.8", 80))
+                    current_ip = s.getsockname()[0]
+                    s.close()
+                except:
+                    current_ip = "127.0.0.1"
+                if current_ip != last_system_states["local_ip"] and current_ip != "127.0.0.1":
+                    old_ip = last_system_states["local_ip"]
+                    msg = f"Host computer local IP changed from {old_ip} to {current_ip}."
+                    action = f"Autopilot updated local network bindings to {current_ip} dynamically."
+                    log_healing_event("Network IP Interface", "HEALED", msg, action)
+                    last_system_states["local_ip"] = current_ip
+                time.sleep(5)
+                continue
+            
             cloud_alive = False
             try:
                 pg_conn = psycopg2.connect(
@@ -646,7 +732,8 @@ def self_healing_monitor_loop():
                     database="postgres",
                     user="postgres",
                     password=SUPABASE_PASSWORD,
-                    connect_timeout=3
+                    connect_timeout=3,
+                    sslmode='require'
                 )
                 pg_conn.autocommit = True
                 cloud_alive = True
@@ -656,7 +743,6 @@ def self_healing_monitor_loop():
                     except: pass
                     pg_conn = None
                 
-            global CLOUD_IS_ALIVE
             CLOUD_IS_ALIVE = cloud_alive
             
             if not cloud_alive and last_system_states["cloud_db"]:
@@ -669,14 +755,19 @@ def self_healing_monitor_loop():
             # 3. If BOTH are alive, execute bidirectional sync!
             if mysql_alive and cloud_alive:
                 try:
-                    # Establish local connection
-                    mysql_conn = mysql.connector.connect(
-                        host=Config.MYSQL_HOST,
-                        port=Config.MYSQL_PORT,
-                        user=Config.MYSQL_USER,
-                        password=Config.MYSQL_PASSWORD,
-                        database=Config.MYSQL_DB
-                    )
+                    # Establish local connection from pool
+                    pool = db_pool
+                    if pool:
+                        mysql_conn = pool.get_connection()
+                    else:
+                        mysql_conn = mysql.connector.connect(
+                            host=Config.MYSQL_HOST,
+                            port=Config.MYSQL_PORT,
+                            user=Config.MYSQL_USER,
+                            password=Config.MYSQL_PASSWORD,
+                            database=Config.MYSQL_DB,
+                            ssl_disabled=True
+                        )
                     # Wrapped cloud connection
                     wrapped_pg = PostgreSQLProxyConnection(pg_conn)
                     
@@ -721,6 +812,8 @@ threading.Thread(target=self_healing_monitor_loop, daemon=True).start()
 CLOUD_DB_URL = "postgresql://neondb_owner:npg_6xQaYTgvCJ7G@ep-spring-recipe-a17qufnw-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
 
 def get_cloud_db_connection():
+    if not is_cloud_enabled():
+        return None
     try:
         conn = psycopg2.connect(CLOUD_DB_URL, connect_timeout=5)
         return conn
@@ -737,6 +830,9 @@ BACKGROUND_SYNC_PENDING = False
 
 def run_cloud_sync_once():
     """Replicate local and cloud data once. Called only by the background worker."""
+    if not is_cloud_available():
+        print("[SYNC] Cloud disabled or local-only mode. Skipping background sync.")
+        return
     mysql_conn = None
     pg_conn = None
     try:
@@ -754,7 +850,8 @@ def run_cloud_sync_once():
             database="postgres",
             user="postgres",
             password=SUPABASE_PASSWORD,
-            connect_timeout=3
+            connect_timeout=3,
+            sslmode='require'
         )
         pg_conn.autocommit = True
 
@@ -765,6 +862,7 @@ def run_cloud_sync_once():
             password=Config.MYSQL_PASSWORD,
             database=Config.MYSQL_DB,
             connection_timeout=2,
+            ssl_disabled=True
         )
         wrapped_pg = PostgreSQLProxyConnection(pg_conn)
         perform_database_sync(mysql_conn, wrapped_pg)
@@ -789,6 +887,24 @@ def background_worker_loop():
             if task_type == 'brain':
                 evolve_brain_realtime(task.get('bill_id'))
             elif task_type == 'sync':
+                if not is_cloud_available():
+                    # Clear pending sync tasks from queue when cloud is disabled or local-only
+                    deferred_tasks = []
+                    while True:
+                        try:
+                            pending = BACKGROUND_WORK_QUEUE.get_nowait()
+                        except queue.Empty:
+                            break
+                        if pending.get('type') == 'sync':
+                            BACKGROUND_WORK_QUEUE.task_done()
+                            continue
+                        deferred_tasks.append(pending)
+                        BACKGROUND_WORK_QUEUE.task_done()
+                    for pending in deferred_tasks:
+                        enqueue_background_task(pending)
+                    with BACKGROUND_SYNC_LOCK:
+                        BACKGROUND_SYNC_PENDING = False
+                    continue
                 time.sleep(SYNC_DEBOUNCE_SECONDS)
 
                 # Collapse all pending sync requests into this single cloud sync.
@@ -832,6 +948,9 @@ def schedule_brain_evolution(bill_id=None):
 
 def trigger_immediate_sync():
     """Request cloud sync without blocking the request thread; requests are debounced."""
+    if not is_cloud_available():
+        print("[SYNC] Cloud disabled or local-only mode. Ignoring sync trigger.")
+        return
     global BACKGROUND_SYNC_PENDING
     with BACKGROUND_SYNC_LOCK:
         if BACKGROUND_SYNC_PENDING:
@@ -933,6 +1052,8 @@ pg_pool_lock = threading.Lock()
 
 def get_pg_pool():
     global pg_pool
+    if not is_cloud_enabled():
+        return None
     if pg_pool is None:
         with pg_pool_lock:
             if pg_pool is None:
@@ -945,7 +1066,8 @@ def get_pg_pool():
                         port=6543,
                         database="postgres",
                         user="postgres",
-                        password=SUPABASE_PASSWORD
+                        password=SUPABASE_PASSWORD,
+                        sslmode='require'
                     )
                     print("[SYNC] Supabase Cloud Threaded Connection Pool initialized successfully.")
                 except Exception as e:
@@ -966,7 +1088,7 @@ def get_db_pool():
         try:
             with db_pool_lock:
                 if db_pool is None:
-                    effective_pool_size = max(1, min(int(Config.MYSQL_POOL_SIZE), 3))
+                    effective_pool_size = max(1, min(int(Config.MYSQL_POOL_SIZE), 20))
                     db_pool = pooling.MySQLConnectionPool(
                         pool_name=Config.MYSQL_POOL_NAME,
                         pool_size=effective_pool_size,
@@ -977,6 +1099,7 @@ def get_db_pool():
                         database=Config.MYSQL_DB,
                         autocommit=Config.MYSQL_AUTOCOMMIT,
                         connection_timeout=1,
+                        ssl_disabled=True,
                     )
         except Exception as e:
             err_msg = f"CRITICAL Pool Error: {e}"
@@ -1285,6 +1408,9 @@ class PostgreSQLProxyConnection:
 
 def get_cloud_db_connection_direct():
     global DB_STATUS, CLOUD_IS_ALIVE, LAST_CONNECTION_ERROR
+    if not is_cloud_available():
+        CLOUD_IS_ALIVE = False
+        return None
     try:
         pool = get_pg_pool()
         if pool:
@@ -1298,7 +1424,8 @@ def get_cloud_db_connection_direct():
             database="postgres",
             user="postgres",
             password=SUPABASE_PASSWORD,
-            connect_timeout=2
+            connect_timeout=2,
+            sslmode='require'
         )
         DB_STATUS = "cloud"
         return PostgreSQLProxyConnection(raw_pg_conn)
@@ -1526,6 +1653,10 @@ class SyncProxyConnection:
     def _flush_changes(self):
         if not self.pending_changes:
             return
+        # In local-only mode, never enqueue sync changes
+        if is_local_only():
+            self.pending_changes.clear()
+            return
         try:
             cur = self._conn.cursor()
             for chg in self.pending_changes:
@@ -1554,7 +1685,7 @@ class SyncProxyConnection:
 
 
 # Mode Manager status variables
-if getattr(Config, 'DATABASE_MODE', 'failover') == 'cloud':
+if get_effective_mode() == 'cloud':
     SYNC_SYSTEM_MODE = "CLOUD_FAILOVER"
 else:
     SYNC_SYSTEM_MODE = "LOCAL_PRIMARY"
@@ -1574,13 +1705,23 @@ def log_sync_event(event_type, message):
 
 def check_mysql_health():
     try:
+        pool = db_pool
+        if pool:
+            conn = pool.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return True
         conn = mysql.connector.connect(
             host=Config.MYSQL_HOST,
             port=Config.MYSQL_PORT,
             user=Config.MYSQL_USER,
             password=Config.MYSQL_PASSWORD,
             database=Config.MYSQL_DB,
-            connection_timeout=2
+            connection_timeout=2,
+            ssl_disabled=True
         )
         cursor = conn.cursor()
         cursor.execute("SELECT 1")
@@ -1592,14 +1733,26 @@ def check_mysql_health():
         return False
 
 def check_cloud_health():
+    if not is_cloud_available():
+        return False
     try:
+        pool = pg_pool
+        if pool:
+            conn = pool.getconn()
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+            cursor.close()
+            pool.putconn(conn)
+            return True
         conn = psycopg2.connect(
             host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
             port=6543,
             database="postgres",
             user="postgres",
             password=SUPABASE_PASSWORD,
-            connect_timeout=2
+            connect_timeout=2,
+            sslmode='require'
         )
         cursor = conn.cursor()
         cursor.execute("SELECT 1")
@@ -1611,40 +1764,45 @@ def check_cloud_health():
         return False
 
 def ensure_sync_queue_tables():
-    # 1. Local MySQL
-    try:
-        conn = mysql.connector.connect(
-            host=Config.MYSQL_HOST,
-            port=Config.MYSQL_PORT,
-            user=Config.MYSQL_USER,
-            password=Config.MYSQL_PASSWORD,
-            database=Config.MYSQL_DB
-        )
-        cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS sync_queue (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                table_name VARCHAR(50) NOT NULL,
-                record_id VARCHAR(50),
-                operation_type VARCHAR(10) NOT NULL,
-                query_sql TEXT NOT NULL,
-                query_params TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                status VARCHAR(20) DEFAULT 'PENDING',
-                invoice_no VARCHAR(100) DEFAULT NULL
-            )
-        """)
+    # 1. Local MySQL (skip in cloud-only mode)
+    if not is_cloud_only():
         try:
-            cur.execute("ALTER TABLE sync_queue ADD COLUMN invoice_no VARCHAR(100) DEFAULT NULL")
-        except:
-            pass
-        conn.commit()
-        cur.close()
-        conn.close()
-    except Exception as e:
-        print(f"[SYNC INIT WARNING] Could not create local sync table: {e}")
+            conn = mysql.connector.connect(
+                host=Config.MYSQL_HOST,
+                port=Config.MYSQL_PORT,
+                user=Config.MYSQL_USER,
+                password=Config.MYSQL_PASSWORD,
+                database=Config.MYSQL_DB,
+                ssl_disabled=True
+            )
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS sync_queue (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    table_name VARCHAR(50) NOT NULL,
+                    record_id VARCHAR(50),
+                    operation_type VARCHAR(10) NOT NULL,
+                    query_sql TEXT NOT NULL,
+                    query_params TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    status VARCHAR(20) DEFAULT 'PENDING',
+                    invoice_no VARCHAR(100) DEFAULT NULL
+                )
+            """)
+            try:
+                cur.execute("ALTER TABLE sync_queue ADD COLUMN invoice_no VARCHAR(100) DEFAULT NULL")
+            except:
+                pass
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            print(f"[SYNC INIT WARNING] Could not create local sync table: {e}")
 
-    # 2. Supabase Cloud
+    # 2. Supabase Cloud (skip in local-only mode)
+    if not is_cloud_available():
+        print("[SYNC INIT] Cloud disabled or local-only mode. Skipping cloud sync_queue setup.")
+        return
     try:
         conn = psycopg2.connect(
             host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
@@ -1811,6 +1969,9 @@ def remap_ids_for_cloud(table_name, query, params, conn_local, cur_cloud, invoic
     return query, params
 
 def push_local_queue_to_cloud():
+    if not is_cloud_available():
+        print("[SYNC PUSH] Cloud disabled or local-only mode. Skipping push.")
+        return
     conn_local = None
     conn_cloud = None
     try:
@@ -1819,7 +1980,8 @@ def push_local_queue_to_cloud():
             port=Config.MYSQL_PORT,
             user=Config.MYSQL_USER,
             password=Config.MYSQL_PASSWORD,
-            database=Config.MYSQL_DB
+            database=Config.MYSQL_DB,
+            ssl_disabled=True
         )
         cur_local = conn_local.cursor(dictionary=True)
         cur_local.execute("SELECT * FROM sync_queue WHERE status = 'PENDING' ORDER BY id ASC")
@@ -1908,6 +2070,9 @@ def push_local_queue_to_cloud():
 
 def run_restore_process():
     global SYNC_SYSTEM_MODE, DB_STATUS
+    if is_local_only() or is_cloud_only():
+        log_sync_event("RESTORE_SKIP", "Restore skipped: not in hybrid/failover mode.")
+        return
     log_sync_event("RESTORE_START", "Starting restore and reconciliation sequence.")
     
     conn_local = None
@@ -1918,7 +2083,8 @@ def run_restore_process():
             port=Config.MYSQL_PORT,
             user=Config.MYSQL_USER,
             password=Config.MYSQL_PASSWORD,
-            database=Config.MYSQL_DB
+            database=Config.MYSQL_DB,
+            ssl_disabled=True
         )
         cur_local = conn_local.cursor(dictionary=True)
         
@@ -2047,6 +2213,36 @@ def db_sync_monitor_loop():
     
     while True:
         try:
+            mode = get_effective_mode()
+
+            # ── LOCAL ONLY MODE ──
+            if mode == 'local':
+                CLOUD_IS_ALIVE = False
+                SYNC_SYSTEM_MODE = "LOCAL_PRIMARY"
+                mysql_ok = check_mysql_health()
+                MYSQL_IS_ALIVE = mysql_ok
+                DB_STATUS = "local" if mysql_ok else "local_offline"
+                time.sleep(3)
+                continue
+
+            # ── CLOUD ONLY MODE ──
+            if mode == 'cloud':
+                MYSQL_IS_ALIVE = False
+                cloud_ok = check_cloud_health()
+                CLOUD_IS_ALIVE = cloud_ok
+                SYNC_SYSTEM_MODE = "CLOUD_FAILOVER"
+                DB_STATUS = "cloud" if cloud_ok else "cloud_offline"
+                time.sleep(3)
+                continue
+
+            # ── HYBRID/FAILOVER MODE ──
+            if not is_cloud_enabled():
+                CLOUD_IS_ALIVE = False
+                SYNC_SYSTEM_MODE = "LOCAL_PRIMARY"
+                DB_STATUS = "local"
+                time.sleep(3)
+                continue
+
             mysql_ok = check_mysql_health()
             cloud_ok = check_cloud_health()
             
@@ -2101,6 +2297,7 @@ def get_local_db_connection():
             database=Config.MYSQL_DB,
             connection_timeout=2,
             autocommit=Config.MYSQL_AUTOCOMMIT,
+            ssl_disabled=True
         )
         cursor = conn.cursor()
         cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
@@ -2115,7 +2312,35 @@ def get_local_db_connection():
 def get_db_connection():
     global DB_STATUS, MYSQL_IS_ALIVE, CLOUD_IS_ALIVE, SYNC_SYSTEM_MODE
     
+    mode = get_effective_mode()
+
+    # ── LOCAL ONLY MODE ──
+    if mode == 'local':
+        conn = get_local_db_connection()
+        if conn:
+            DB_STATUS = "local"
+            return conn
+        DB_STATUS = "local_offline"
+        return None
+
+    # ── CLOUD ONLY MODE ──
+    if mode == 'cloud':
+        conn = get_cloud_db_connection_direct()
+        if conn:
+            DB_STATUS = "cloud"
+            return SyncProxyConnection(conn, is_pg=True)
+        DB_STATUS = "cloud_offline"
+        return None
+
+    # ── HYBRID/FAILOVER MODE ──
     if SYNC_SYSTEM_MODE == "CLOUD_FAILOVER":
+        if not is_cloud_enabled():
+            conn = get_local_db_connection()
+            if conn:
+                DB_STATUS = "local"
+                SYNC_SYSTEM_MODE = "LOCAL_PRIMARY"
+                return conn
+            return None
         conn = get_cloud_db_connection_direct()
         if conn:
             DB_STATUS = "cloud"
@@ -2134,6 +2359,7 @@ def get_db_connection():
                 database=Config.MYSQL_DB,
                 connection_timeout=2,
                 autocommit=Config.MYSQL_AUTOCOMMIT,
+                ssl_disabled=True
             )
             cursor = conn.cursor()
             cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
@@ -2154,10 +2380,11 @@ def get_db_connection():
             return SyncProxyConnection(conn, is_pg=False)
     except Exception as local_err:
         MYSQL_IS_ALIVE = False
-        conn = get_cloud_db_connection_direct()
-        if conn:
-            DB_STATUS = "cloud"
-            return SyncProxyConnection(conn, is_pg=True)
+        if is_cloud_enabled():
+            conn = get_cloud_db_connection_direct()
+            if conn:
+                DB_STATUS = "cloud"
+                return SyncProxyConnection(conn, is_pg=True)
             
     return None
 
@@ -2182,15 +2409,23 @@ def is_retryable_db_error(exc):
 
 
 def ensure_billing_performance_indexes():
+    if is_cloud_only():
+        return
     index_statements = (
         "CREATE INDEX idx_bills_date_status_created_by ON bills (bill_date, status, created_by)",
         "CREATE INDEX idx_bill_items_bill_id ON bill_items (bill_id)",
         "CREATE INDEX idx_bill_items_product_name ON bill_items (product_name)",
         "CREATE INDEX idx_stock_movements_bill_id ON stock_movements (bill_id)",
         "CREATE INDEX idx_returns_log_bill_id ON returns_log (bill_id)",
-        "CREATE INDEX idx_expenses_date_group ON expenses (expense_date, expense_group)",
-        "CREATE INDEX idx_sync_queue_status_id ON sync_queue (status, id)",
-        "CREATE INDEX idx_sync_queue_invoice_status ON sync_queue (invoice_no, status)",
+        "CREATE INDEX idx_returns_log_product_code ON returns_log (product_code)",
+        "CREATE INDEX idx_returns_log_return_date ON returns_log (return_date)",
+        "CREATE INDEX idx_audit_logs_table_name ON audit_logs (table_name)",
+        "CREATE INDEX idx_audit_logs_record_id ON audit_logs (record_id)",
+        "CREATE INDEX idx_audit_logs_action ON audit_logs (action)",
+        "CREATE INDEX idx_denominations_balance_id ON denominations (balance_id)",
+        "CREATE INDEX idx_sync_queue_status ON sync_queue (status)",
+        "CREATE INDEX idx_sync_queue_invoice_no ON sync_queue (invoice_no)",
+        "CREATE INDEX idx_sync_queue_table_name ON sync_queue (table_name)",
     )
     conn = None
     cursor = None
@@ -2203,6 +2438,7 @@ def ensure_billing_performance_indexes():
             database=Config.MYSQL_DB,
             connection_timeout=2,
             autocommit=True,
+            ssl_disabled=True
         )
         cursor = conn.cursor()
         for statement in index_statements:
@@ -2223,8 +2459,44 @@ def ensure_billing_performance_indexes():
 def get_login_db_connection():
     global DB_STATUS, MYSQL_IS_ALIVE, SYNC_SYSTEM_MODE, LAST_CONNECTION_ERROR
     LAST_CONNECTION_ERROR = None
-    
+
+    mode = get_effective_mode()
+
+    # ── LOCAL ONLY MODE ──
+    if mode == 'local':
+        try:
+            conn = mysql.connector.connect(
+                host=Config.MYSQL_HOST,
+                port=Config.MYSQL_PORT,
+                user=Config.MYSQL_USER,
+                password=Config.MYSQL_PASSWORD,
+                database=Config.MYSQL_DB,
+                connection_timeout=2,
+                autocommit=Config.MYSQL_AUTOCOMMIT,
+                ssl_disabled=True
+            )
+            cursor = conn.cursor()
+            cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
+            cursor.close()
+            MYSQL_IS_ALIVE = True
+            DB_STATUS = "local"
+            return conn
+        except Exception as e:
+            log_error(f"[LOGIN DB ERROR] Local MySQL: {e}")
+            LAST_CONNECTION_ERROR = f"Local MySQL Error: {e}"
+            MYSQL_IS_ALIVE = False
+            DB_STATUS = "local_offline"
+            return None
+
+    # ── CLOUD ONLY MODE ──
+    if mode == 'cloud':
+        return get_cloud_db_connection_direct()
+
+    # ── HYBRID/FAILOVER MODE ──
     if SYNC_SYSTEM_MODE == "CLOUD_FAILOVER":
+        if not is_cloud_enabled():
+            print("[LOGIN DB] Cloud failover disabled by user. Trying local.")
+            return get_local_db_connection()
         return get_cloud_db_connection_direct()
         
     try:
@@ -2236,6 +2508,7 @@ def get_login_db_connection():
             database=Config.MYSQL_DB,
             connection_timeout=2,
             autocommit=Config.MYSQL_AUTOCOMMIT,
+            ssl_disabled=True
         )
         cursor = conn.cursor()
         cursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
@@ -2248,16 +2521,100 @@ def get_login_db_connection():
         LAST_CONNECTION_ERROR = f"Local MySQL Error: {e}"
         MYSQL_IS_ALIVE = False
         
+    if not is_cloud_enabled():
+        print("[LOGIN DB] Cloud fallback disabled by user. No cloud connection attempted.")
+        return None
     return get_cloud_db_connection_direct()
+
+@app.route('/api/cloud/status')
+def get_cloud_status():
+    return jsonify({
+        'cloud_enabled': is_cloud_enabled(),
+        'cloud_alive': CLOUD_IS_ALIVE,
+        'database_mode': Config.DATABASE_MODE,
+        'sync_mode': SYNC_SYSTEM_MODE
+    })
+
+@app.route('/api/cloud/toggle', methods=['POST'])
+def toggle_cloud():
+    data = request.get_json() or {}
+    enabled = bool(data.get('enabled', True))
+    Config.CLOUD_ENABLED = enabled
+    
+    # Save to config file
+    try:
+        config_path = getattr(Config, 'ACTIVE_CONFIG_PATH', None)
+        if config_path and os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                cfg = json.load(f)
+            cfg['CLOUD_ENABLED'] = enabled
+            with open(config_path, 'w') as f:
+                json.dump(cfg, f, indent=4)
+    except Exception as e:
+        print(f"[CONFIG] Failed to save cloud toggle: {e}")
+    
+    # Respect DATABASE_MODE: if local-only, cloud toggle is ignored
+    global CLOUD_IS_ALIVE, SYNC_SYSTEM_MODE, DB_STATUS
+    if not enabled or is_local_only():
+        CLOUD_IS_ALIVE = False
+        SYNC_SYSTEM_MODE = "LOCAL_PRIMARY"
+        DB_STATUS = "local"
+    
+    msg = 'Cloud sync disabled.' if not enabled else 'Cloud sync will resume.'
+    return jsonify({
+        'status': 'success',
+        'cloud_enabled': enabled,
+        'message': f"Cloud {'enabled' if enabled else 'disabled'}. {msg}"
+    })
+
 
 @app.route('/api/db-status')
 def get_db_status_route():
-    global DB_STATUS, MYSQL_IS_ALIVE
+    global DB_STATUS, MYSQL_IS_ALIVE, CLOUD_IS_ALIVE
+    mode = get_effective_mode()
+
+    if mode == 'local':
+        if MYSQL_IS_ALIVE:
+            return jsonify({
+                'status': 'local',
+                'label': 'Local MySQL',
+                'color': '#10b981',
+                'mode': 'local',
+                'alive': True
+            })
+        return jsonify({
+            'status': 'local_offline',
+            'label': 'Local Server is OFF',
+            'color': '#ef4444',
+            'mode': 'local',
+            'alive': False
+        })
+
+    if mode == 'cloud':
+        if CLOUD_IS_ALIVE:
+            return jsonify({
+                'status': 'cloud',
+                'label': 'Supabase Cloud',
+                'color': '#a855f7',
+                'mode': 'cloud',
+                'alive': True
+            })
+        return jsonify({
+            'status': 'cloud_offline',
+            'label': 'Cloud Server is OFF',
+            'color': '#ef4444',
+            'mode': 'cloud',
+            'alive': False
+        })
+
     current_status = "local" if MYSQL_IS_ALIVE else "cloud"
+    alive = MYSQL_IS_ALIVE if current_status == 'local' else CLOUD_IS_ALIVE
     return jsonify({
         'status': current_status,
         'label': 'Local MySQL' if current_status == 'local' else 'Supabase Cloud',
-        'color': '#10b981' if current_status == 'local' else '#a855f7'
+        'color': '#10b981' if current_status == 'local' else '#a855f7',
+        'mode': 'failover',
+        'alive': alive
     })
 
 @app.route('/api/config/server-ip', methods=['GET', 'POST'])
@@ -2294,10 +2651,13 @@ def manage_server_ip():
                 json.dump(config_data, f, indent=4)
         
         # 3. Reset DB Pool to force reconnect
-        global db_pool, SYNC_SYSTEM_MODE
+        global db_pool, SYNC_SYSTEM_MODE, DB_STATUS, CLOUD_IS_ALIVE
         db_pool = None 
         if new_mode == 'cloud':
             SYNC_SYSTEM_MODE = "CLOUD_FAILOVER"
+        elif new_mode == 'local':
+            SYNC_SYSTEM_MODE = "LOCAL_PRIMARY"
+            CLOUD_IS_ALIVE = False
         else:
             SYNC_SYSTEM_MODE = "LOCAL_PRIMARY"
         
@@ -2464,57 +2824,71 @@ def wipe_both_databases():
 
     results = {}
 
+    wipe_mode = get_effective_mode()
+
     # ── 1. Wipe LOCAL MySQL ────────────────────────────────────────────────
-    try:
-        mysql_conn = mysql.connector.connect(
-            host=Config.MYSQL_HOST,
-            port=Config.MYSQL_PORT,
-            user=Config.MYSQL_USER,
-            password=Config.MYSQL_PASSWORD,
-            database=Config.MYSQL_DB,
-            connection_timeout=3,
-        )
-        mcur = mysql_conn.cursor()
-        mcur.execute("SET FOREIGN_KEY_CHECKS = 0")
-        for tbl in TRANSACTION_TABLES:
-            try:
-                mcur.execute(f"TRUNCATE TABLE {tbl}")
-            except Exception as te:
-                print(f"[WIPE LOCAL] {tbl}: {te}")
-        mcur.execute("SET FOREIGN_KEY_CHECKS = 1")
-        mysql_conn.commit()
-        mysql_conn.close()
-        results['local_mysql'] = 'wiped'
-        print("[WIPE] Local MySQL cleared successfully.")
-    except Exception as e:
-        results['local_mysql'] = f'skipped ({e})'
-        print(f"[WIPE] Local MySQL not available: {e}")
+    if wipe_mode == 'cloud':
+        results['local_mysql'] = 'skipped (cloud-only mode)'
+        print("[WIPE] Cloud-only mode. Skipping local MySQL wipe.")
+    else:
+        try:
+            mysql_conn = mysql.connector.connect(
+                host=Config.MYSQL_HOST,
+                port=Config.MYSQL_PORT,
+                user=Config.MYSQL_USER,
+                password=Config.MYSQL_PASSWORD,
+                database=Config.MYSQL_DB,
+                connection_timeout=3,
+                ssl_disabled=True
+            )
+            mcur = mysql_conn.cursor()
+            mcur.execute("SET FOREIGN_KEY_CHECKS = 0")
+            for tbl in TRANSACTION_TABLES:
+                try:
+                    mcur.execute(f"TRUNCATE TABLE {tbl}")
+                except Exception as te:
+                    print(f"[WIPE LOCAL] {tbl}: {te}")
+            mcur.execute("SET FOREIGN_KEY_CHECKS = 1")
+            mysql_conn.commit()
+            mysql_conn.close()
+            results['local_mysql'] = 'wiped'
+            print("[WIPE] Local MySQL cleared successfully.")
+        except Exception as e:
+            results['local_mysql'] = f'skipped ({e})'
+            print(f"[WIPE] Local MySQL not available: {e}")
 
     # ── 2. Wipe CLOUD Supabase ────────────────────────────────────────────
-    try:
-        raw_pg = psycopg2.connect(
-            host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
-            port=6543,
-            database="postgres",
-            user="postgres",
-            password=SUPABASE_PASSWORD,
-            connect_timeout=5
-        )
-        pgcur = raw_pg.cursor()
-        for tbl in TRANSACTION_TABLES:
-            try:
-                pgcur.execute(f"TRUNCATE TABLE {tbl} CASCADE")
-                raw_pg.commit()
-            except Exception as te:
-                raw_pg.rollback()
-                print(f"[WIPE CLOUD] {tbl}: {te}")
-        pgcur.close()
-        raw_pg.close()
-        results['supabase_cloud'] = 'wiped'
-        print("[WIPE] Supabase cloud cleared successfully.")
-    except Exception as e:
-        results['supabase_cloud'] = f'skipped ({e})'
-        print(f"[WIPE] Supabase not available: {e}")
+    if wipe_mode == 'local':
+        results['supabase_cloud'] = 'skipped (local-only mode)'
+        print("[WIPE] Local-only mode. Skipping cloud wipe.")
+    elif not is_cloud_enabled():
+        results['supabase_cloud'] = 'skipped (cloud disabled by user)'
+        print("[WIPE] Cloud disabled by user. Skipping cloud wipe.")
+    else:
+        try:
+            raw_pg = psycopg2.connect(
+                host=f"db.{SUPABASE_PROJECT_ID}.supabase.co",
+                port=6543,
+                database="postgres",
+                user="postgres",
+                password=SUPABASE_PASSWORD,
+                connect_timeout=5
+            )
+            pgcur = raw_pg.cursor()
+            for tbl in TRANSACTION_TABLES:
+                try:
+                    pgcur.execute(f"TRUNCATE TABLE {tbl} CASCADE")
+                    raw_pg.commit()
+                except Exception as te:
+                    raw_pg.rollback()
+                    print(f"[WIPE CLOUD] {tbl}: {te}")
+            pgcur.close()
+            raw_pg.close()
+            results['supabase_cloud'] = 'wiped'
+            print("[WIPE] Supabase cloud cleared successfully.")
+        except Exception as e:
+            results['supabase_cloud'] = f'skipped ({e})'
+            print(f"[WIPE] Supabase not available: {e}")
 
     return jsonify({
         'status': 'success',
@@ -2769,33 +3143,42 @@ def evolve_brain_realtime(bill_id=None):
         log_healing_event('NEURAL_CORE', 'CALIBRATING', '', f'Initializing network weight optimization for {bill_display}.')
         
         updated_thresholds = 0
+        
+        # Batch query: fetch 30-day sales for ALL products at once instead of N+1
+        cursor.execute("""
+            SELECT bi.product_name, SUM(bi.qty) as total_sold
+            FROM bill_items bi
+            JOIN bills b ON bi.bill_id = b.id
+            WHERE b.status != 'Cancelled' AND b.bill_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            GROUP BY bi.product_name
+        """)
+        sales_map = {}
+        for row in cursor.fetchall():
+            name = row['product_name']
+            sales_map[name] = float((row['total_sold']) or 0)
+        
+        # Batch query: fetch current thresholds for ALL products at once
+        cursor.execute("SELECT name, min_threshold FROM products WHERE name IN (%s)" % ','.join(['%s'] * max(len(products_to_update), 1)), tuple(products_to_update) if products_to_update else ())
+        threshold_map = {}
+        for row in cursor.fetchall():
+            threshold_map[row['name']] = float(row['min_threshold'] or 0)
+        
+        # Update thresholds in batch
+        updates_to_apply = []
         for name in products_to_update:
-            # Fetch last 30 days of sales qty for this product
-            cursor.execute("""
-                SELECT SUM(bi.qty) as total_sold
-                FROM bill_items bi
-                JOIN bills b ON bi.bill_id = b.id
-                WHERE b.status != 'Cancelled' AND bi.product_name = %s AND b.bill_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            """, (name,))
-            sales_data = cursor.fetchone()
-            total_sold = float((sales_data['total_sold'] if isinstance(sales_data, dict) else sales_data[0]) or 0)
-            
-            # Calculate daily sales rate
+            total_sold = sales_map.get(name, 0)
             daily_rate = total_sold / 30.0
-            
-            # Auto-evolve min_threshold: safety stock for 10 days
             suggested_min = max(5.0, math.ceil(daily_rate * 10.0))
-            
-            # Check current threshold to see if we've updated it
-            cursor.execute("SELECT min_threshold FROM products WHERE name = %s", (name,))
-            prod_info = cursor.fetchone()
-            current_min = float((prod_info['min_threshold'] if isinstance(prod_info, dict) else prod_info[0]) if prod_info else 0)
+            current_min = threshold_map.get(name, 0)
             
             if suggested_min != current_min:
-                # Write back to products table safely
-                cursor.execute("UPDATE products SET min_threshold = %s WHERE name = %s", (suggested_min, name))
+                updates_to_apply.append((suggested_min, name))
                 log_healing_event('NEURAL_CORE', 'THRESHOLD_ADJUSTED', '', f"Optimized '{name}' safety stock to {suggested_min} (Rate: {daily_rate:.2f}/day)")
                 updated_thresholds += 1
+        
+        # Execute batch updates
+        if updates_to_apply:
+            cursor.executemany("UPDATE products SET min_threshold = %s WHERE name = %s", updates_to_apply)
             
         # 2. Adjust category forecasting multipliers in seasonal_history based on recent sales velocity
         cursor.execute("""
@@ -2973,6 +3356,9 @@ def log_audit(cursor, action, table_name, record_id, old_val=None, new_val=None)
         print(f"Audit Log Error: {e}")
 
 def check_and_init_db():
+    if is_cloud_only():
+        print("[DB INIT] Cloud-only mode. Skipping local MySQL initialization.")
+        return
     print("Initializing Database...")
     try:
         # 1. Connect to MySQL Server
@@ -2980,7 +3366,8 @@ def check_and_init_db():
             host=Config.MYSQL_HOST,
             port=Config.MYSQL_PORT,
             user=Config.MYSQL_USER,
-            password=Config.MYSQL_PASSWORD
+            password=Config.MYSQL_PASSWORD,
+            ssl_disabled=True
         )
         cursor = conn.cursor()
         
@@ -3197,6 +3584,9 @@ def check_and_init_db():
 
 def ensure_cloud_tables():
     """Ensure all required tables exist in Supabase (PostgreSQL). Called at startup."""
+    if not is_cloud_available():
+        print("[CLOUD INIT] Cloud disabled or local-only mode. Skipping cloud table setup.")
+        return
     print("[CLOUD INIT] Ensuring Supabase tables exist...")
     try:
         raw_conn = psycopg2.connect(
@@ -3485,7 +3875,14 @@ def login():
                 flash('Invalid credentials. Please try again.', 'error')
         else:
             global LAST_CONNECTION_ERROR
-            if LAST_CONNECTION_ERROR:
+            mode = get_effective_mode()
+            if mode == 'local':
+                flash('Local Server is OFF! Please check if MySQL is running on the server PC.', 'error')
+            elif mode == 'cloud':
+                flash('Cloud Server is OFF! Please check your internet connection or Supabase status.', 'error')
+            elif not is_cloud_enabled():
+                flash('Database connection failed! (Cloud sync disabled & Local MySQL unavailable. Please check if MySQL server is running.)', 'error')
+            elif LAST_CONNECTION_ERROR:
                 flash(f'Database connection failed! ({LAST_CONNECTION_ERROR})', 'error')
             elif SYNC_SYSTEM_MODE == "CLOUD_FAILOVER":
                 flash('Database connection failed! (Could not connect to Supabase Cloud. Check internet connection.)', 'error')
@@ -4598,7 +4995,8 @@ def api_sync_status():
             port=Config.MYSQL_PORT,
             user=Config.MYSQL_USER,
             password=Config.MYSQL_PASSWORD,
-            database=Config.MYSQL_DB
+            database=Config.MYSQL_DB,
+            ssl_disabled=True
         )
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM sync_queue WHERE status = 'PENDING'")
@@ -4620,11 +5018,13 @@ def api_sync_status():
     except:
         pass
 
+    db_mode = get_effective_mode()
     return jsonify({
         'status': 'success',
         'mode': SYNC_SYSTEM_MODE,
-        'mysql': 'ONLINE' if check_mysql_health() else 'OFFLINE',
-        'cloud': 'ONLINE' if check_cloud_health() else 'OFFLINE',
+        'database_mode': db_mode,
+        'mysql': 'OFFLINE' if db_mode == 'cloud' else ('ONLINE' if check_mysql_health() else 'OFFLINE'),
+        'cloud': 'OFFLINE' if (db_mode == 'local' or not is_cloud_enabled()) else ('ONLINE' if check_cloud_health() else 'OFFLINE'),
         'local_queue_pending': local_pending,
         'cloud_queue_pending': cloud_pending,
         'logs': SYNC_LOGS[:30]
@@ -4639,7 +5039,17 @@ def api_sync_toggle_mode():
     target_mode = data.get('mode')
     
     global SYNC_SYSTEM_MODE, DB_STATUS
+    
+    # In local-only or cloud-only mode, admin cannot override the mode
+    mode = get_effective_mode()
+    if mode == 'local':
+        return jsonify({'status': 'error', 'message': 'System is in LOCAL-ONLY mode. Change Database Mode from Login to use failover.'}), 400
+    if mode == 'cloud':
+        return jsonify({'status': 'error', 'message': 'System is in CLOUD-ONLY mode. Change Database Mode from Login to use failover.'}), 400
+    
     if target_mode in ("LOCAL_PRIMARY", "CLOUD_FAILOVER"):
+        if target_mode == "CLOUD_FAILOVER" and not is_cloud_enabled():
+            return jsonify({'status': 'error', 'message': 'Cloud is disabled. Cannot switch to cloud failover mode.'}), 400
         SYNC_SYSTEM_MODE = target_mode
         DB_STATUS = "local" if target_mode == "LOCAL_PRIMARY" else "cloud"
         log_sync_event("MANUAL_MODE_CHANGE", f"Admin manually switched mode to {target_mode}.")
@@ -4654,6 +5064,12 @@ def api_sync_force_action():
         
     data = request.json or {}
     action = data.get('action')
+    
+    mode = get_effective_mode()
+    if mode == 'local':
+        return jsonify({'status': 'error', 'message': 'LOCAL-ONLY mode: no cloud sync available.'}), 400
+    if mode == 'cloud':
+        return jsonify({'status': 'error', 'message': 'CLOUD-ONLY mode: data is already in cloud.'}), 400
     
     global SYNC_SYSTEM_MODE
     if action == 'push':
@@ -4688,12 +5104,13 @@ def api_maintenance_status():
         mysql_alive = is_port_open(Config.MYSQL_PORT, Config.MYSQL_HOST)
     
     cloud_alive = False
-    try:
-        conn = psycopg2.connect(CLOUD_DB_URL, connect_timeout=2)
-        conn.close()
-        cloud_alive = True
-    except:
-        pass
+    if is_cloud_available():
+        try:
+            conn = psycopg2.connect(CLOUD_DB_URL, connect_timeout=2)
+            conn.close()
+            cloud_alive = True
+        except:
+            pass
         
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -4910,10 +5327,6 @@ def delete_user(uid):
     except Exception as e:
         if conn: conn.rollback(); conn.close()
         return jsonify({'status': 'error', 'message': str(e)}), 500
-
-@app.route('/admin/masters/categories')
-def admin_categories():
-    return render_template('admin/masters/categories.html')
 
 @app.route('/admin/stock/manage')
 def admin_stock_manage():
@@ -5542,43 +5955,27 @@ def get_closure_report():
         user_filter = " AND b.created_by = %s"
         query_params.append(session.get('username'))
 
-    # Category-specific filtering based on Counter
+    # Category-specific filtering based on Counter is disabled as all products should be included in all reports, but we keep the title/text designations
     username = session.get('username', '').lower()
     cat_filter = ""
-    if username in ['counter1', 'counter2']:
-        cat_filter = " AND (p.category LIKE '%OIL%')"
-    elif username in ['counter3', 'counter4']:
-        cat_filter = " AND (p.category LIKE '%CHOCO%')"
 
     try:
-        # 1. Sales Summary (Filtered by Category if Counter)
-        if cat_filter:
-            cursor.execute(f"""
-                SELECT 
-                    COUNT(DISTINCT b.id) as bill_count,
-                    SUM(bi.amount) as total_sales,
-                    SUM(CASE WHEN UPPER(b.payment_mode) = 'CASH' THEN bi.amount ELSE 0 END) as cash_sales,
-                    SUM(CASE WHEN UPPER(b.payment_mode) = 'CARD' THEN bi.amount ELSE 0 END) as card_sales,
-                    SUM(CASE WHEN UPPER(b.payment_mode) = 'UPI' THEN bi.amount ELSE 0 END) as upi_sales
-                FROM bill_items bi
-                JOIN bills b ON bi.bill_id = b.id
-                LEFT JOIN products p ON bi.product_name = p.name
-                WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter}{cat_filter}
-            """, tuple(query_params))
-        else:
-            cursor.execute(f"""
-                SELECT 
-                    COUNT(*) as bill_count,
-                    SUM(total_amount) as total_sales,
-                    SUM(CASE WHEN UPPER(payment_mode) = 'CASH' THEN total_amount ELSE 0 END) as cash_sales,
-                    SUM(CASE WHEN UPPER(payment_mode) = 'CARD' THEN total_amount ELSE 0 END) as card_sales,
-                    SUM(CASE WHEN UPPER(payment_mode) = 'UPI' THEN total_amount ELSE 0 END) as upi_sales
-                FROM bills b
-                WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter.replace('b.', '')}
-            """, tuple(query_params))
+        # 1. Sales Summary — always count ALL bills by this user (no cat_filter here)
+        # cat_filter only applies to the category breakdown table, not total sales.
+        cursor.execute(f"""
+            SELECT 
+                COUNT(*) as bill_count,
+                SUM(total_amount) as total_sales,
+                SUM(CASE WHEN UPPER(payment_mode) = 'CASH' THEN total_amount ELSE 0 END) as cash_sales,
+                SUM(CASE WHEN UPPER(payment_mode) = 'CARD' THEN total_amount ELSE 0 END) as card_sales,
+                SUM(CASE WHEN UPPER(payment_mode) = 'UPI' THEN total_amount ELSE 0 END) as upi_sales
+            FROM bills b
+            WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter}
+        """, tuple(query_params))
             
-        sales = cursor.fetchone()
-        for k in sales: sales[k] = float(sales[k] or 0)
+        sales = cursor.fetchone() or {}
+        for k in list(sales.keys()): sales[k] = float(sales[k] or 0)
+        if 'bill_count' not in sales: sales = {'bill_count': 0, 'total_sales': 0.0, 'cash_sales': 0.0, 'card_sales': 0.0, 'upi_sales': 0.0}
         sales['credit_sales'] = 0.0
         sales['avg_bill'] = sales['total_sales'] / sales['bill_count'] if sales['bill_count'] > 0 else 0
 
@@ -5660,7 +6057,7 @@ def get_closure_report():
         cursor.execute("SELECT * FROM cash_balance WHERE balance_date = %s", (report_date,))
         balance = cursor.fetchone()
         if not balance:
-            balance = {'opening_balance': 2500, 'actual_closing': 0}
+            balance = {'opening_balance': 2500, 'actual_closing': 0, 'difference': 0}
         else:
             balance['opening_balance'] = float(balance['opening_balance'])
             balance['actual_closing'] = float(balance['actual_closing'])
@@ -5685,8 +6082,8 @@ def get_closure_report():
         # 7. Counter Breakdown
         cursor.execute(f"""
             SELECT created_by as counter, SUM(total_amount) as amount
-            FROM bills
-            WHERE DATE(bill_date) = %s AND status != 'Cancelled'{user_filter}
+            FROM bills b
+            WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter}
             GROUP BY created_by
         """, tuple(query_params))
         counter_breakdown = cursor.fetchall()
@@ -6798,10 +7195,16 @@ def get_dashboard_realtime():
     hourly_map = {int(row['hour']): float(row['revenue']) for row in hourly_raw}
     hourly_data = []
     labels = []
-    for h in range(9, 22):
-        ampm = 'AM' if h < 12 else 'PM'
-        display_h = h if h <= 12 else h - 12
-        labels.append(f"{display_h}{ampm}")
+    for h in range(24):
+        if h == 0:
+            display_str = "12AM"
+        elif h == 12:
+            display_str = "12PM"
+        elif h < 12:
+            display_str = f"{h}AM"
+        else:
+            display_str = f"{h-12}PM"
+        labels.append(display_str)
         hourly_data.append(hourly_map.get(h, 0))
 
     cursor.execute(f"""
@@ -6855,7 +7258,7 @@ def get_next_invoice():
     conn = get_db_connection()
     if not conn: return jsonify({'next_id': "SS-0", 'display_id': 'SS-0'})
     cursor = conn.cursor()
-    cursor.execute("SELECT `last_value` FROM bill_sequences WHERE seq_date = %s", (global_key,))
+    cursor.execute("SELECT `last_value` FROM bill_sequences WHERE seq_date = %s", (global_key.strftime('%Y-%m-%d'),))
     res = cursor.fetchone()
     next_val = 1
     if res:
@@ -6960,7 +7363,7 @@ def get_all_bills_api():
     if not conn: return jsonify([])
     cursor = conn.cursor(dictionary=True)
     # Fetching all columns needed by the Bill-wise report
-    cursor.execute("SELECT id, invoice_no, total_amount, bill_date, status, discount, prev_total, source_bill_id, payment_mode, tsc_percent, tsc_amount FROM bills ORDER BY id ASC")
+    cursor.execute("SELECT id, invoice_no, total_amount, bill_date, status, discount, prev_total, source_bill_id, payment_mode, tsc_percent, tsc_amount FROM bills ORDER BY CAST(SUBSTRING(invoice_no, 4) AS UNSIGNED) ASC")
     bills = cursor.fetchall()
     conn.close()
     for b in bills:
@@ -7192,39 +7595,6 @@ def get_report_categories():
     conn.close()
     return jsonify(cats)
 
-@app.route('/api/inventory/categories', methods=['GET', 'POST', 'DELETE'])
-@app.route('/api/inventory/categories/<int:cat_id>', methods=['DELETE'])
-def inventory_categories(cat_id=None):
-    conn = get_db_connection()
-    if not conn: return jsonify([])
-    cursor = conn.cursor(dictionary=True)
-    
-    if request.method == 'GET':
-        cursor.execute("SELECT * FROM categories ORDER BY name")
-        res = cursor.fetchall()
-        conn.close()
-        return jsonify(res)
-        
-    elif request.method == 'POST':
-        data = request.json
-        try:
-            cursor.execute("INSERT INTO categories (name) VALUES (%s)", (data['name'],))
-            conn.commit(); conn.close()
-            return jsonify({'status': 'success'})
-        except Exception as e:
-            if conn: conn.rollback(); conn.close()
-            return jsonify({'status': 'error', 'message': str(e)}), 500
-            
-    elif request.method == 'DELETE':
-        cid = cat_id or request.json.get('id')
-        try:
-            cursor.execute("DELETE FROM categories WHERE id = %s", (cid,))
-            conn.commit(); conn.close()
-            return jsonify({'status': 'success'})
-        except Exception as e:
-            if conn: conn.rollback(); conn.close()
-            return jsonify({'status': 'error', 'message': str(e)}), 500
-
 @app.route('/api/inventory/next-barcode')
 def get_next_barcode():
     conn = get_db_connection()
@@ -7423,11 +7793,11 @@ def api_stock_transfer():
             
         if is_auto:
             transfer_key = datetime.date(2000, 1, 2)
-            cursor.execute("SELECT `last_value` FROM bill_sequences WHERE seq_date = %s FOR UPDATE", (transfer_key,))
+            cursor.execute("SELECT `last_value` FROM bill_sequences WHERE seq_date = %s FOR UPDATE", (transfer_key.strftime('%Y-%m-%d'),))
             res = cursor.fetchone()
             if res:
                 next_val = res['last_value'] + 1
-                cursor.execute("UPDATE bill_sequences SET `last_value` = %s WHERE seq_date = %s", (next_val, transfer_key))
+                cursor.execute("UPDATE bill_sequences SET `last_value` = %s WHERE seq_date = %s", (next_val, transfer_key.strftime('%Y-%m-%d')))
             else:
                 next_val = 1
                 cursor.execute("INSERT INTO bill_sequences (seq_date, `last_value`) VALUES (%s, %s)", (transfer_key, next_val))
@@ -7522,7 +7892,7 @@ if __name__ == '__main__':
         url = f"http://{host}:{Config.SERVER_PORT}/"
         if webview and not os.environ.get("NO_WEBVIEW"):
             print("Launching Desktop Window...")
-            webview.create_window("MaplePro - Billing System", url, width=1280, height=800, min_size=(1024, 768))
+            webview.create_window("MaplePro Billing System - Sagar Super", url, width=1280, height=800, min_size=(1024, 768))
             webview.start()
         else:
             if not os.environ.get("NO_WEBVIEW"):

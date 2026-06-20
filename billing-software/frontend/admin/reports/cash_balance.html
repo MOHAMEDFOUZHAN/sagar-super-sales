@@ -40,39 +40,7 @@
 
 
 
-        @media print {
-
-            .denom-row {
-
-                background: white !important;
-
-                border-bottom: 1px solid black !important;
-
-                padding: 4px !important;
-
-                grid-template-columns: 80px 80px 120px;
-
-            }
-
-
-
-            .denom-input {
-
-                border: 1px solid black !important;
-
-                color: black !important;
-
-            }
-
-
-
-            h1, h2, h3 {
-
-                color: black !important;
-
-            }
-
-        }
+        
 
 
 
@@ -81,6 +49,7 @@
             display: none;
 
         }
+        .print-only-header { display: none; }
 
     </style>
 
@@ -119,14 +88,10 @@
 
 
         <div class="print-only-header">
-
-            <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER</h1>
-
-            <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Cash Balance & Denominations</p>
-
-            <p id="printRunDate" style="margin: 2px 0; font-weight: bold;"></p>
-
-            <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+            <h1>SAGAR SUPER</h1>
+            <p>Cash Balance & Denominations</p>
+            <p id="printDateRange"></p>
+        </div>
 
         </div>
 
@@ -194,11 +159,7 @@
 
     
 <style>
-    @media print {
-        .dynamic-footer {
-            display: none !important;
-        }
-    }
+    
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
     <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>

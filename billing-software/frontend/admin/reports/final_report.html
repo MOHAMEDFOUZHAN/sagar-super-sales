@@ -146,45 +146,7 @@
 
 
 
-        @media print {
-
-            .final-grid {
-
-                display: grid !important;
-
-                grid-template-columns: repeat(2, 1fr) !important;
-
-                gap: 15px !important;
-
-            }
-
-            .summary-card {
-
-                border: 1px solid black !important;
-
-                margin-bottom: 10px !important;
-
-                padding: 10px !important;
-
-                break-inside: avoid;
-
-            }
-
-            .summary-row {
-
-                border-bottom: 1px solid black !important;
-
-                padding: 5px 0 !important;
-
-            }
-
-            .summary-label, .summary-value {
-
-                color: black !important;
-
-            }
-
-        }
+        
 
 
 
@@ -193,6 +155,7 @@
             display: none;
 
         }
+        .print-only-header { display: none; }
 
     </style>
 
@@ -251,14 +214,10 @@
 
 
             <div class="print-only-header">
-
-                <h1 style="margin: 0; font-size: 2rem;">SAGAR SUPER</h1>
-
-                <p style="margin: 5px 0;">Final Daily Closure Report</p>
-
-                <p id="printDateRange" style="font-weight: bold;"></p>
-
-            </div>
+            <h1>SAGAR SUPER</h1>
+            <p>Final Daily Closure Report</p>
+            <p id="printDateRange"></p>
+        </div>
 
 
 
@@ -410,11 +369,7 @@
 
     
 <style>
-    @media print {
-        .dynamic-footer {
-            display: none !important;
-        }
-    }
+    
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
     <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>

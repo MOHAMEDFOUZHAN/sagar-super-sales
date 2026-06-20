@@ -420,7 +420,25 @@
 
             if (!confirm(confirmText)) return;
 
-
+            try {
+                const res = await fetch('/api/admin/system/reset-db', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode, password })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    showNotif(data.message);
+                    setTimeout(() => {
+                        window.location.href = mode === 'factory' ? '/login' : '/admin/dashboard';
+                    }, 2000);
+                } else {
+                    showNotif(data.message, true);
+                }
+            } catch (err) {
+                showNotif('Network error occurred.', true);
+            }
+        }
 
         async function wipeBothDbs() {
             const password = document.getElementById('pass_wipe_both').value;
@@ -460,43 +478,6 @@
                 statusEl.innerHTML = 'Network error.';
                 showNotif('Network error occurred.', true);
             }
-        }
-
-
-                    method: 'POST',
-
-                    headers: { 'Content-Type': 'application/json' },
-
-                    body: JSON.stringify({ mode, password })
-
-                });
-
-                const data = await res.json();
-
-
-
-                if (data.status === 'success') {
-
-                    showNotif(data.message);
-
-                    setTimeout(() => {
-
-                        window.location.href = mode === 'factory' ? '/login' : '/admin/dashboard';
-
-                    }, 2000);
-
-                } else {
-
-                    showNotif(data.message, true);
-
-                }
-
-            } catch (err) {
-
-                showNotif('Network error occurred.', true);
-
-            }
-
         }
 
 

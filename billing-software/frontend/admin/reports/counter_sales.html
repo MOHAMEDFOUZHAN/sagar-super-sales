@@ -135,46 +135,11 @@
             align-items: center;
 
         }
+        .print-only-header { display: none; }
 
 
 
-        @media print {
-
-            .counter-grid {
-
-                display: grid !important;
-
-                grid-template-columns: repeat(2, 1fr) !important;
-
-                gap: 15px !important;
-
-            }
-
-            .counter-card {
-
-                background: white !important;
-
-                border: 1px solid black !important;
-
-                break-inside: avoid;
-
-                padding: 15px !important;
-
-            }
-
-            .counter-name, .stat-value {
-
-                color: black !important;
-
-            }
-
-            .btn-view {
-
-                display: none !important;
-
-            }
-
-        }
+        
 
     </style>
 
@@ -270,11 +235,7 @@
 
     
 <style>
-    @media print {
-        .dynamic-footer {
-            display: none !important;
-        }
-    }
+    
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
     <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>

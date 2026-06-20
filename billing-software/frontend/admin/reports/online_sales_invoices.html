@@ -217,18 +217,11 @@
         .status-paid { background: rgba(16, 185, 129, 0.1); color: #10b981; }
 
         .status-cancelled { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .print-only-header { display: none; }
 
 
 
-        @media print {
-
-            .sub-nav, .filter-panel, .no-print {
-
-                display: none !important;
-
-            }
-
-        }
+        
 
     </style>
 
@@ -298,7 +291,7 @@
 
 
 
-            <div class="glass-panel" style="padding: 20px;">
+            <div class="glass-panel">
 
                 <div class="table-wrapper">
 
@@ -342,11 +335,7 @@
 
     
 <style>
-    @media print {
-        .dynamic-footer {
-            display: none !important;
-        }
-    }
+    
 </style>
 <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
     <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>

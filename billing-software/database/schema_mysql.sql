@@ -112,6 +112,9 @@ CREATE TABLE IF NOT EXISTS returns_log (
     action VARCHAR(50),
     created_by VARCHAR(50),
     return_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_returns_log_bill_id (bill_id),
+    INDEX idx_returns_log_product_code (product_code),
+    INDEX idx_returns_log_return_date (return_date),
     FOREIGN KEY (bill_id) REFERENCES bills(id) ON DELETE CASCADE
 );
 
@@ -136,7 +139,10 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     record_id INT,
     old_value TEXT,
     new_value TEXT,
-    action_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    action_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_audit_logs_table_name (table_name),
+    INDEX idx_audit_logs_record_id (record_id),
+    INDEX idx_audit_logs_action (action)
 );
 
 -- Cash Balance Table
@@ -156,7 +162,24 @@ CREATE TABLE IF NOT EXISTS denominations (
     balance_id INT,
     note_value INT,
     count INT,
+    INDEX idx_denominations_balance_id (balance_id),
     FOREIGN KEY (balance_id) REFERENCES cash_balance(id) ON DELETE CASCADE
+);
+
+-- Sync Queue Table (for offline-to-cloud sync)
+CREATE TABLE IF NOT EXISTS sync_queue (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    table_name VARCHAR(50) NOT NULL,
+    record_id INT,
+    operation_type VARCHAR(20) NOT NULL,
+    query_sql TEXT,
+    query_params TEXT,
+    status VARCHAR(20) DEFAULT 'PENDING',
+    invoice_no VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_sync_queue_status (status),
+    INDEX idx_sync_queue_invoice_no (invoice_no),
+    INDEX idx_sync_queue_table_name (table_name)
 );
 
 -- Default User IDs

@@ -190,59 +190,12 @@
 
 
 
-        @media print {
-
-            .reward-card {
-
-                break-inside: avoid;
-
-                margin-bottom: 20px;
-
-            }
-
-
-
-            .kpi-grid {
-
-                display: grid !important;
-
-                grid-template-columns: repeat(3, 1fr) !important;
-
-                gap: 10px !important;
-
-                margin-bottom: 20px !important;
-
-            }
-
-
-
-            canvas {
-
-                display: none !important;
-
-            }
-
-
-
-            .tab-content {
-
-                display: block !important;
-
-                opacity: 1 !important;
-
-                visibility: visible !important;
-
-            }
-
-        }
-
-
-
         .print-only-header {
 
             display: none;
 
         }
+        .print-only-header { display: none; }
 
     </style>
 
@@ -299,15 +252,9 @@
 
 
         <div class="print-only-header">
-
-            <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER</h1>
-
-            <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Loyalty & Commission Report</p>
-
-            <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
-
-            <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
-
+            <h1>SAGAR SUPER</h1>
+            <p>Loyalty & Commission Report</p>
+            <p id="printDateRange"></p>
         </div>
 
 
@@ -372,15 +319,15 @@
 
                     <div class="kpi-icon" style="color: var(--success); background: rgba(16, 185, 129, 0.1);">
 
-                        <i class="fa-solid fa-percent"></i>
+                        <i class="fa-solid fa-indian-rupee-sign"></i>
 
                     </div>
 
                     <div class="kpi-info">
 
-                        <h3 id="avgBizz">0%</h3>
+                        <h3 id="avgBizz">₹0.00</h3>
 
-                        <p>Avg Reward Rate</p>
+                        <p>Avg Reward Amount</p>
 
                     </div>
 
@@ -572,18 +519,7 @@
 
         </div>
 
-    
-<style>
-    @media print {
-        .dynamic-footer {
-            display: none !important;
-        }
-    }
-</style>
-<footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-    <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
-</footer>
-</main>
+    </main>
 
 
 
@@ -709,8 +645,6 @@
 
                     total += r.bizz_amount;
 
-                    sumPercent += r.bizz_percent;
-
                     count++;
 
                     prods.add(r.product_name);
@@ -723,7 +657,7 @@
 
             document.getElementById('uniqueProds').innerText = prods.size;
 
-            document.getElementById('avgBizz').innerText = count > 0 ? (sumPercent / count).toFixed(1) + '%' : '0%';
+            document.getElementById('avgBizz').innerText = count > 0 ? '\u20B9' + (total / count).toFixed(2) : '\u20B90.00';
 
             document.getElementById('printDateRange').innerText = `Period: ${new Date(document.getElementById('startDate').value).toLocaleDateString()} to ${new Date(document.getElementById('endDate').value).toLocaleDateString()}`;
 
@@ -753,7 +687,7 @@
 
                             <td>\u20B9${r.amount.toFixed(2)}</td>
 
-                            <td>${r.bizz_percent}%</td>
+                            <td>₹${r.bizz_percent}</td>
 
                             <td style="color: var(--warning); font-weight: 800;">\u20B9${r.bizz_amount.toFixed(2)}</td>
 
@@ -949,4 +883,3 @@
 
 
 </html>
-

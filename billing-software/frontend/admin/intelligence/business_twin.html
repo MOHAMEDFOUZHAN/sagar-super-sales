@@ -318,6 +318,38 @@
             transform: translateY(-1px);
         }
 
+        .mic-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            padding: 12px 18px;
+            border-radius: var(--radius-md);
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .mic-btn:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .mic-btn.active {
+            background: rgba(239, 68, 68, 0.25);
+            color: #ef4444 !important;
+            border-color: rgba(239, 68, 68, 0.4);
+            animation: pulse-mic 1.5s infinite;
+        }
+        @keyframes pulse-mic {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
         /* Typing indicator */
         .typing-indicator {
             display: flex;
@@ -428,8 +460,9 @@
                     <div class="terminal-dot green"></div>
                 </div>
                 <div class="terminal-title"><i class="fa-solid fa-terminal"></i> AI REASONING WORKSTATION</div>
+                <button class="btn" id="twinSpeakToggleBtn" style="padding: 4px 10px; font-size: 0.7rem; background: rgba(99, 102, 241, 0.2); margin-left: auto;" onclick="toggleTwinVoiceOutput()"><i class="fa-solid fa-volume-high"></i> VOICE: ON</button>
                 <button class="btn" style="padding: 4px 10px; font-size: 0.7rem; background: rgba(99, 102, 241, 0.2); margin-left: 10px;" onclick="promptShareEmail()"><i class="fa-solid fa-share-nodes"></i> SHARE EMAIL</button>
-                <div style="font-size: 0.7rem; color: var(--text-muted);">MODEL: LLAMA-3.3-70B</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted); margin-left: 10px;">MODEL: LLAMA-3.3-70B</div>
             </div>
 
             <div class="terminal-body" id="chatLogs">
@@ -449,6 +482,7 @@
 
             <div class="terminal-input-container">
                 <input type="text" class="terminal-input" id="terminalInput" placeholder="Enter custom command or ask a business question..." onkeypress="handleKeyPress(event)">
+                <button id="twinMicBtn" class="mic-btn" onclick="toggleTwinVoiceInput()" title="Voice Input"><i class="fa-solid fa-microphone"></i></button>
                 <button class="send-btn" id="sendBtn" onclick="sendCommand()">
                     <span>SEND</span> <i class="fa-solid fa-paper-plane"></i>
                 </button>
@@ -468,6 +502,105 @@
     </main>
 
     <script>
+        let twinVoiceOutputEnabled = localStorage.getItem('twin_voice_output_enabled') !== 'false';
+        let twinVoiceInputActive = false;
+        let twinSpeechRecognizer = null;
+
+        function updateTwinSpeakBtnUI() {
+            const btn = document.getElementById('twinSpeakToggleBtn');
+            if (btn) {
+                if (twinVoiceOutputEnabled) {
+                    btn.innerHTML = '<i class="fa-solid fa-volume-high"></i> VOICE: ON';
+                    btn.style.background = 'rgba(16, 185, 129, 0.2)'; // Green tint
+                    btn.style.color = '#10b981';
+                } else {
+                    btn.innerHTML = '<i class="fa-solid fa-volume-xmark"></i> VOICE: OFF';
+                    btn.style.background = 'rgba(255, 255, 255, 0.05)';
+                    btn.style.color = 'var(--text-muted)';
+                }
+            }
+        }
+
+        function toggleTwinVoiceOutput() {
+            twinVoiceOutputEnabled = !twinVoiceOutputEnabled;
+            localStorage.setItem('twin_voice_output_enabled', twinVoiceOutputEnabled ? 'true' : 'false');
+            updateTwinSpeakBtnUI();
+            if (!twinVoiceOutputEnabled) {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                }
+            }
+        }
+
+        function toggleTwinVoiceInput() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
+                return;
+            }
+
+            const micBtn = document.getElementById('twinMicBtn');
+            const inputEl = document.getElementById('terminalInput');
+
+            if (twinVoiceInputActive) {
+                if (twinSpeechRecognizer) twinSpeechRecognizer.stop();
+                return;
+            }
+
+            twinVoiceInputActive = true;
+            micBtn.classList.add('active');
+            inputEl.placeholder = "Listening...";
+
+            twinSpeechRecognizer = new SpeechRecognition();
+            twinSpeechRecognizer.continuous = false;
+            twinSpeechRecognizer.lang = 'en-US';
+            twinSpeechRecognizer.interimResults = false;
+            twinSpeechRecognizer.maxAlternatives = 1;
+
+            twinSpeechRecognizer.onresult = (event) => {
+                const speechToText = event.results[0][0].transcript;
+                inputEl.value = speechToText;
+                sendCommand();
+            };
+
+            twinSpeechRecognizer.onerror = (event) => {
+                console.error("Speech recognition error", event.error);
+            };
+
+            twinSpeechRecognizer.onend = () => {
+                twinVoiceInputActive = false;
+                micBtn.classList.remove('active');
+                inputEl.placeholder = "Enter custom command or ask a business question...";
+            };
+
+            twinSpeechRecognizer.start();
+        }
+
+        function speakTwinText(htmlContent) {
+            if ('speechSynthesis' in window) {
+                const tempDiv = document.createElement("div");
+                tempDiv.innerHTML = htmlContent;
+                let plainText = tempDiv.textContent || tempDiv.innerText || "";
+                
+                if (plainText.length > 800) {
+                    plainText = plainText.substring(0, 800) + "... and more details shown on terminal.";
+                }
+                
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(plainText);
+                utterance.lang = 'en-IN';
+                
+                const voices = window.speechSynthesis.getVoices();
+                const preferredVoice = voices.find(v => v.lang === 'en-IN' || v.lang.startsWith('en-'));
+                if (preferredVoice) utterance.voice = preferredVoice;
+                
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // Initialize UI
+        setTimeout(updateTwinSpeakBtnUI, 500);
+
         // Fetch stats to fill Telemetry Widgets
         async function fetchTelemetry() {
             try {
@@ -566,6 +699,9 @@
                     chatHistory.push({ role: 'assistant', content: data.answer });
                     if (chatHistory.length > 12) {
                         chatHistory.shift();
+                    }
+                    if (twinVoiceOutputEnabled) {
+                        speakTwinText(data.answer);
                     }
                 } else {
                     twinMsg.innerHTML = `<p style="color: var(--danger); font-weight: 700;"><i class="fa-solid fa-triangle-exclamation"></i> Error communicating with Twin AI</p><p style="font-size: 0.8rem; font-family: monospace;">${data.message}</p>`;

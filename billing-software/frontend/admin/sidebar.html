@@ -78,7 +78,7 @@
 </style>
 
 {% set is_ai_active = request.endpoint in ['admin_analytics', 'admin_intelligence_stock', 'admin_intelligence_twin'] or '/admin/intelligence/forecasting' in request.path %}
-{% set is_masters_active = request.endpoint in ['admin_products', 'admin_categories', 'admin_users'] %}
+{% set is_masters_active = request.endpoint in ['admin_products', 'admin_users'] %}
 {% set is_stock_active = request.endpoint in ['admin_stock_manage', 'admin_stock_transfer'] or 'stock_manage' in request.endpoint or 'stock_transfer' in request.endpoint %}
 {% set is_reports_active = 'billwise_sales' in request.endpoint or 'sales_report' in request.endpoint or 'daily_sales' in request.endpoint or 'detail_sales' in request.endpoint or 'total_sales' in request.endpoint or 'daily_stock' in request.endpoint or 'daily_position' in request.endpoint or 'cancelled_report' in request.endpoint or 'transfer_report' in request.endpoint or 'counter_wise' in request.endpoint or 'online_sales' in request.endpoint or 'final_report' in request.endpoint or 'final_sales_report' in request.endpoint or 'reports_expenses' in request.endpoint or 'reports_correction' in request.endpoint or 'change_sales' in request.endpoint or 'reports_cash' in request.endpoint or 'counter_sales' in request.endpoint or 'online_sales_reports' in request.endpoint or 'online_sales_invoices' in request.endpoint or 'final_report_admin' in request.endpoint %}
 {% set is_system_active = request.endpoint in ['admin_returns', 'admin_maintenance', 'admin_maintenance_health', 'admin_failover_sync', 'admin_network_diagnostics'] or 'admin_returns' in request.endpoint or 'admin_maintenance' in request.endpoint or 'admin_maintenance_health' in request.endpoint or 'admin_failover_sync' in request.endpoint or 'admin_network_diagnostics' in request.endpoint %}
@@ -142,12 +142,6 @@
                     <a href="{{ url_for('admin_products') }}"
                         class="nav-link {{ 'active' if request.endpoint == 'admin_products' else '' }}">
                         <i class="fa-solid fa-box"></i> Products
-                    </a>
-                </li>
-                <li>
-                    <a href="{{ url_for('admin_categories') }}"
-                        class="nav-link {{ 'active' if request.endpoint == 'admin_categories' else '' }}">
-                        <i class="fa-solid fa-layer-group"></i> Categories
                     </a>
                 </li>
                 <li>
@@ -402,7 +396,15 @@
                                 dot.style.background = "#10b981";
                                 dot.style.boxShadow = "0 0 6px #10b981";
                                 text.innerText = "LOCAL";
-                            } else {
+                            } else if (data.status === "local_offline") {
+                                container.style.background = "rgba(239, 68, 68, 0.05)";
+                                badge.style.background = "rgba(239, 68, 68, 0.15)";
+                                badge.style.color = "#ef4444";
+                                badge.style.border = "1px solid rgba(239, 68, 68, 0.3)";
+                                dot.style.background = "#ef4444";
+                                dot.style.boxShadow = "0 0 6px #ef4444";
+                                text.innerText = "LOCAL (OFF)";
+                            } else if (data.status === "cloud") {
                                 container.style.background = "rgba(168, 85, 247, 0.05)";
                                 badge.style.background = "rgba(168, 85, 247, 0.15)";
                                 badge.style.color = "#a855f7";
@@ -410,6 +412,22 @@
                                 dot.style.background = "#a855f7";
                                 dot.style.boxShadow = "0 0 6px #a855f7";
                                 text.innerText = "CLOUD";
+                            } else if (data.status === "cloud_offline") {
+                                container.style.background = "rgba(239, 68, 68, 0.05)";
+                                badge.style.background = "rgba(239, 68, 68, 0.15)";
+                                badge.style.color = "#ef4444";
+                                badge.style.border = "1px solid rgba(239, 68, 68, 0.3)";
+                                dot.style.background = "#ef4444";
+                                dot.style.boxShadow = "0 0 6px #ef4444";
+                                text.innerText = "CLOUD (OFF)";
+                            } else {
+                                container.style.background = "rgba(255, 255, 255, 0.02)";
+                                badge.style.background = "rgba(255, 255, 255, 0.08)";
+                                badge.style.color = "#888";
+                                badge.style.border = "1px solid rgba(255, 255, 255, 0.1)";
+                                dot.style.background = "#888";
+                                dot.style.boxShadow = "none";
+                                text.innerText = "UNKNOWN";
                             }
                         })
                         .catch(() => {

@@ -1,0 +1,37 @@
+[
+    {
+        "timestamp": "2026-06-12 18:13:58",
+        "severity": "ERROR",
+        "source": "Default Gateway",
+        "message": "Router offline - all client counters will lose connection.",
+        "action": "Check if main router is turned off. Verify router LAN ports are active."
+    },
+    {
+        "timestamp": "2026-06-12 18:11:15",
+        "severity": "WARN",
+        "source": "DNS Services",
+        "message": "DNS failure - local network is working, but internet is down.",
+        "action": "Verify internet subscription status. Restart the ISP fiber/modem box."
+    },
+    {
+        "timestamp": "2026-06-12 18:08:07",
+        "severity": "ERROR",
+        "source": "Ethernet",
+        "message": "Network cable unplugged on interface 'Ethernet'.",
+        "action": "Ensure LAN cable is clicked securely into the port and the router is powered on."
+    },
+    {
+        "timestamp": "2026-06-12 18:08:07",
+        "severity": "ERROR",
+        "source": "Local Area Connection* 3",
+        "message": "Network cable unplugged on interface 'Local Area Connection* 3'.",
+        "action": "Ensure LAN cable is clicked securely into the port and the router is powered on."
+    },
+    {
+        "timestamp": "2026-06-12 18:08:07",
+        "severity": "ERROR",
+        "source": "Local Area Connection* 4",
+        "message": "Network cable unplugged on interface 'Local Area Connection* 4'.",
+        "action": "Ensure LAN cable is clicked securely into the port and the router is powered on."
+    }
+]

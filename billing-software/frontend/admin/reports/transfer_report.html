@@ -64,10 +64,7 @@
 
         .print-only-header { display: none; }
 
-        @media print {
-            .col-loc { display: table-cell !important; }
-            .dynamic-footer { display: none !important; }
-        }
+        
     </style>
 </head>
 
@@ -101,13 +98,13 @@
             </div>
 
             <div class="print-only-header">
-                <h1 style="margin: 0; font-size: 2.2rem; font-weight: 900; letter-spacing: -1px;">SAGAR SUPER</h1>
-                <p style="margin: 2px 0; font-size: 1.1rem; font-weight: 600;">Stock Transfer Report</p>
-                <p id="printDateRange" style="margin: 2px 0; font-weight: bold;"></p>
-                <div style="border-bottom: 3px solid black; margin-top: 5px; margin-bottom: 15px;"></div>
+            <h1>SAGAR SUPER</h1>
+            <p>Stock Transfer Report</p>
+            <p id="printDateRange"></p>
+        </div>
             </div>
 
-            <div class="glass-panel" style="padding: 20px;">
+            <div class="glass-panel">
                 <div class="table-wrapper">
                     <table class="report-table">
                         <thead>
@@ -271,9 +268,7 @@
         .table th { background: #f5f5f5; font-weight: bold; }
         .footer { margin-top: 60px; display: flex; justify-content: space-between; font-size: 14px; }
         .sig-box { width: 200px; border-top: 1px solid #333; text-align: center; padding-top: 8px; margin-top: 40px; }
-        @media print {
-            body { padding: 0; }
-        }
+        
     </style>
 </head>
 <body>
@@ -365,9 +360,7 @@
         .meta-table, .item-table { width: 100%; border-collapse: collapse; }
         .item-table th, .item-table td { padding: 4px 0; text-align: left; font-size: 10px; }
         .item-table th { font-weight: bold; }
-        @media print {
-            body { width: 100%; margin: 0; padding: 2mm; }
-        }
+        
     </style>
 </head>
 <body>

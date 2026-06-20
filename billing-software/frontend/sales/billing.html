@@ -1152,7 +1152,81 @@
 
         </ul>
 
-        <div style="margin-top: auto;">
+                <!-- Database Status Indicator -->
+        <div id="db-status-container" style="padding: 10px 16px; margin-bottom: 8px; border-radius: var(--radius-md); font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); transition: all 0.3s; font-family: 'Inter', sans-serif;">
+            <span style="display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 0.75rem;">
+                <i class="fa-solid fa-database"></i> DB Connection
+            </span>
+            <span id="db-status-badge" style="padding: 4px 10px; border-radius: 20px; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; display: inline-flex; align-items: center; gap: 6px; font-weight: 800;">
+                <span id="db-status-dot" style="width: 6px; height: 6px; border-radius: 50%;"></span>
+                <span id="db-status-text">Checking...</span>
+            </span>
+        </div>
+        <script>
+            (function() {
+                function updateDbStatus() {
+                    fetch("/api/db-status")
+                        .then(res => res.json())
+                        .then(data => {
+                            const badge = document.getElementById("db-status-badge");
+                            const dot = document.getElementById("db-status-dot");
+                            const text = document.getElementById("db-status-text");
+                            const container = document.getElementById("db-status-container");
+                            if (!badge || !dot || !text || !container) return;
+                            
+                            if (data.status === "local") {
+                                container.style.background = "rgba(16, 185, 129, 0.05)";
+                                badge.style.background = "rgba(16, 185, 129, 0.15)";
+                                badge.style.color = "#10b981";
+                                badge.style.border = "1px solid rgba(16, 185, 129, 0.3)";
+                                dot.style.background = "#10b981";
+                                dot.style.boxShadow = "0 0 6px #10b981";
+                                text.innerText = "LOCAL";
+                            } else if (data.status === "local_offline") {
+                                container.style.background = "rgba(239, 68, 68, 0.05)";
+                                badge.style.background = "rgba(239, 68, 68, 0.15)";
+                                badge.style.color = "#ef4444";
+                                badge.style.border = "1px solid rgba(239, 68, 68, 0.3)";
+                                dot.style.background = "#ef4444";
+                                dot.style.boxShadow = "0 0 6px #ef4444";
+                                text.innerText = "LOCAL (OFF)";
+                            } else if (data.status === "cloud") {
+                                container.style.background = "rgba(168, 85, 247, 0.05)";
+                                badge.style.background = "rgba(168, 85, 247, 0.15)";
+                                badge.style.color = "#a855f7";
+                                badge.style.border = "1px solid rgba(168, 85, 247, 0.3)";
+                                dot.style.background = "#a855f7";
+                                dot.style.boxShadow = "0 0 6px #a855f7";
+                                text.innerText = "CLOUD";
+                            } else if (data.status === "cloud_offline") {
+                                container.style.background = "rgba(239, 68, 68, 0.05)";
+                                badge.style.background = "rgba(239, 68, 68, 0.15)";
+                                badge.style.color = "#ef4444";
+                                badge.style.border = "1px solid rgba(239, 68, 68, 0.3)";
+                                dot.style.background = "#ef4444";
+                                dot.style.boxShadow = "0 0 6px #ef4444";
+                                text.innerText = "CLOUD (OFF)";
+                            } else {
+                                container.style.background = "rgba(255, 255, 255, 0.02)";
+                                badge.style.background = "rgba(255, 255, 255, 0.08)";
+                                badge.style.color = "#888";
+                                badge.style.border = "1px solid rgba(255, 255, 255, 0.1)";
+                                dot.style.background = "#888";
+                                dot.style.boxShadow = "none";
+                                text.innerText = "UNKNOWN";
+                            }
+                        })
+                        .catch(() => {
+                            const text = document.getElementById("db-status-text");
+                            if (text) text.innerText = "UNKNOWN";
+                        });
+                }
+                
+                updateDbStatus();
+                setInterval(updateDbStatus, 3000);
+            })();
+        </script>
+<div style="margin-top: auto;">
 
             <div style="padding: 12px 16px; margin-bottom: 8px; background: rgba(255,255,255,0.05); border-radius: var(--radius-md); border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 12px;">
 
@@ -1200,7 +1274,7 @@
 
                 <img src="/images/logo.ico" style="width: 24px; height: 24px; object-fit: contain;">
 
-                <span style="color: var(--warning); font-weight: 800; letter-spacing: 1px; font-size: 1.1rem;">MAPLEPRO</span>
+                <span style="color: var(--warning); font-weight: 800; letter-spacing: 1px; font-size: 1.1rem;">SAGAR SUPER</span>
 
             </div>
 
@@ -1268,7 +1342,7 @@
 
         <div class="entry-bar glass-panel" style="margin: 0 10px;">
 
-            <div class="form-group"><label>#</label><input class="input-dark" value="1" readonly
+            <div class="form-group"><label>#</label><input id="entry_row_num" class="input-dark" value="1" readonly
 
                     style="text-align: center;"></div>
 
@@ -1404,9 +1478,9 @@
 
 
 
-                <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 10px; align-items: center;">
+                <div style="display: grid; grid-template-columns: 1fr; gap: 10px; align-items: center;">
 
-                    <div class="flex-between">
+                    <div class="flex-between" style="display: none;">
 
                         <span style="color: var(--text-muted); font-size: 0.8rem;">TSC CHARGE</span>
 
@@ -1571,7 +1645,7 @@
 
                 <div>Sagar - Since 1964</div>
 
-                <div>COMMITTED TO QUALITY</div>
+                <div style="text-decoration: underline;">COMMITTED TO QUALITY</div>
 
                 <div class="shop-online">SHOP ONLINE @</div>
 
@@ -1579,7 +1653,7 @@
 
                 <div class="thanks">*Thanks for shopping***Kindly Visit Again*</div>
 
-                <div style="font-weight: bold; margin: 5px 0;">No return no replacement</div>
+                <div style="font-weight: bold; margin: 5px 0;">(No return no replacement)</div>
 
                 <div class="trust">CELEBRATING 60 YEARS OF TRUST</div>
 
@@ -1863,6 +1937,18 @@
 
         function parseWeighingBarcode(barcode) {
 
+            if (barcode.length === 9 && /^\d{9}$/.test(barcode)) {
+
+                return {
+
+                    code: barcode.substring(0, 4),
+
+                    weight: parseFloat(barcode.substring(4)) || 0
+
+                };
+
+            }
+
             if (barcode.length > 3 && /^\d+$/.test(barcode)) {
 
                 return {
@@ -1883,11 +1969,20 @@
 
         qrInput.addEventListener('input', () => {
 
-            const rawBarcode = qrInput.value.trim();
+            let rawBarcode = qrInput.value.trim();
 
             if (!rawBarcode) return;
 
-
+            // Clean up repeated double scans (e.g., 10001000 -> 1000)
+            if (rawBarcode.length >= 6 && rawBarcode.length % 2 === 0) {
+                const half = rawBarcode.length / 2;
+                const firstHalf = rawBarcode.substring(0, half);
+                const secondHalf = rawBarcode.substring(half);
+                if (firstHalf === secondHalf) {
+                    rawBarcode = firstHalf;
+                    qrInput.value = rawBarcode;
+                }
+            }
 
             // Small debounce for the actual scan/type action
 
@@ -1900,6 +1995,7 @@
                 
 
                 isFetchingProduct = true;
+                qrInput.readOnly = true;
 
                 try {
 
@@ -1919,26 +2015,20 @@
 
                     if (!exactMatch && rawBarcode.length > 4 && /^\d+$/.test(rawBarcode)) {
 
-                        // 2. Fallback: Check if it's a weighing scale barcode (first 4 digits = code)
+                        // 2. Fallback: Check if it's a barcode with quantity embedded
+                        //    9-digit: first 4 = product code, last 5 = qty
+                        //    Other: first 3 = product code, rest = weight/qty
 
-                        const scannedCode = rawBarcode.substring(0, 3);
-
-                        const scannedWeight = parseFloat(rawBarcode.substring(3)) || 0;
-
-                        
+                        const isNineDigit = rawBarcode.length === 9;
+                        const scannedCode = isNineDigit ? rawBarcode.substring(0, 4) : rawBarcode.substring(0, 3);
+                        const scannedQty = parseFloat(rawBarcode.substring(isNineDigit ? 4 : 3)) || 0;
 
                         const retryRes = await fetch(`/api/products?q=${encodeURIComponent(scannedCode)}`);
-
                         const retryProducts = await retryRes.json();
 
-                        
-
                         exactMatch = retryProducts.find(p => String(p.barcode) === scannedCode);
-
                         if (exactMatch) {
-
-                            parsed = { code: scannedCode, weight: scannedWeight };
-
+                            parsed = { code: scannedCode, weight: scannedQty };
                         }
 
                     }
@@ -1946,6 +2036,14 @@
 
 
                     if (exactMatch) {
+                        const inCartQty = getCartQtyForProduct(exactMatch);
+                        const availableStock = exactMatch.current_stock - inCartQty;
+                        if (availableStock <= 0) {
+                            alert("Stock is zero");
+                            qrInput.value = '';
+                            isFetchingProduct = false;
+                            return;
+                        }
 
                         // 1. If there's a pending item from a previous scan, add it now
 
@@ -1994,6 +2092,7 @@
                 } finally {
 
                     isFetchingProduct = false;
+                    qrInput.readOnly = false;
 
                 }
 
@@ -2023,7 +2122,18 @@
 
 
 
-                const rawBarcode = qrInput.value.trim();
+                let rawBarcode = qrInput.value.trim();
+
+                // Clean up repeated double scans (e.g., 10001000 -> 1000)
+                if (rawBarcode.length >= 6 && rawBarcode.length % 2 === 0) {
+                    const half = rawBarcode.length / 2;
+                    const firstHalf = rawBarcode.substring(0, half);
+                    const secondHalf = rawBarcode.substring(half);
+                    if (firstHalf === secondHalf) {
+                        rawBarcode = firstHalf;
+                        qrInput.value = rawBarcode;
+                    }
+                }
 
                 if (!rawBarcode) {
 
@@ -2044,6 +2154,7 @@
 
 
                 isFetchingProduct = true;
+                qrInput.readOnly = true;
 
                 try {
 
@@ -2061,24 +2172,16 @@
 
                     if (!match && rawBarcode.length > 4 && /^\d+$/.test(rawBarcode)) {
 
-                        const scannedCode = rawBarcode.substring(0, 3);
-
-                        const scannedWeight = parseFloat(rawBarcode.substring(3)) || 0;
-
-                        
+                        const isNineDigit = rawBarcode.length === 9;
+                        const scannedCode = isNineDigit ? rawBarcode.substring(0, 4) : rawBarcode.substring(0, 3);
+                        const scannedQty = parseFloat(rawBarcode.substring(isNineDigit ? 4 : 3)) || 0;
 
                         const retryRes = await fetch(`/api/products?q=${encodeURIComponent(scannedCode)}`);
-
                         const retryProducts = await retryRes.json();
 
-                        
-
                         match = retryProducts.find(p => String(p.barcode) === scannedCode) || retryProducts[0];
-
                         if (match) {
-
-                            parsed = { code: scannedCode, weight: scannedWeight };
-
+                            parsed = { code: scannedCode, weight: scannedQty };
                         }
 
                     } else if (!match && products.length > 0) {
@@ -2090,6 +2193,15 @@
 
 
                     if (match) {
+                        const inCartQty = getCartQtyForProduct(match);
+                        const availableStock = match.current_stock - inCartQty;
+                        if (availableStock <= 0) {
+                            alert("Stock is zero");
+                            qrInput.value = '';
+                            qrInput.focus();
+                            isFetchingProduct = false;
+                            return;
+                        }
 
                         selectProduct(match);
 
@@ -2129,6 +2241,7 @@
                 } finally {
 
                     isFetchingProduct = false;
+                    qrInput.readOnly = false;
 
                 }
 
@@ -2161,8 +2274,17 @@
                     const products = await response.json();
 
                     if (products.length > 0) {
+                        const match = products[0];
+                        const inCartQty = getCartQtyForProduct(match);
+                        const availableStock = match.current_stock - inCartQty;
+                        if (availableStock <= 0) {
+                            alert("Stock is zero");
+                            productNameInput.value = '';
+                            productNameInput.focus();
+                            return;
+                        }
 
-                        selectProduct(products[0]);
+                        selectProduct(match);
 
                         qtyInput.focus();
 
@@ -2311,7 +2433,11 @@
                 const availableDisplay = isGM ? (stockAvailable / 1000).toFixed(3) + ' KG' : stockAvailable;
                 const inCartDisplay = isGM ? (currentQtyInCart / 1000).toFixed(3) + ' KG' : currentQtyInCart;
                 const requestedDisplay = isGM ? (qtyToAdd / 1000).toFixed(3) + ' KG' : qtyToAdd;
-                alert(`Insufficient Stock! Available: ${availableDisplay}, Already in cart: ${inCartDisplay}, Requested: ${requestedDisplay}`);
+                if (stockAvailable <= 0) {
+                    alert("Stock is zero");
+                } else {
+                    alert(`Insufficient Stock! Available: ${availableDisplay}, Already in cart: ${inCartDisplay}, Requested: ${requestedDisplay}`);
+                }
 
                 return;
 
@@ -2393,6 +2519,12 @@
 
         function renderTable() {
 
+            // Update the next row number in the entry bar
+            const entryRowEl = document.getElementById('entry_row_num');
+            if (entryRowEl) {
+                entryRowEl.value = items.length + 1;
+            }
+
             tableBody.innerHTML = '';
 
             let total = 0;
@@ -2429,7 +2561,7 @@
                     <td><input type="number" step="any" class="input-dark" value="${item.qty}" style="padding: 2px 5px; width: 60px; text-align: center; border-color: var(--glass-highlight);" onchange="updateItemQty(${index}, this.value)" onkeydown="if(event.key==='Enter') this.blur()"></td>
 
                     <td>${item.rate.toFixed(2)}</td>
-                    <td>${item.bizz}%</td>
+                    <td>₹${item.bizz}</td>
                     <td style="font-weight: bold;">${item.amount.toFixed(2)}</td>
                     <td><i class="fa-solid fa-trash" style="color: var(--danger); cursor: pointer;" onclick="removeItem(${index})"></i></td>
                 `;
@@ -2540,7 +2672,11 @@
 
                 const availableDisplay = isGM ? (item.stock / 1000).toFixed(3) + ' KG' : item.stock;
 
-                alert(`Insufficient Stock! Available: ${availableDisplay}`);
+                if (item.stock <= 0) {
+                    alert("Stock is zero");
+                } else {
+                    alert(`Insufficient Stock! Available: ${availableDisplay}`);
+                }
 
                 renderTable();
 
@@ -2588,7 +2724,7 @@
 
             const tscText = document.getElementById('tsc_display').innerText;
 
-            if (tscText.includes('\u20B9') && !tscText.includes('\u20B90.00')) {
+            if (false && tscText.includes('\u20B9') && !tscText.includes('\u20B90.00')) {
 
                 document.getElementById('confirm_tsc_badge').style.display = 'block';
 

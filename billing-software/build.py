@@ -1,4 +1,6 @@
-import platform, sys, collections
+import platform
+import sys
+import collections
 
 # WMI bypass patch for Pyinstaller
 if sys.platform == "win32":
@@ -11,11 +13,13 @@ if sys.platform == "win32":
 
 print("Starting PyInstaller build process...")
 import PyInstaller.__main__
+import os
 
+# Build as a single EXE as requested, but with high-compatibility flags
 PyInstaller.__main__.run([
     '--noconfirm',
-    '--onefile',
-    '--windowed',
+    '--onefile',             
+    '--windowed',            
     '--icon', 'frontend/images/app_icon.ico',
     '--add-data', 'frontend;frontend',
     '--add-data', 'database;database',
@@ -23,8 +27,16 @@ PyInstaller.__main__.run([
     '--hidden-import', 'engineio.async_drivers.threading',
     '--hidden-import', 'simple_websocket',
     '--hidden-import', 'wsproto',
-    '--name', 'SagarBilling',
-    '--noupx',
+    '--collect-all', 'flask',
+    '--collect-all', 'flask_socketio',
+    '--collect-all', 'engineio',
+    '--collect-all', 'socketio',
+    '--collect-all', 'charset_normalizer',
+    '--collect-all', 'psycopg2',
+    '--collect-all', 'mysql',
+    '--name', 'SSMP',
+    '--clean',              
+    '--noupx',              
     'app.py'
 ])
-print("Build process finished.")
+print("Build process finished. The single executable is in the 'dist' folder.")
