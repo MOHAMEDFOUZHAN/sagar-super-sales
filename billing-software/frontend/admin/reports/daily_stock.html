@@ -150,6 +150,7 @@
             <h1>SAGAR SUPER</h1>
             <p>Daily Stock Status Report</p>
             <p id="printDateRange"></p>
+            <p id="printCategory" style="margin-top: 4px; font-size: 0.9rem;"></p>
         </div>
             </div>
 
@@ -233,6 +234,7 @@
         function applyFilters() {
             const query    = document.getElementById('stockSearch').value.toLowerCase().trim();
             const selCat   = document.getElementById('catFilter').value.toLowerCase();
+            const catSelect = document.getElementById('catFilter');
 
             const filtered = fullStockData.filter(item => {
                 const matchCat  = !selCat || (item.category || 'General').toLowerCase() === selCat;
@@ -241,6 +243,13 @@
                     (item.barcode && item.barcode.toLowerCase().includes(query));
                 return matchCat && matchText;
             });
+
+            const printCat = document.getElementById('printCategory');
+            if (catSelect.value) {
+                printCat.textContent = 'Category: ' + catSelect.value;
+            } else {
+                printCat.textContent = '';
+            }
 
             renderStock(filtered);
         }
@@ -289,5 +298,8 @@
 
         loadReport();
     </script>
+    
+
+<script>window.addEventListener('beforeprint',function(){var d=document.getElementById('printDateRange');if(d){var n=new Date();d.textContent=d.textContent.trim()+'    '+n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true})}})();</script>
 </body>
 </html>

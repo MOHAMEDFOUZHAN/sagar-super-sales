@@ -113,6 +113,314 @@
         }
         .print-only-header { display: none; }
 
+        /* Interactive rows */
+        .report-table tbody tr:not(.item-row) {
+            cursor: pointer;
+            transition: background-color 0.2s var(--ease-out);
+        }
+        .report-table tbody tr:not(.item-row):hover td {
+            background: rgba(239, 68, 68, 0.08) !important;
+        }
+        .report-table tbody tr.item-row {
+            cursor: default;
+        }
+        .report-table tbody tr.item-row:hover td {
+            background: transparent !important;
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(2, 6, 23, 0.85);
+            backdrop-filter: blur(12px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s var(--ease-out);
+        }
+
+        .modal-overlay.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        /* Modal Content */
+        .modal-content {
+            background: #0f172a;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            width: 90%;
+            max-width: 650px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: translateY(30px);
+            transition: transform 0.3s var(--ease-out);
+            position: relative;
+        }
+
+        .modal-overlay.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(239, 68, 68, 0.05);
+        }
+
+        .modal-title {
+            font-size: 1.4rem;
+            font-weight: 800;
+            color: var(--danger);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-close-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .modal-close-btn:hover {
+            background: var(--danger);
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .bill-details-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--glass-border);
+        }
+
+        .detail-item label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .detail-item span {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        /* Items list table in modal */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .items-table th {
+            background: rgba(255, 255, 255, 0.02) !important;
+            padding: 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted) !important;
+            border-bottom: 1px solid var(--glass-border) !important;
+        }
+
+        .items-table td {
+            padding: 12px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+            color: var(--text-main) !important;
+        }
+
+        .modal-footer {
+            padding: 20px 24px;
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            background: rgba(2, 6, 23, 0.4);
+        }
+
+        .modal-summary-box {
+            margin-top: 20px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .summary-row.total {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--danger);
+            border-top: 1px solid var(--glass-border);
+            padding-top: 8px;
+            margin-top: 4px;
+        }
+
+        @media print {
+            /* If modal is open, hide everything else and style the modal to print as a receipt */
+            body.modal-open .sidebar,
+            body.modal-open .main-content > *:not(#billModal),
+            body.modal-open footer {
+                display: none !important;
+            }
+
+            body.modal-open .main-content {
+                padding: 0 !important;
+                margin: 0 !important;
+                background: white !important;
+            }
+
+            body.modal-open #billModal {
+                display: block !important;
+                position: relative !important;
+                width: 100% !important;
+                height: auto !important;
+                background: white !important;
+                color: black !important;
+                opacity: 1 !important;
+                z-index: auto !important;
+            }
+
+            body.modal-open .modal-content {
+                background: white !important;
+                color: black !important;
+                border: none !important;
+                box-shadow: none !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                height: auto !important;
+                max-height: none !important;
+                transform: none !important;
+                position: relative !important;
+                display: block !important;
+                padding: 0 !important;
+            }
+
+            body.modal-open .modal-header {
+                border-bottom: 2px solid #000 !important;
+                background: transparent !important;
+                padding: 10px 0 !important;
+            }
+
+            body.modal-open .modal-title {
+                color: black !important;
+                font-size: 14pt !important;
+            }
+
+            body.modal-open .modal-close-btn,
+            body.modal-open .modal-footer {
+                display: none !important; /* Hide close button and print buttons in the print-out */
+            }
+
+            body.modal-open .modal-body {
+                padding: 10px 0 !important;
+            }
+
+            body.modal-open .bill-details-grid {
+                background: none !important;
+                border: 1px solid #000 !important;
+                grid-template-columns: repeat(2, 1fr) !important;
+                padding: 10px !important;
+                color: black !important;
+            }
+
+            body.modal-open .detail-item label {
+                color: #444 !important;
+            }
+
+            body.modal-open .detail-item span {
+                color: black !important;
+            }
+
+            body.modal-open .items-table th {
+                background: #f1f5f9 !important;
+                color: black !important;
+                border-bottom: 2px solid #000 !important;
+                border-top: 1px solid #000 !important;
+            }
+
+            body.modal-open .items-table td {
+                border-bottom: 1px solid #ddd !important;
+                color: black !important;
+            }
+
+            body.modal-open .modal-summary-box {
+                background: none !important;
+                border: 1px solid #000 !important;
+                margin-top: 15px !important;
+            }
+
+            body.modal-open .summary-row {
+                color: black !important;
+            }
+
+            body.modal-open .summary-row.total {
+                border-top: 2px solid #000 !important;
+                color: black !important;
+            }
+
+            /* If modal is NOT open, hide the modal from printing */
+            body:not(.modal-open) #billModal {
+                display: none !important;
+            }
+
+            /* Clean up badge box for print-out (make it small and text-only) */
+            .badge {
+                background: transparent !important;
+                border: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                font-size: 8pt !important;
+                color: #000 !important;
+                text-shadow: none !important;
+            }
+        }
+
     </style>
 
 </head>
@@ -201,7 +509,7 @@
 
                                 <th>DATE/TIME</th>
 
-                                <th class="col-method">METHOD</th>
+                                <th class="col-method">PAYMENT METHOD</th>
 
                                 <th class="amount-cell">AMOUNT (&#8377;)</th>
 
@@ -242,7 +550,80 @@
 </footer>
 </main>
 
+    <!-- Bill Details Modal -->
+    <div id="billModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <i class="fa-solid fa-file-invoice-dollar"></i> Voided Invoice: <span id="modalInvoiceNo"></span>
+                </h2>
+                <button class="modal-close-btn" onclick="closeBillDetails()" aria-label="Close modal">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="bill-details-grid">
+                    <div class="detail-item">
+                        <label>Date & Time</label>
+                        <span id="modalDate">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Original Payment Mode</label>
+                        <span id="modalPaymentMode">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Created By</label>
+                        <span id="modalCreatedBy">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Status</label>
+                        <span style="color: var(--danger); font-weight: bold; display: flex; align-items: center; gap: 6px;">
+                            <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 6px var(--danger);"></span>
+                            CANCELLED
+                        </span>
+                    </div>
+                </div>
 
+                <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Items in Bill</h3>
+                <div class="table-wrapper" style="max-height: 250px; overflow-y: auto;">
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left;">Product Name</th>
+                                <th style="text-align: right; width: 100px;">Rate</th>
+                                <th style="text-align: center; width: 80px;">Qty</th>
+                                <th style="text-align: right; width: 120px;">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalItemsBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="modal-summary-box">
+                    <div class="summary-row">
+                        <span>Subtotal</span>
+                        <span id="modalSubtotal">₹0.00</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Discount</span>
+                        <span id="modalDiscount">₹0.00</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>TSC (Tax / Service Charge)</span>
+                        <span id="modalTSC">₹0.00 (0%)</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Cancelled Total</span>
+                        <span id="modalTotal">₹0.00</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="printThermal()" style="background: var(--primary);"><i class="fa-solid fa-print"></i> Thermal Print</button>
+                <button class="btn btn-secondary" onclick="closeBillDetails()" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border);">Close</button>
+            </div>
+        </div>
+    </div>
 
     <script>
 
@@ -300,7 +681,19 @@
 
 
 
-                filtered.forEach(b => {
+                // Fetch items for all filtered cancelled bills in parallel to display them inside the table
+                const filteredWithItems = await Promise.all(filtered.map(async b => {
+                    try {
+                        const itemsRes = await fetch(`/api/bills/${b.id}/items`);
+                        const items = await itemsRes.json();
+                        return { ...b, items };
+                    } catch (e) {
+                        console.error("Failed to fetch items for bill " + b.id, e);
+                        return { ...b, items: [] };
+                    }
+                }));
+
+                filteredWithItems.forEach(b => {
 
                     const bDate = new Date(b.bill_date);
 
@@ -314,9 +707,14 @@
 
                     const tr = document.createElement('tr');
 
+                    tr.style.fontWeight = 'bold';
+                    tr.style.cursor = 'pointer';
+                    tr.title = 'Click to view bill details';
+                    tr.onclick = () => showBillDetails(b);
+
                     tr.innerHTML = `
 
-                        <td style="font-weight: 700;">${b.invoice_no || ('SS-' + b.id)}</td>
+                        <td style="font-weight: 700; color: var(--danger);">${b.invoice_no || ('SS-' + b.id)}</td>
 
                         <td>${dateTime}</td>
 
@@ -327,6 +725,22 @@
                     `;
 
                     tbody.appendChild(tr);
+
+                    if (b.items && b.items.length > 0) {
+                        b.items.forEach(item => {
+                            const itemTr = document.createElement('tr');
+                            itemTr.className = 'item-row';
+                            itemTr.style.background = 'rgba(255, 255, 255, 0.01)';
+                            itemTr.innerHTML = `
+                                <td style="color: var(--text-muted); font-size: 0.8rem; font-style: italic; text-align: right; padding-right: 12px; pointer-events: none;">└─</td>
+                                <td colspan="2" style="font-size: 0.85rem; color: var(--text-muted); padding-left: 10px; pointer-events: none;">
+                                    ${item.product_name} <span style="opacity: 0.7; margin-left: 10px; font-size: 0.8rem;">(Qty: ${item.qty} @ ₹${item.rate.toFixed(2)})</span>
+                                </td>
+                                <td class="amount-cell" style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal; pointer-events: none;">\u20B9${item.amount.toFixed(2)}</td>
+                            `;
+                            tbody.appendChild(itemTr);
+                        });
+                    }
 
                 });
 
@@ -353,6 +767,123 @@
 
 
         loadReport();
+
+        let currentModalBill = null;
+        let currentModalItems = [];
+
+        async function showBillDetails(bill) {
+            currentModalBill = bill;
+            currentModalItems = [];
+
+            const modalOverlay = document.getElementById('billModal');
+            const itemsBody = document.getElementById('modalItemsBody');
+            
+            document.getElementById('modalInvoiceNo').innerText = bill.invoice_no || ('SS-' + bill.id);
+            document.getElementById('modalDate').innerText = new Date(bill.bill_date).toLocaleDateString('en-GB') + ' ' + new Date(bill.bill_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            document.getElementById('modalPaymentMode').innerText = bill.payment_mode || 'N/A';
+            document.getElementById('modalCreatedBy').innerText = bill.created_by || 'SYSTEM';
+            
+            const prevTotal = bill.prev_total || 0;
+            const discount = bill.discount || 0;
+            const tscAmount = bill.tsc_amount || 0;
+            const tscPercent = bill.tsc_percent || 0;
+            const subtotal = prevTotal + discount - tscAmount;
+            
+            document.getElementById('modalSubtotal').innerText = '₹' + subtotal.toFixed(2);
+            document.getElementById('modalDiscount').innerText = '₹' + discount.toFixed(2);
+            document.getElementById('modalTSC').innerText = '₹' + tscAmount.toFixed(2) + ` (${tscPercent}%)`;
+            document.getElementById('modalTotal').innerText = '₹' + prevTotal.toFixed(2);
+
+            itemsBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Loading items...</td></tr>';
+            
+            modalOverlay.style.display = 'flex';
+            // Trigger reflow
+            modalOverlay.offsetHeight;
+            modalOverlay.classList.add('show');
+            document.body.classList.add('modal-open');
+            
+            try {
+                const res = await fetch(`/api/bills/${bill.id}/items`);
+                const items = await res.json();
+                
+                currentModalItems = items;
+                itemsBody.innerHTML = '';
+                if (items.length === 0) {
+                    itemsBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--text-muted);">No items found.</td></tr>';
+                } else {
+                    items.forEach(item => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${item.product_name}</td>
+                            <td style="text-align: right;">₹${item.rate.toFixed(2)}</td>
+                            <td style="text-align: center;">${item.qty}</td>
+                            <td style="text-align: right; font-weight: 600;">₹${item.amount.toFixed(2)}</td>
+                        `;
+                        itemsBody.appendChild(tr);
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+                itemsBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: var(--danger);">Failed to load items.</td></tr>';
+            }
+        }
+
+        function closeBillDetails() {
+            const modalOverlay = document.getElementById('billModal');
+            modalOverlay.classList.remove('show');
+            document.body.classList.remove('modal-open');
+            setTimeout(() => {
+                modalOverlay.style.display = 'none';
+            }, 300); // match transition
+        }
+
+        async function printThermal() {
+            if (!currentModalBill || currentModalItems.length === 0) {
+                alert("No items loaded to print.");
+                return;
+            }
+            
+            const bDateObj = new Date(currentModalBill.bill_date);
+            const dateStr = bDateObj.getFullYear() + '-' + String(bDateObj.getMonth() + 1).padStart(2, '0') + '-' + String(bDateObj.getDate()).padStart(2, '0');
+            const timeStr = bDateObj.toTimeString().split(' ')[0]; // HH:MM:SS format
+            
+            const itemsToPrint = currentModalItems.map(item => ({
+                product_name: item.product_name,
+                qty: item.qty,
+                rate: item.rate,
+                amount: item.amount
+            }));
+
+            try {
+                const res = await fetch('/api/print-thermal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: itemsToPrint,
+                        bill_no: currentModalBill.invoice_no || ('SS-' + currentModalBill.id),
+                        bill_date: dateStr,
+                        bill_time: timeStr,
+                        bill_type: (currentModalBill.payment_mode || 'CASH') + ' (VOIDED)'
+                    })
+                });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    alert("Thermal print job spooled successfully.");
+                } else {
+                    alert("Thermal print failed: " + result.message);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error sending print request: " + err.message);
+            }
+        }
+
+        // Close on outside click
+        document.getElementById('billModal').addEventListener('click', (e) => {
+            if (e.target.id === 'billModal') {
+                closeBillDetails();
+            }
+        });
 
     </script>
 

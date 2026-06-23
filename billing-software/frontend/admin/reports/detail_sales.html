@@ -170,9 +170,7 @@
         .print-only-header { display: none; }
 
         @media print {
-            #rowTotalPercentage {
-                color: transparent !important;
-            }
+            @page { size: landscape; }
         }
 
     </style>
@@ -343,14 +341,6 @@
 
                     </tr>
 
-                    <tr style="border-top: 2px solid var(--primary); background: rgba(99, 102, 241, 0.05);">
-
-                        <td style="font-weight: 800; color: var(--primary);">TOTAL PERCENTAGE (%)</td>
-
-                        <td id="rowTotalPercentage" style="font-size: 1.4rem; font-weight: 900; color: var(--primary);">0.00 %</td>
-
-                    </tr>
-
                 </table>
 
             </div>
@@ -459,7 +449,7 @@
 
                 
 
-                document.getElementById('rowTotalPercentage').innerText = totalPercentage.toFixed(2) + ' %';
+                // rowTotalPercentage removed per user request
 
 
 
@@ -477,6 +467,9 @@
 
     </script>
 
+    
+
+<script>window.addEventListener('beforeprint',function(){var d=document.getElementById('printDateRange');if(d){var n=new Date();d.textContent=d.textContent.trim()+'    '+n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true})}})();</script>
 </body>
 
 

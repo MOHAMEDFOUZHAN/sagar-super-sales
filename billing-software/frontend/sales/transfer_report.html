@@ -118,6 +118,8 @@
 
             .dynamic-footer { display: none !important; }
 
+            .hide-on-print { display: none !important; }
+
         }
 
     </style>
@@ -142,7 +144,7 @@
 
             <li><a href="/sales/report" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Reports</a></li>
 
-            <li><a href="/sales/returns" class="nav-link"><i class="fa-solid fa-rotate-left"></i> Returns & Voids</a></li>
+            <li><a href="/sales/returns" class="nav-link"><i class="fa-solid fa-rotate-left"></i> Returns & Cancelled Bills</a></li>
 
             <li><a href="/sales/stock/transfer" class="nav-link"><i class="fa-solid fa-truck-ramp-box"></i> Stock Transfer</a></li>
 
@@ -328,7 +330,7 @@
 
                                 <th>DATE/TIME</th>
 
-                                <th>REFERENCE / CHALLAN</th>
+                                <th>TRANSFER ID</th>
 
                                 <th>TYPE</th>
 
@@ -341,9 +343,7 @@
                                 <th class="col-loc">FROM</th>
 
                                 <th class="col-loc">TO</th>
-
-                                <th style="text-align: center; width: 220px;">PRINT ACTION</th>
-
+                                <th class="hide-on-print" style="text-align: center; width: 220px;">PRINT ACTION</th>
                             </tr>
 
                         </thead>
@@ -528,9 +528,7 @@
                         <td class="col-loc"><span class="location-badge">${g.from}</span></td>
 
                         <td class="col-loc"><span class="location-badge" style="color:var(--primary);">${g.to}</span></td>
-
-                        <td>${actionHtml}</td>
-
+                        <td class="hide-on-print">${actionHtml}</td>
                     `;
 
                     tbody.appendChild(tr);
@@ -590,7 +588,7 @@
         </div>
         <div style="text-align: right;">
             <div class="title">Transfer Challan</div>
-            <p style="margin: 5px 0; font-weight: bold; font-size: 16px;">Challan No: ${g.reference}</p>
+            <p style="margin: 5px 0; font-weight: bold; font-size: 16px;">Transfer ID: ${g.reference}</p>
         </div>
     </div>
     
@@ -611,7 +609,7 @@
             <tr>
                 <th style="width: 50px;">S.No</th>
                 <th>Date/Time</th>
-                <th>Reference</th>
+                <th>Transfer ID</th>
                 <th>Type</th>
                 <th>Code</th>
                 <th>Item Name</th>
@@ -691,7 +689,7 @@
         <div style="text-align: left; font-size: 10px;">
             Date : ${new Date(g.date).toLocaleDateString('en-GB')} 
             Time : ${new Date(g.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}<br>
-            BILL No : ${displayBillNo}
+            TRANSFER ID : ${displayBillNo}
         </div>
         <div class="separator"></div>
     </div>

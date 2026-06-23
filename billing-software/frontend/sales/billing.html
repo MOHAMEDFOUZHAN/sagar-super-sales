@@ -1144,7 +1144,7 @@
 
             <li><a href="/sales/report" class="nav-link"><i class="fa-solid fa-file-invoice-dollar"></i> Reports</a></li>
 
-            <li><a href="/sales/returns" class="nav-link"><i class="fa-solid fa-rotate-left"></i> Returns & Voids</a></li>
+            <li><a href="/sales/returns" class="nav-link"><i class="fa-solid fa-rotate-left"></i> Returns & Cancelled Bills</a></li>
 
             <li><a href="/sales/stock/transfer" class="nav-link"><i class="fa-solid fa-truck-ramp-box"></i> Stock Transfer</a></li>
 
@@ -3090,7 +3090,7 @@
 
                         <div style="display:flex; gap:10px;">
 
-                            <button class="btn btn-danger" onclick="voidBill(${billId})">VOID</button>
+                            <button class="btn btn-danger" onclick="voidBill(${billId})">CANCEL</button>
 
                         </div>
 
@@ -3120,7 +3120,7 @@
 
         async function voidBill(billId) {
 
-            if (!confirm("Are you sure you want to VOID this bill?")) return;
+            if (!confirm("Are you sure you want to CANCEL this bill?")) return;
 
             try {
 
@@ -3138,7 +3138,7 @@
 
                 if (result.status === 'success') {
 
-                    alert("Bill Voided!");
+                    alert("Bill Cancelled!");
 
                     openHistory(); 
 

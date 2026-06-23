@@ -123,6 +123,10 @@
         }
         .print-only-header { display: none; }
 
+        @media print {
+            .no-print { display: none !important; }
+        }
+
 
 
         
@@ -356,10 +360,6 @@
                 }
                 
                 let outgoingDisplay = '';
-                if (item.outgoing !== "" && item.outgoing !== 0 && parseFloat(item.outgoing) !== 0) {
-                    const outgoingVal = parseFloat(item.outgoing);
-                    outgoingDisplay = isGM ? (outgoingVal / 1000).toFixed(3) + ' KG' : outgoingVal + ' ' + (item.unit || 'PCS');
-                }
 
                 tr.innerHTML = `
 
@@ -565,6 +565,9 @@
 
     </script>
 
+    
+
+<script>window.addEventListener('beforeprint',function(){var d=document.getElementById('printDateRange');if(d){var n=new Date();d.textContent=d.textContent.trim()+'    '+n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true})}})();</script>
 </body>
 
 

@@ -59,7 +59,6 @@ from backend.network_diagnostics import (
     is_admin
 )
 from thermal_printer import print_thermal_bill, print_closure_report
-import psycopg2
 from psycopg2.extras import RealDictCursor
 import sqlite3
 import subprocess
@@ -5776,6 +5775,36 @@ def get_corrections_report():
     finally:
         conn.close()
 
+def normalize_category(product_name, product_category, product_barcode):
+    cat = (product_category or '').upper()
+    name = (product_name or '').upper()
+    bc = (product_barcode or '')
+    
+    if 'OILS' in cat:
+        return 'OILS'
+    elif 'SPICES' in cat:
+        return 'SPICES'
+    elif 'TEA' in cat:
+        return 'TEA/COFFEE'
+    elif 'AROM' in cat:
+        return 'AROMATICS'
+    elif 'CAND' in cat or 'NATUR' in cat or 'CANDIES' in cat:
+        return 'CANDIES'
+    elif 'MRD' in cat or 'CFC' in cat or 'CHOCO' in cat or 'MRD' in name or 'CHOCO' in name or 'CFC' in name:
+        if bc.startswith('18') or bc.startswith('8'):
+            return 'CFC'
+        else:
+            return 'C-MRD'
+    elif 'JELLY' in cat or 'FRUIT' in cat or 'JELLY' in name or 'FRUIT' in name:
+        if bc.startswith('195') or bc.startswith('95') or 'VARKEY' in name:
+            return 'VARKEY'
+        else:
+            return 'FRUIT JELLY'
+    elif 'VARKEY' in cat or 'VARKEY' in name:
+        return 'VARKEY'
+    else:
+        return 'OTHERS'
+
 @app.route('/api/reports/sales-detailed')
 def get_detailed_sales_report():
     conn = get_db_connection()
@@ -5804,7 +5833,10 @@ def get_detailed_sales_report():
             row['bill_total'] = float(row.get('bill_total') or 0)
             row['tsc_percent'] = float(row.get('tsc_percent') or 0)
             row['tsc_amount'] = float(row.get('tsc_amount') or 0)
-            if not row['category']: row['category'] = 'Uncategorized'
+            
+            # Normalize category using unified logic
+            row['category'] = normalize_category(row['product_name'], row['category'], row['barcode'])
+            
             if isinstance(row.get('bill_date'), (datetime.datetime, datetime.date)):
                 row['bill_date'] = row['bill_date'].isoformat()
             
@@ -5906,30 +5938,35 @@ def get_daily_range_report():
         # Category Summary for this day
         cursor.execute("""
             SELECT 
-                CASE 
-                    WHEN UPPER(p.category) LIKE '%OILS%' THEN 'OILS'
-                    WHEN UPPER(p.category) LIKE '%SPICES%' THEN 'SPICES'
-                    WHEN UPPER(p.category) LIKE '%TEA%' THEN 'TEA'
-                    WHEN UPPER(p.category) LIKE '%AROM%' THEN 'AROM'
-                    WHEN UPPER(p.category) LIKE '%NATUR%' THEN 'NATUR'
-                    WHEN UPPER(p.name) LIKE '%MRD%' OR UPPER(p.name) LIKE '%CHOCO%' THEN 'C-MRD'
-                    WHEN UPPER(p.name) LIKE '%CFC%' THEN 'C-CFC'
-                    WHEN UPPER(p.name) LIKE '%FRUIT JELLY%' OR UPPER(p.name) LIKE '%JELLY%' THEN 'FJ'
-                    WHEN UPPER(p.name) LIKE '%VARKEY%' THEN 'VARKEY'
-                    ELSE 'OTHERS'
-                END as sub_cat,
-                SUM(bi.amount) as amt
+                p.category,
+                p.barcode,
+                bi.product_name,
+                bi.amount as amt
             FROM bill_items bi
             JOIN bills b ON bi.bill_id = b.id
             LEFT JOIN products p ON bi.product_name = p.name
             WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'
-            GROUP BY sub_cat
         """, (d_str,))
         cats = cursor.fetchall()
         
-        cat_map = {'OILS':0,'SPICES':0,'TEA':0,'AROM':0,'NATUR':0,'OTHERS':0,'C-MRD':0,'C-CFC':0,'FJ':0,'VARKEY':0}
+        cat_map = {
+            'OILS': 0.0,
+            'SPICES': 0.0,
+            'TEA/COFFEE': 0.0,
+            'AROMATICS': 0.0,
+            'OTHERS': 0.0,
+            'CANDIES': 0.0,
+            'C-MRD': 0.0,
+            'CFC': 0.0,
+            'FRUIT JELLY': 0.0,
+            'VARKEY': 0.0
+        }
         for c in cats:
-            cat_map[c['sub_cat']] = float(c['amt'] or 0)
+            normalized = normalize_category(c['product_name'], c['category'], c['barcode'])
+            if normalized in cat_map:
+                cat_map[normalized] += float(c['amt'] or 0)
+            else:
+                cat_map['OTHERS'] += float(c['amt'] or 0)
             
         results.append({
             'date': d_str,
@@ -7293,13 +7330,25 @@ def get_recent_bills():
         
     if bill_no:
         # Search by Invoice No or ID
-        if bill_no.isdigit():
-            conditions.append("(invoice_no = %s OR id = %s)")
-            params.append(f"{int(bill_no):05d}")
-            params.append(bill_no)
+        clean_bill_no = bill_no.strip()
+        import re
+        digit_match = re.search(r'\d+$', clean_bill_no)
+        if digit_match:
+            num_str = digit_match.group(0)
+            num_val = int(num_str)
+            conditions.append("""(
+                LOWER(invoice_no) LIKE LOWER(%s)
+                OR id = %s
+                OR invoice_no LIKE %s
+                OR invoice_no LIKE %s
+            )""")
+            params.append(f"%{clean_bill_no}%")
+            params.append(num_val)
+            params.append(f"%{num_val:05d}")
+            params.append(f"%{num_val}")
         else:
-            conditions.append("invoice_no LIKE %s")
-            params.append(f"%{bill_no}%")
+            conditions.append("LOWER(invoice_no) LIKE LOWER(%s)")
+            params.append(f"%{clean_bill_no}%")
             
     if start_date:
         conditions.append("DATE(bill_date) >= %s")
@@ -7885,11 +7934,21 @@ if __name__ == '__main__':
 
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    time.sleep(2)
+
+    host = Config.SERVER_HOST if Config.SERVER_HOST != '0.0.0.0' else '127.0.0.1'
+    port = Config.SERVER_PORT
+    url = f"http://{host}:{port}/"
+
+    # Wait for the Flask-SocketIO server to start by actively pinging the port
+    start_wait = time.time()
+    while time.time() - start_wait < 3.0:
+        try:
+            with socket.create_connection((host, port), timeout=0.1):
+                break
+        except (socket.timeout, ConnectionRefusedError, OSError):
+            time.sleep(0.05)
 
     try:
-        host = Config.SERVER_HOST if Config.SERVER_HOST != '0.0.0.0' else '127.0.0.1'
-        url = f"http://{host}:{Config.SERVER_PORT}/"
         if webview and not os.environ.get("NO_WEBVIEW"):
             print("Launching Desktop Window...")
             webview.create_window("MaplePro Billing System - Sagar Super", url, width=1280, height=800, min_size=(1024, 768))
@@ -7904,3 +7963,4 @@ if __name__ == '__main__':
         print(f"Webview setup failed: {e}")
         webbrowser.open(url)
         while True: time.sleep(100)
+"""  """

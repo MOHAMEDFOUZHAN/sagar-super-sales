@@ -489,4 +489,24 @@ tr:hover td {
     canvas {
         display: none !important;
     }
+
+    /* Page numbering */
+    body {
+        counter-reset: page;
+    }
+
+    body::after {
+        counter-increment: page;
+        content: "Page " counter(page);
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 8pt;
+        font-family: 'Inter', sans-serif;
+        color: #000 !important;
+        display: block !important;
+        pointer-events: none;
+    }
 }

@@ -110,7 +110,7 @@
                         <thead>
                             <tr>
                                 <th>DATE/TIME</th>
-                                <th>REFERENCE / CHALLAN</th>
+                                <th>TRANSFER ID</th>
                                 <th>TYPE</th>
                                 <th style="text-align: center;">CODE</th>
                                 <th>ITEM NAME</th>
@@ -279,7 +279,7 @@
         </div>
         <div style="text-align: right;">
             <div class="title">Transfer Challan</div>
-            <p style="margin: 5px 0; font-weight: bold; font-size: 16px;">Challan No: ${g.reference}</p>
+            <p style="margin: 5px 0; font-weight: bold; font-size: 16px;">Transfer ID: ${g.reference}</p>
         </div>
     </div>
     
@@ -300,7 +300,7 @@
             <tr>
                 <th style="width: 50px;">S.No</th>
                 <th>Date/Time</th>
-                <th>Reference</th>
+                <th>Transfer ID</th>
                 <th>Type</th>
                 <th>Code</th>
                 <th>Item Name</th>
@@ -378,7 +378,7 @@
         <div style="text-align: left; font-size: 10px;">
             Date : \${new Date(g.date).toLocaleDateString('en-GB')} 
             Time : \${new Date(g.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}<br>
-            BILL No : \${displayBillNo}
+            TRANSFER ID : \${displayBillNo}
         </div>
         <div class="separator"></div>
     </div>

@@ -448,6 +448,27 @@
 
                     tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">No transactions for this date.</td></tr>';
 
+                } else {
+
+                    let grandTotal = 0, grandBizz = 0;
+                    filtered.forEach(item => {
+                        if (item.bill_status !== 'Cancelled') {
+                            grandTotal += item.amount;
+                            grandBizz += item.bizz_amount;
+                        }
+                    });
+
+                    const grandRow = document.createElement('tr');
+                    grandRow.style.background = 'rgba(99, 102, 241, 0.15)';
+                    grandRow.style.fontWeight = '800';
+                    grandRow.innerHTML = `
+                        <td colspan="2" style="text-align: right; color: var(--primary);">GRAND TOTAL</td>
+                        <td class="amount-cell" style="color: var(--success);">₹${grandBizz.toFixed(2)}</td>
+                        <td colspan="3"></td>
+                        <td class="amount-cell" style="color: var(--primary);">₹${grandTotal.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(grandRow);
+
                 }
 
 
@@ -465,6 +486,7 @@
         loadReport();
 
     </script>
+<script>window.addEventListener('beforeprint',function(){var d=document.getElementById('printDateRange');if(d){var n=new Date();d.textContent=d.textContent.trim()+'    '+n.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:true})}})();</script>
 
 </body>
 
