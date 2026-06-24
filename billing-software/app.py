@@ -5989,8 +5989,16 @@ def get_closure_report():
     user_filter = ""
     query_params = [report_date]
     if session.get('role') == 'sales':
-        user_filter = " AND b.created_by = %s"
-        query_params.append(session.get('username'))
+        username = session.get('username', '').lower()
+        if username in ['counter1', 'counter2']:
+            user_filter = " AND b.created_by IN (%s, %s)"
+            query_params.extend(['counter1', 'counter2'])
+        elif username in ['counter3', 'counter4']:
+            user_filter = " AND b.created_by IN (%s, %s)"
+            query_params.extend(['counter3', 'counter4'])
+        else:
+            user_filter = " AND b.created_by = %s"
+            query_params.append(session.get('username'))
 
     # Category-specific filtering based on Counter is disabled as all products should be included in all reports, but we keep the title/text designations
     username = session.get('username', '').lower()
@@ -7062,8 +7070,16 @@ def get_stats():
     user_filter = ""
     query_params = [today]
     if session.get('role') == 'sales':
-        user_filter = " AND created_by = %s"
-        query_params.append(session.get('username'))
+        username = session.get('username', '').lower()
+        if username in ['counter1', 'counter2']:
+            user_filter = " AND created_by IN (%s, %s)"
+            query_params.extend(['counter1', 'counter2'])
+        elif username in ['counter3', 'counter4']:
+            user_filter = " AND created_by IN (%s, %s)"
+            query_params.extend(['counter3', 'counter4'])
+        else:
+            user_filter = " AND created_by = %s"
+            query_params.append(session.get('username'))
     
     cursor.execute(f"SELECT SUM(total_amount) FROM bills WHERE DATE(bill_date) = %s AND status != 'Cancelled'{user_filter}", tuple(query_params))
     daily_sales = cursor.fetchone()[0] or 0
@@ -7217,8 +7233,16 @@ def get_dashboard_realtime():
     user_filter = ""
     query_params_today = [today]
     if session.get('role') == 'sales':
-        user_filter = " AND created_by = %s"
-        query_params_today.append(session.get('username'))
+        username = session.get('username', '').lower()
+        if username in ['counter1', 'counter2']:
+            user_filter = " AND created_by IN (%s, %s)"
+            query_params_today.extend(['counter1', 'counter2'])
+        elif username in ['counter3', 'counter4']:
+            user_filter = " AND created_by IN (%s, %s)"
+            query_params_today.extend(['counter3', 'counter4'])
+        else:
+            user_filter = " AND created_by = %s"
+            query_params_today.append(session.get('username'))
 
     cursor.execute(f"""
         SELECT EXTRACT(HOUR FROM bill_date) as hour, SUM(total_amount) as revenue
@@ -7325,8 +7349,16 @@ def get_recent_bills():
     params = []
     
     if session.get('role') == 'sales':
-        conditions.append("created_by = %s")
-        params.append(session.get('username'))
+        username = session.get('username', '').lower()
+        if username in ['counter1', 'counter2']:
+            conditions.append("created_by IN (%s, %s)")
+            params.extend(['counter1', 'counter2'])
+        elif username in ['counter3', 'counter4']:
+            conditions.append("created_by IN (%s, %s)")
+            params.extend(['counter3', 'counter4'])
+        else:
+            conditions.append("created_by = %s")
+            params.append(session.get('username'))
         
     if bill_no:
         # Search by Invoice No or ID
@@ -7947,6 +7979,7 @@ if __name__ == '__main__':
                 break
         except (socket.timeout, ConnectionRefusedError, OSError):
             time.sleep(0.05)
+
 
     try:
         if webview and not os.environ.get("NO_WEBVIEW"):

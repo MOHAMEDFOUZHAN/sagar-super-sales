@@ -455,8 +455,6 @@
 
             </div>
 
-            <p style="text-align: center; font-size: 0.8rem; margin-top: 20px;">Page : 1 of 1</p>
-
         </div>
 
     
@@ -564,7 +562,21 @@
 
             const tscRows = document.getElementById('tscRows');
 
-            tscRows.innerHTML = `<tr><td>TSC</td><td>${(data.tsc_total || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+            const tscTotal = data.tsc_total || 0;
+
+            const tsc80 = tscTotal * 0.8;
+
+            const tsc20 = tscTotal * 0.2;
+
+            tscRows.innerHTML = `
+
+                <tr><td>TSC</td><td>${tscTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
+
+                <tr><td>TSC @ 80%</td><td>${tsc80.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
+
+                <tr><td>TSC @ 20%</td><td>${tsc20.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
+
+            `;
 
 
 

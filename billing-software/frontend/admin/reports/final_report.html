@@ -361,6 +361,38 @@
 
                     </div>
 
+                    <div class="summary-card">
+
+                        <h3 style="color: var(--accent); margin-bottom: 15px;"><i class="fa-solid fa-percent"></i> TSC
+
+                            Performance</h3>
+
+                        <div class="summary-row" style="font-size: 0.9rem;">
+
+                            <div class="summary-label">Total TSC Collected</div>
+
+                            <div class="summary-value" id="valTscTotal">&#8377;0.00</div>
+
+                        </div>
+
+                        <div class="summary-row" style="font-size: 0.9rem;">
+
+                            <div class="summary-label">TSC 80% Adjustment</div>
+
+                            <div class="summary-value" id="valTsc80">&#8377;0.00</div>
+
+                        </div>
+
+                        <div class="summary-row" style="font-size: 0.9rem;">
+
+                            <div class="summary-label">TSC 20% Adjustment</div>
+
+                            <div class="summary-value" id="valTsc20">&#8377;0.00</div>
+
+                        </div>
+
+                    </div>
+
                 </div>
 
             </div>
@@ -483,6 +515,14 @@
                 document.getElementById('valBizTotal').innerText = '\u20B9' + data.biz_charges.toFixed(2);
 
                 document.getElementById('valBiz80').innerText = '\u20B9' + (data.biz_charges * 0.8).toFixed(2);
+
+                const tscTotal = data.tsc_total || 0;
+
+                document.getElementById('valTscTotal').innerText = '\u20B9' + tscTotal.toFixed(2);
+
+                document.getElementById('valTsc80').innerText = '\u20B9' + (tscTotal * 0.8).toFixed(2);
+
+                document.getElementById('valTsc20').innerText = '\u20B9' + (tscTotal * 0.2).toFixed(2);
 
 
 

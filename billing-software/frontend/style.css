@@ -357,7 +357,13 @@ tr:hover td {
 @media print {
     @page {
         size: A4;
-        margin: 8mm 10mm;
+        margin: 10mm 15mm 20mm 15mm;
+        @bottom-center {
+            content: "Page " counter(page) " of " counter(pages);
+            font-size: 8pt;
+            font-family: 'Inter', sans-serif;
+            color: #000;
+        }
     }
 
     body {
@@ -490,23 +496,5 @@ tr:hover td {
         display: none !important;
     }
 
-    /* Page numbering */
-    body {
-        counter-reset: page;
-    }
-
-    body::after {
-        counter-increment: page;
-        content: "Page " counter(page);
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        text-align: center;
-        font-size: 8pt;
-        font-family: 'Inter', sans-serif;
-        color: #000 !important;
-        display: block !important;
-        pointer-events: none;
-    }
+    /* Page numbering is handled dynamically via paged media @page @bottom-center margin box. */
 }

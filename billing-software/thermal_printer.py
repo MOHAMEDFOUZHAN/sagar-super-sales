@@ -231,6 +231,8 @@ def build_closure_report(data: dict, width: int = 42) -> bytes:
     emit(f"{'BIZ@80%:':<24}{data.get('biz80', '0.00'):>18}")
     emit(f"{'BIZ@20%:':<24}{data.get('biz20', '0.00'):>18}")
     emit(f"{'Total TSC:':<24}{data.get('tsc_total', '0.00'):>18}")
+    emit(f"{'TSC@80%:':<24}{data.get('tsc80', '0.00'):>18}")
+    emit(f"{'TSC@20%:':<24}{data.get('tsc20', '0.00'):>18}")
     emit("-" * width)
 
     # Cash Audit

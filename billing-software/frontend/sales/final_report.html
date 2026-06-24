@@ -2012,9 +2012,9 @@
 
                 tableRows += Row('TSC:', '\u20B9' + tscTotal);
 
-                tableRows += Row('80% :', '\u20B9' + tsc80);
+                tableRows += Row('80% :', tsc80);
 
-                tableRows += Row('20% :', '\u20B9' + tsc20);
+                tableRows += Row('20% :', tsc20);
 
                 tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
 
@@ -2195,6 +2195,10 @@
                     biz20: getText('biz20Val'),
 
                     tsc_total: getText('totalTscVal'),
+
+                    tsc80: getText('tsc80Val'),
+
+                    tsc20: getText('tsc20Val'),
 
                     total_exp: getText('cashExpVal'),
 
