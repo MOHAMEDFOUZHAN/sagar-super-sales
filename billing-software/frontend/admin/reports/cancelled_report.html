@@ -699,7 +699,7 @@
 
                     const dateTime = bDate.toLocaleDateString('en-GB') + ' ' + bDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-                    const amt = b.prev_total || 0; 
+                    const amt = b.prev_total || b.total_amount || 0; 
 
                     total += amt;
 
@@ -783,7 +783,7 @@
             document.getElementById('modalPaymentMode').innerText = bill.payment_mode || 'N/A';
             document.getElementById('modalCreatedBy').innerText = bill.created_by || 'SYSTEM';
             
-            const prevTotal = bill.prev_total || 0;
+            const prevTotal = bill.prev_total || bill.total_amount || 0;
             const discount = bill.discount || 0;
             const tscAmount = bill.tsc_amount || 0;
             const tscPercent = bill.tsc_percent || 0;

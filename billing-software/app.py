@@ -5826,6 +5826,7 @@ def get_detailed_sales_report():
         conn.close()
         
         for row in data:
+            row['qty'] = float(row['qty'] or 0)
             row['amount'] = float(row['amount'] or 0)
             row['rate'] = float(row['rate'] or 0)
             row['bizz_percent'] = float(row.get('bizz_percent') or 0)

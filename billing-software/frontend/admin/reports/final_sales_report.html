@@ -152,15 +152,25 @@
 
         async function loadCategories() {
             try {
-                const res = await fetch('/api/reports/categories');
-                const cats = await res.json();
+                const categories = [
+                    { text: 'AROMATICS', value: 'AROMATICS' },
+                    { text: 'C-CFC', value: 'CFC' },
+                    { text: 'C-MRD', value: 'C-MRD' },
+                    { text: 'CANDIES', value: 'CANDIES' },
+                    { text: 'FRUIT/JELLY', value: 'FRUIT JELLY' },
+                    { text: 'OILS', value: 'OILS' },
+                    { text: 'OTHERS', value: 'OTHERS' },
+                    { text: 'SPICES', value: 'SPICES' },
+                    { text: 'TEA/COFFEE', value: 'TEA/COFFEE' },
+                    { text: 'VARKEY', value: 'VARKEY' }
+                ];
+                
                 const select = document.getElementById('categoryFilter');
-                // Clear existing except first
                 select.innerHTML = '<option value="ALL">All Categories</option>';
-                cats.forEach(name => {
+                categories.forEach(cat => {
                     const opt = document.createElement('option');
-                    opt.value = name;
-                    opt.textContent = name;
+                    opt.value = cat.value;
+                    opt.textContent = cat.text;
                     select.appendChild(opt);
                 });
             } catch (err) {
@@ -171,11 +181,13 @@
         async function loadReport() {
             const start = document.getElementById('startDate').value;
             const end = document.getElementById('endDate').value;
-            const category = document.getElementById('categoryFilter').value;
+            const selectElem = document.getElementById('categoryFilter');
+            const category = selectElem.value;
+            const categoryName = selectElem.options[selectElem.selectedIndex].text;
 
             const startF = new Date(start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
             const endF = new Date(end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-            document.getElementById('printInfo').innerText = `Category: ${category} | Period: ${startF} to ${endF}`;
+            document.getElementById('printInfo').innerText = `Category: ${categoryName} | Period: ${startF} to ${endF}`;
 
             try {
                 const res = await fetch('/api/reports/sales-detailed');
@@ -208,7 +220,7 @@
                             qty: 0
                         };
                     }
-                    grouped[code].qty += item.qty;
+                    grouped[code].qty += parseFloat(item.qty || 0);
                 });
 
                 const tbody = document.getElementById('reportRows');
