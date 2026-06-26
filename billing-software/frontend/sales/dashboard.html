@@ -523,9 +523,9 @@
 
                     <span style="color: #6366f1;"><i class="fa-solid fa-circle"></i> Cash (&#8377; 0)</span>
 
-                    <span style="color: #06b6d4;"><i class="fa-solid fa-circle"></i> UPI (&#8377; 0)</span>
-
                     <span style="color: #ec4899;"><i class="fa-solid fa-circle"></i> Card (&#8377; 0)</span>
+
+                    <span style="color: #06b6d4;"><i class="fa-solid fa-circle"></i> UPI (&#8377; 0)</span>
 
                 </div>
 
@@ -628,13 +628,13 @@
 
                 data: {
 
-                    labels: ['Cash', 'UPI', 'Card'],
+                    labels: ['Cash', 'Card', 'UPI'],
 
                     datasets: [{
 
                         data: [0, 0, 0],
 
-                        backgroundColor: ['#6366f1', '#06b6d4', '#ec4899'],
+                        backgroundColor: ['#6366f1', '#ec4899', '#06b6d4'],
 
                         borderWidth: 0,
 
@@ -760,7 +760,7 @@
 
 
 
-                    paymentChart.data.datasets[0].data = [cash, upi, card];
+                    paymentChart.data.datasets[0].data = [cash, card, upi];
 
                     paymentChart.update();
 
@@ -774,9 +774,9 @@
 
                         legendDiv.children[0].innerHTML = `<i class="fa-solid fa-circle"></i> Cash (Rs. ${cash.toLocaleString('en-IN')})`;
 
-                        legendDiv.children[1].innerHTML = `<i class="fa-solid fa-circle"></i> UPI (Rs. ${upi.toLocaleString('en-IN')})`;
+                        legendDiv.children[1].innerHTML = `<i class="fa-solid fa-circle"></i> Card (Rs. ${card.toLocaleString('en-IN')})`;
 
-                        legendDiv.children[2].innerHTML = `<i class="fa-solid fa-circle"></i> Card (Rs. ${card.toLocaleString('en-IN')})`;
+                        legendDiv.children[2].innerHTML = `<i class="fa-solid fa-circle"></i> UPI (Rs. ${upi.toLocaleString('en-IN')})`;
 
                     }
 

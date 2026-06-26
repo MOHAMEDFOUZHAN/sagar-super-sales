@@ -114,8 +114,8 @@
                         <tr>
                             <th style="min-width: 100px;">DATE</th>
                             <th>CASH</th>
-                            <th>UPI</th>
                             <th>CARD</th>
+                            <th>UPI</th>
                             <th>OILS</th>
                             <th>SPICES</th>
                             <th>TEA/COFFEE</th>
@@ -192,8 +192,8 @@
                     row.innerHTML = `
                         <td>${new Date(day.date).toLocaleDateString('en-GB')}</td>
                         <td class="amount-cell">${d.cash.toFixed(0)}</td>
-                        <td class="amount-cell">${d.upi.toFixed(0)}</td>
                         <td class="amount-cell">${d.card.toFixed(0)}</td>
+                        <td class="amount-cell">${d.upi.toFixed(0)}</td>
                         <td class="amount-cell">${(c['OILS'] || 0).toFixed(0)}</td>
                         <td class="amount-cell">${(c['SPICES'] || 0).toFixed(0)}</td>
                         <td class="amount-cell">${(c['TEA/COFFEE'] || 0).toFixed(0)}</td>
@@ -213,8 +213,8 @@
                     <tr>
                         <td>TOTAL</td>
                         <td class="amount-cell">${grandTotals.cash.toFixed(0)}</td>
-                        <td class="amount-cell">${grandTotals.upi.toFixed(0)}</td>
                         <td class="amount-cell">${grandTotals.card.toFixed(0)}</td>
+                        <td class="amount-cell">${grandTotals.upi.toFixed(0)}</td>
                         <td class="amount-cell">${grandTotals.oils.toFixed(0)}</td>
                         <td class="amount-cell">${grandTotals.spices.toFixed(0)}</td>
                         <td class="amount-cell">${grandTotals.tea.toFixed(0)}</td>

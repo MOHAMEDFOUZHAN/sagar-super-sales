@@ -185,14 +185,11 @@ def build_closure_report(data: dict, width: int = 42) -> bytes:
 
     # Header
     payload += ALIGN_CENTER + BOLD_ON
-    counter_text = data.get('counter', '')
-    if counter_text and "OIL SECTION" in str(counter_text).upper():
-        emit("OIL SECTION FINAL REPORT")
-    else:
-        emit("FINAL REPORT")
-    if counter_text:
-        emit(f"COUNTER: {counter_text}")
     emit("SAGAR SUPER")
+    emit("FINAL REPORT")
+    counter_text = data.get('counter', '')
+    if counter_text:
+        emit(str(counter_text).upper())
     payload += BOLD_OFF
     emit(f"Date: {data.get('date', '')}")
     emit(f"Time: {data.get('time', '')}")
@@ -223,6 +220,30 @@ def build_closure_report(data: dict, width: int = 42) -> bytes:
         emit(f"{cat['label']:<24}{cat['val']:>18}")
     emit("-" * width)
 
+    # Office Expenses
+    office_exps = [e for e in data.get('office_expenses', []) if e.get('label') not in ['TSC', 'BIZ']]
+    payload += BOLD_ON
+    emit("OFFICE EXPENSE")
+    payload += BOLD_OFF
+    if office_exps:
+        for e in office_exps:
+            emit(f"{e.get('label', '') + ':':<24}{e.get('val', '0.00'):>18}")
+    else:
+        emit(f"{'NO OFFICE EXPENSE':<24}{'0.00':>18}")
+    emit("-" * width)
+
+    # Shop Expenses
+    shop_exps = data.get('shop_expenses', [])
+    payload += BOLD_ON
+    emit("SHOP EXPENSE")
+    payload += BOLD_OFF
+    if shop_exps:
+        for e in shop_exps:
+            emit(f"{e.get('label', '') + ':':<24}{e.get('val', '0.00'):>18}")
+    else:
+        emit(f"{'NO SHOP EXPENSE':<24}{'0.00':>18}")
+    emit("-" * width)
+
     # Bizz & TSC
     payload += BOLD_ON
     emit("BIZ & TSC SUMMARY")
@@ -237,14 +258,32 @@ def build_closure_report(data: dict, width: int = 42) -> bytes:
 
     # Cash Audit
     payload += BOLD_ON
-    emit("CASH FLOW AUDIT")
+    emit("CASH DEBIT EXPENSE")
     payload += BOLD_OFF
-    emit(f"{'TOTAL EXPENSE:':<24}{data.get('total_exp', '0.00'):>18}")
-    emit(f"{'OPENING BAL:':<24}{data.get('ob', '0.00'):>18}")
-    emit(f"{'EXPECTED CB:':<24}{data.get('expected', '0.00'):>18}")
+    try:
+        expected_str = str(data.get('expected', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
+        expected_val = float(expected_str) if expected_str else 0.0
+        ob_str = str(data.get('ob', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
+        ob_val = float(ob_str) if ob_str else 0.0
+        counted_str = str(data.get('cb', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
+        counted_val = float(counted_str) if counted_str else 0.0
+        
+        actual_cb = counted_val + ob_val
+        diff_val = actual_cb - expected_val
+        diff_sign = "+" if diff_val >= 0 else "-"
+        diff_str = f"Rs.{diff_sign}{abs(diff_val):,.2f}"
+        cb_display = f"Rs.{actual_cb:,.2f}"
+        cash_off_display = f"Rs.{counted_val:,.2f}"
+    except Exception:
+        diff_str = "Rs.0.00"
+        cb_display = data.get('cb', '0.00')
+        cash_off_display = data.get('cash_off', '0.00')
+
+    emit(f"{'O.B:':<24}{data.get('ob', '0.00'):>18}")
+    emit(f"{'(+/-):':<24}{diff_str:>18}")
     payload += BOLD_ON
-    emit(f"{'ACTUAL CB:':<24}{data.get('cb', '0.00'):>18}")
-    emit(f"{'NET TO OFFICE:':<24}{data.get('cash_off', '0.00'):>18}")
+    emit(f"{'C.B:':<24}{cb_display:>18}")
+    emit(f"{'C @ OFF:':<24}{cash_off_display:>18}")
     payload += BOLD_OFF
     emit("-" * width)
 

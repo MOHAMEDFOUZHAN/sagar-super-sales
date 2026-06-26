@@ -260,7 +260,7 @@
 
                     <div class="form-group" style="margin: 0; width: 200px;">
 
-                        <input type="text" id="tRef" class="input-dark" placeholder="Reference / Challan No" readonly style="background: rgba(255,255,255,0.03); color: var(--text-muted); cursor: not-allowed;">
+                        <input type="text" id="tRef" class="input-dark" placeholder="Reference / Transfer ID" readonly style="background: rgba(255,255,255,0.03); color: var(--text-muted); cursor: not-allowed;">
 
                     </div>
 
@@ -776,7 +776,7 @@
         </div>
         <div style="text-align: right;">
             <div class="title">Transfer Challan</div>
-            <p style="margin: 5px 0; font-weight: bold; font-size: 16px;">Challan No: ${g.reference}</p>
+            <p style="margin: 5px 0; font-weight: bold; font-size: 16px;">Transfer ID: ${g.reference}</p>
         </div>
     </div>
     
@@ -869,7 +869,7 @@
         <div style="text-align: left; font-size: 10px;">
             Date : ${new Date(g.date).toLocaleDateString('en-GB')} 
             Time : ${new Date(g.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}<br>
-            BILL No : ${displayBillNo}
+            TRANSFER ID : ${displayBillNo}
         </div>
         <div class="separator"></div>
     </div>

@@ -6091,7 +6091,7 @@ def get_closure_report():
         expenses_raw = cursor.fetchall()
         office_exps = []
         shop_exps = []
-        total_exc = 0
+        total_exc = total_biz + total_tsc
         for e in expenses_raw:
             amt = float(e['amount'] or 0)
             total_exc += amt
@@ -6294,7 +6294,7 @@ def save_closure():
     data = request.json
     report_date = data.get('date', datetime.date.today().isoformat())
     opening_bal = float(data.get('opening_balance', 0))
-    actual_closing = float(data.get('actual_closing', 0))
+    actual_closing = float(data.get('actual_closing', 0)) + opening_bal
     denoms = data.get('denominations', [])
     
     conn = get_db_connection()
@@ -6311,7 +6311,10 @@ def save_closure():
         cursor.execute("SELECT SUM(bizz_amount) FROM bill_items bi JOIN bills b ON bi.bill_id = b.id WHERE DATE(b.bill_date) = %s AND b.status!='Cancelled'", (report_date,))
         total_biz = float(cursor.fetchone()[0] or 0)
         
-        expected_closing = opening_bal + cash_sales - total_exp - total_biz
+        cursor.execute("SELECT SUM(tsc_amount) FROM bills WHERE DATE(bill_date) = %s AND status!='Cancelled'", (report_date,))
+        total_tsc = float(cursor.fetchone()[0] or 0)
+        
+        expected_closing = opening_bal + cash_sales - (total_exp + total_biz + total_tsc)
         diff = actual_closing - expected_closing
         
         cursor.execute("""
@@ -7957,6 +7960,11 @@ if __name__ == '__main__':
             # Add transfer_type column if table existed without it
             try:
                 _cur.execute("ALTER TABLE stock_transfers ADD COLUMN transfer_type VARCHAR(10) DEFAULT 'OUT'")
+            except:
+                pass
+            # Add product_barcode column if table existed without it
+            try:
+                _cur.execute("ALTER TABLE stock_transfers ADD COLUMN product_barcode VARCHAR(50)")
             except:
                 pass
             _conn.commit()

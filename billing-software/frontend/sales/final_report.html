@@ -1311,7 +1311,7 @@
 
         <!-- 8, 9, 10. CASH AUDIT -->
 
-        <div class="audit-section-title">Cash Flow Audit & Verification</div>
+        <div class="audit-section-title">Cash Debit Expense & Verification</div>
 
         <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 24px;">
 
@@ -1714,7 +1714,7 @@
 
 
 
-                const expected = data.balance.opening_balance + data.sales.cash_sales - data.total_expenses - data.biz_charges;
+                const expected = data.balance.opening_balance + data.sales.cash_sales - data.total_expenses;
 
                 document.getElementById('expectedVal').innerText = '\u20B9' + expected.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
@@ -1772,7 +1772,7 @@
 
 
 
-            const toOffice = Math.max(0, total - 2500);
+            const toOffice = total;
 
             document.getElementById('netToOfficeVal').innerText = '\u20B9' + toOffice.toLocaleString('en-IN', { minimumFractionDigits: 2 });
 
@@ -1914,6 +1914,8 @@
 
                 const ob = getText('obVal');
 
+                const expectedCB = getText('expectedVal');
+
                 const cb = getText('actualVal');
 
                 const cashOff = getText('netToOfficeVal');
@@ -1986,15 +1988,30 @@
 
                 tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
 
+                // Office Expenses
+                const filteredOfficeExp = officeExp.filter(e => !['TSC', 'BIZ'].includes(e.label));
+                tableRows += SectionHeader('OFFICE EXPENSE');
+                if (filteredOfficeExp.length > 0) {
+                    filteredOfficeExp.forEach(e => {
+                        tableRows += Row(e.label + ':', e.val);
+                    });
+                } else {
+                    tableRows += Row('NO OFFICE EXPENSE', '₹0.00');
+                }
+                tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
 
+                // Shop Expenses
+                tableRows += SectionHeader('SHOP EXPENSE');
+                if (shopExp.length > 0) {
+                    shopExp.forEach(e => {
+                        tableRows += Row(e.label + ':', e.val);
+                    });
+                } else {
+                    tableRows += Row('NO SHOP EXPENSE', '₹0.00');
+                }
+                tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
 
-                tableRows += SectionHeader('CASH DEBIT EXP');
-
-                officeExp.filter(e => !['TSC', 'BIZ'].includes(e.label)).forEach(e => {
-
-                    tableRows += Row(e.label + ':', e.val);
-
-                });
+                tableRows += SectionHeader('BIZ & TSC SUMMARY');
 
                 tableRows += Row('TotalBiz:', bizTotal);
 
@@ -2002,31 +2019,44 @@
 
                 tableRows += Row('BIZ@20%:', biz17);
 
-                shopExp.forEach(e => { tableRows += Row(e.label + ':', e.val); });
+                tableRows += Row('Total TSC:', '\u20B9' + tscTotal);
+
+                tableRows += Row('TSC@80%:', tsc80);
+
+                tableRows += Row('TSC@20%:', tsc20);
 
                 tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
 
 
 
-                tableRows += SectionHeader('TSC Super');
+                // Calculate actual C.B, discrepancy (+/-), and C @ OFF from user entries
+                let diffStr = '₹0.00';
+                let actualCBText = '₹0.00';
+                let cashOffText = '₹0.00';
+                try {
+                    const expectedNum = parseFloat(expectedCB.replace(/[^\d.-]/g, '')) || 0;
+                    const obNum = parseFloat(ob.replace(/[^\d.-]/g, '')) || 0;
+                    const countedNum = parseFloat(cb.replace(/[^\d.-]/g, '')) || 0;
+                    
+                    const actualCBVal = countedNum + obNum;
+                    const diffVal = actualCBVal - expectedNum;
+                    
+                    diffStr = (diffVal >= 0 ? '+' : '-') + '₹' + Math.abs(diffVal).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                    actualCBText = '₹' + actualCBVal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                    cashOffText = '₹' + countedNum.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                } catch(e) {
+                    console.error(e);
+                }
 
-                tableRows += Row('TSC:', '\u20B9' + tscTotal);
+                tableRows += SectionHeader('CASH DEBIT EXPENSE');
 
-                tableRows += Row('80% :', tsc80);
+                tableRows += Row('O.B:', ob);
 
-                tableRows += Row('20% :', tsc20);
+                tableRows += Row('(+/-):', diffStr);
 
-                tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
+                tableRows += Row('C.B:', actualCBText, true);
 
-
-
-                tableRows += Row('TOTAL EXPENSE:', totalExp, true);
-
-                tableRows += Row('OB(+/-):', ob);
-
-                tableRows += Row('C.B:', cb, true);
-
-                tableRows += Row('CASH / OFF:', cashOff, true);
+                tableRows += Row('C @ OFF:', cashOffText, true);
 
                 tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
 
@@ -2052,11 +2082,11 @@
 
                         <div style="text-align: center; margin-bottom: 20px;">
 
-                            <h3 style="margin: 0; text-transform: uppercase;">${counterLabel && counterLabel.toUpperCase().includes('OIL SECTION') ? 'Oil Section Final Report' : 'Final Report'}</h3>
+                            <h2 style="margin: 0; text-transform: uppercase; font-size: 1.5rem; font-weight: 900;">Sagar Super</h2>
+
+                            <h3 style="margin: 5px 0; text-transform: uppercase; font-size: 1.1rem; font-weight: 700;">Final Report</h3>
 
                             ${counterLabel ? `<div style="margin-top: 6px; font-size: 0.95rem; font-weight: 700; text-transform: uppercase;">${counterLabel}</div>` : ''}
-
-                            <h2 style="margin: 5px 0; text-transform: uppercase;">Sagar Super</h2>
 
                             <p style="margin: 5px 0; font-size: 0.9rem;">Date: ${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')} &nbsp; Time: ${syncTime}<br>
 
@@ -2210,7 +2240,11 @@
 
                     cash_off: getText('netToOfficeVal'),
 
-                    denominations: denominations
+                    denominations: denominations,
+
+                    office_expenses: officeExp,
+
+                    shop_expenses: shopExp
 
                 };
 
