@@ -217,69 +217,98 @@ def build_closure_report(data: dict, width: int = 42) -> bytes:
     emit("CATEGORY")
     payload += BOLD_OFF
     for cat in data.get('categories', []):
-        emit(f"{cat['label']:<24}{cat['val']:>18}")
+        val_str = str(cat.get('val', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
+        try:
+            val_num = float(val_str)
+        except Exception:
+            val_num = 0.0
+        if val_num > 0:
+            emit(f"{cat['label']:<24}{cat['val']:>18}")
     emit("-" * width)
 
-    # Office Expenses
-    office_exps = [e for e in data.get('office_expenses', []) if e.get('label') not in ['TSC', 'BIZ']]
-    payload += BOLD_ON
-    emit("OFFICE EXPENSE")
-    payload += BOLD_OFF
-    if office_exps:
-        for e in office_exps:
-            emit(f"{e.get('label', '') + ':':<24}{e.get('val', '0.00'):>18}")
-    else:
-        emit(f"{'NO OFFICE EXPENSE':<24}{'0.00':>18}")
-    emit("-" * width)
-
-    # Shop Expenses
-    shop_exps = data.get('shop_expenses', [])
-    payload += BOLD_ON
-    emit("SHOP EXPENSE")
-    payload += BOLD_OFF
-    if shop_exps:
-        for e in shop_exps:
-            emit(f"{e.get('label', '') + ':':<24}{e.get('val', '0.00'):>18}")
-    else:
-        emit(f"{'NO SHOP EXPENSE':<24}{'0.00':>18}")
-    emit("-" * width)
-
-    # Bizz & TSC
-    payload += BOLD_ON
-    emit("BIZ & TSC SUMMARY")
-    payload += BOLD_OFF
-    emit(f"{'TotalBiz:':<24}{data.get('biz_total', '0.00'):>18}")
-    emit(f"{'BIZ@80%:':<24}{data.get('biz80', '0.00'):>18}")
-    emit(f"{'BIZ@20%:':<24}{data.get('biz20', '0.00'):>18}")
-    emit(f"{'Total TSC:':<24}{data.get('tsc_total', '0.00'):>18}")
-    emit(f"{'TSC@80%:':<24}{data.get('tsc80', '0.00'):>18}")
-    emit(f"{'TSC@20%:':<24}{data.get('tsc20', '0.00'):>18}")
-    emit("-" * width)
-
-    # Cash Audit
+    # CASH DEBIT EXPENSE
     payload += BOLD_ON
     emit("CASH DEBIT EXPENSE")
     payload += BOLD_OFF
+
+    # Helper to clean and format amount
+    def fmt_amt(val) -> str:
+        if not val: return "Rs.0.00"
+        cleaned = str(val).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
+        try:
+            return f"Rs.{float(cleaned):,.2f}"
+        except Exception:
+            return f"Rs.{cleaned}"
+
+    # 1. Biz Breakdown
+    emit(f"{'BIZ @ 80%:':<24}{fmt_amt(data.get('biz80', '0.00')):>18}")
+    emit(f"{'BIZ @ 20%:':<24}{fmt_amt(data.get('biz20', '0.00')):>18}")
+    emit(f"{'Biz:':<24}{fmt_amt(data.get('biz_total', '0.00')):>18}")
+
+    # 2. TSC Breakdown
+    emit(f"{'TSC @ 80%:':<24}{fmt_amt(data.get('tsc80', '0.00')):>18}")
+    emit(f"{'TSC @ 20%:':<24}{fmt_amt(data.get('tsc20', '0.00')):>18}")
+    emit(f"{'TSC:':<24}{fmt_amt(data.get('tsc_total', '0.00')):>18}")
+
+    # 3. Entered Expenses (both Office and Shop Expenses)
+    office_exps = [e for e in data.get('office_expenses', []) if e.get('label') not in ['TSC', 'BIZ']]
+    shop_exps = data.get('shop_expenses', [])
+    total_entered_exp = 0.0
+    for e in (office_exps + shop_exps):
+        val_str = str(e.get('val', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
+        try:
+            total_entered_exp += float(val_str)
+        except Exception:
+            pass
+        emit(f"{e.get('label', '') + ':':<24}{fmt_amt(e.get('val', '0.00')):>18}")
+
+    # 4. Total Expense (entered expenses + BIZ + TSC)
+    total_exp_str = str(data.get('total_exp', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
     try:
-        expected_str = str(data.get('expected', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
-        expected_val = float(expected_str) if expected_str else 0.0
+        total_exp_val = float(total_exp_str) if total_exp_str else 0.0
+    except Exception:
+        total_exp_val = total_entered_exp
+    emit(f"{'TOTAL EXPENSE:':<24}{fmt_amt(str(total_exp_val)):>18}")
+    emit("-" * width)
+
+    # 5. Cash Audit calculations (O.B, Discrepancy, C.B, C @ OFF)
+    try:
+        cash_sales_val = 0.0
+        for pm in data.get('payments', []):
+            if str(pm.get('label', '')).upper() == 'CASH':
+                pm_str = str(pm.get('val', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
+                try:
+                    cash_sales_val = float(pm_str)
+                except Exception:
+                    pass
+
         ob_str = str(data.get('ob', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
         ob_val = float(ob_str) if ob_str else 0.0
+        
         counted_str = str(data.get('cb', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
         counted_val = float(counted_str) if counted_str else 0.0
         
-        actual_cb = counted_val + ob_val
-        diff_val = actual_cb - expected_val
+        # Formula 1: C @ OFF = Cash Sales - Total Expense
+        net_to_office = cash_sales_val - total_exp_val
+
+        # Formula 2: Cash Balance (C.B.) = C @ OFF + Opening Balance
+        cb_val = net_to_office + ob_val
+
+        # Formula 3: Difference = Closing Cash Count (counted_val) - Cash Balance (cb_val)
+        diff_val = counted_val - cb_val
+        
         diff_sign = "+" if diff_val >= 0 else "-"
         diff_str = f"Rs.{diff_sign}{abs(diff_val):,.2f}"
-        cb_display = f"Rs.{actual_cb:,.2f}"
-        cash_off_display = f"Rs.{counted_val:,.2f}"
+        cb_display = f"Rs.{cb_val:,.2f}"
+        cash_off_display = f"Rs.{net_to_office:,.2f}"
+        counted_display = f"Rs.{counted_val:,.2f}"
     except Exception:
         diff_str = "Rs.0.00"
-        cb_display = data.get('cb', '0.00')
-        cash_off_display = data.get('cash_off', '0.00')
+        cb_display = fmt_amt(data.get('expected', '0.00'))
+        cash_off_display = fmt_amt(data.get('cash_off', '0.00'))
+        counted_display = fmt_amt(data.get('cb', '0.00'))
 
-    emit(f"{'O.B:':<24}{data.get('ob', '0.00'):>18}")
+    emit(f"{'O.B:':<24}{fmt_amt(data.get('ob', '0.00')):>18}")
     emit(f"{'(+/-):':<24}{diff_str:>18}")
     payload += BOLD_ON
     emit(f"{'C.B:':<24}{cb_display:>18}")

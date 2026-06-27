@@ -1021,10 +1021,6 @@
 
                         <option value="local" style="background: #1e1e2e; color: #fff;">Local Only (Main Server)</option>
 
-                        <option value="cloud" style="background: #1e1e2e; color: #fff;">Cloud Only (Supabase)</option>
-
-                        <option value="failover" style="background: #1e1e2e; color: #fff;">Hybrid / Failover (Local + Cloud)</option>
-
                     </select>
 
                     <i class="fa-solid fa-database"></i>
@@ -1071,19 +1067,9 @@
 
         function toggleIpField() {
 
-            const dbMode = document.getElementById('dbMode').value;
-
             const ipGroup = document.getElementById('serverIpGroup');
 
-            if (dbMode === 'cloud') {
-
-                ipGroup.style.display = 'none';
-
-            } else {
-
-                ipGroup.style.display = 'block';
-
-            }
+            ipGroup.style.display = 'block';
 
         }
 
@@ -1101,7 +1087,7 @@
 
                     document.getElementById('serverIp').value = data.current_ip || '127.0.0.1';
 
-                    document.getElementById('dbMode').value = data.db_mode || 'failover';
+                    document.getElementById('dbMode').value = 'local';
 
                     toggleIpField();
 

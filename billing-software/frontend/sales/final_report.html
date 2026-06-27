@@ -14,7 +14,7 @@
 
     <!-- Fonts & Icons -->
 
-    
+    <script src="{{ url_for('static', filename='assets/js/cash-calculator.js') }}"></script>
 
     <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
 
@@ -1265,53 +1265,8 @@
 
 
 
-        <!-- 4, 5. EXPENSES -->
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-
-            <div class="glass-panel">
-
-                <div class="audit-section-title">Office Expenses</div>
-
-                <table id="officeExpTable">
-
-                    <tbody id="officeExpBody"></tbody>
-
-                </table>
-
-            </div>
-
-            <div class="glass-panel">
-
-                <div class="audit-section-title">Shop Expenses</div>
-
-                <table id="shopExpTable">
-
-                    <tbody id="shopExpBody"></tbody>
-
-                    <tfoot>
-
-                        <tr style="background: rgba(0,0,0,0.1);">
-
-                            <td style="font-weight: 800;">TOTAL SHOP</td>
-
-                            <td style="text-align: right; font-weight: 800;" id="totalShop">&#8377;0.00</td>
-
-                        </tr>
-
-                    </tfoot>
-
-                </table>
-
-            </div>
-
-        </div>
-
-
-
-        <!-- 8, 9, 10. CASH AUDIT -->
-
-        <div class="audit-section-title">Cash Debit Expense & Verification</div>
+        <!-- CASH DEBIT EXPENSE & Verification -->
+        <div class="audit-section-title">CASH DEBIT EXPENSE & Verification</div>
 
         <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 24px;">
 
@@ -1345,83 +1300,81 @@
 
             <div class="glass-panel">
 
-                <div class="glass-panel">
+                <div class="glass-panel" style="padding: 15px;">
 
-                    <table style="font-size: 0.95rem; border-spacing: 0 5px; border-collapse: separate; width: 100%;">
+                    <table style="font-size: 0.95rem; border-spacing: 0 8px; border-collapse: separate; width: 100%;">
 
+                        <!-- 1. Biz Breakdown -->
                         <tr style="color: var(--text-muted);">
-
-                            <td style="padding: 8px;">(+) OPENING BALANCE</td>
-
-                            <td style="text-align: right; padding: 8px;" id="obVal">&#8377;0.00</td>
-
+                            <td style="padding: 4px 8px; padding-left: 20px; font-size: 0.85rem;">BIZ @ 80%</td>
+                            <td style="text-align: right; padding: 4px 8px; font-size: 0.85rem;" id="biz80Val">&#8377;0.00</td>
                         </tr>
-
                         <tr style="color: var(--text-muted);">
-
-                            <td style="padding: 8px;">(+) CASH SALES</td>
-
-                            <td style="text-align: right; padding: 8px;" id="cashSalesVal">&#8377;0.00</td>
-
+                            <td style="padding: 4px 8px; padding-left: 20px; font-size: 0.85rem;">BIZ @ 20%</td>
+                            <td style="text-align: right; padding: 4px 8px; font-size: 0.85rem;" id="biz20Val">&#8377;0.00</td>
+                        </tr>
+                        <tr style="color: var(--text-muted); font-weight: bold;">
+                            <td style="padding: 6px 8px;">Biz</td>
+                            <td style="text-align: right; padding: 6px 8px;" id="bizChargesVal">&#8377;0.00</td>
                         </tr>
 
+                        <!-- 2. TSC Breakdown -->
                         <tr style="color: var(--text-muted);">
-
-                            <td style="padding: 8px;">(-) EXPENSES</td>
-
-                            <td style="text-align: right; padding: 8px;" id="cashExpVal">&#8377;0.00</td>
-
+                            <td style="padding: 4px 8px; padding-left: 20px; font-size: 0.85rem;">TSC @ 80%</td>
+                            <td style="text-align: right; padding: 4px 8px; font-size: 0.85rem;" id="tsc80Val">&#8377;0.00</td>
                         </tr>
-
                         <tr style="color: var(--text-muted);">
-
-                            <td style="padding: 8px;">(-) BIZ REWARDS</td>
-
-                            <td style="text-align: right; padding: 8px;" id="bizChargesVal">&#8377;0.00</td>
-
+                            <td style="padding: 4px 8px; padding-left: 20px; font-size: 0.85rem;">TSC @ 20%</td>
+                            <td style="text-align: right; padding: 4px 8px; font-size: 0.85rem;" id="tsc20Val">&#8377;0.00</td>
+                        </tr>
+                        <tr style="color: var(--text-muted); font-weight: bold;">
+                            <td style="padding: 6px 8px;">TSC</td>
+                            <td style="text-align: right; padding: 6px 8px;" id="tscVal">&#8377;0.00</td>
                         </tr>
 
-                        <tr style="font-weight: 800; color: var(--accent); border-top: 1px solid var(--glass-border);">
+                        <!-- 3. Dynamic Entered Expenses -->
+                        <tbody id="dynamicExpBody"></tbody>
 
-                            <td style="padding: 10px;">EXPECTED CLOSING</td>
-
-                            <td style="text-align: right; padding: 10px;" id="expectedVal">&#8377;0.00</td>
-
+                        <!-- 4. Total Expense Row -->
+                        <tr style="font-weight: bold; color: var(--text-main);">
+                            <td style="padding: 8px;">TOTAL EXPENSE</td>
+                            <td style="text-align: right; padding: 8px;" id="totalEnteredExpenseVal">&#8377;0.00</td>
                         </tr>
 
-                        <tr style="font-weight: 900;">
+                        <!-- Separator line -->
+                        <tr><td colspan="2" style="border-top: 1px solid var(--glass-border); height: 1px;"></td></tr>
 
-                            <td
-
-                                style="padding: 15px; background: rgba(255,255,255,0.03); border-top-left-radius: 12px; border-bottom-left-radius: 12px;">
-
-                                ACTUAL COUNTED</td>
-
-                            <td style="text-align: right; color: var(--success); padding: 15px; background: rgba(255,255,255,0.03); border-top-right-radius: 12px; border-bottom-right-radius: 12px;"
-
-                                id="actualVal">&#8377;0.00</td>
-
-                        </tr>
-
+                        <!-- 4. O.B -->
                         <tr style="color: var(--text-muted);">
-
-                            <td style="padding: 15px;">(-) NEXT DAY FLOAT</td>
-
-                            <td style="text-align: right; padding: 15px;">-&#8377;2,500.00</td>
-
+                            <td style="padding: 6px 8px;">O.B</td>
+                            <td style="text-align: right; padding: 6px 8px;" id="obVal">&#8377;0.00</td>
                         </tr>
 
-                        <tr style="font-weight: 900; color: var(--warning); border-top: 2px solid var(--glass-border);">
+                        <!-- 5. (+/-) Discrepancy -->
+                        <tr style="font-weight: 800;">
+                            <td style="padding: 6px 8px;">(+/-)</td>
+                            <td style="text-align: right; padding: 6px 8px;" id="diffVal">&#8377;0.00</td>
+                        </tr>
 
-                            <td style="padding: 20px; font-size: 1.3rem;">NET CASH TO OFFICE</td>
+                        <!-- 6. C.B -->
+                        <tr style="font-weight: 900; color: var(--accent);">
+                            <td style="padding: 8px;">C.B</td>
+                            <td style="text-align: right; padding: 8px;" id="cbVal">&#8377;0.00</td>
+                        </tr>
 
-                            <td style="text-align: right; padding: 20px; font-size: 1.5rem;" id="netToOfficeVal">&#8377;0.00
-
-                            </td>
-
+                        <!-- 7. C @ OFF -->
+                        <tr style="font-weight: 900; color: var(--success); background: rgba(16, 185, 129, 0.05);">
+                            <td style="padding: 10px; border-top-left-radius: 8px; border-bottom-left-radius: 8px;">C @ OFF</td>
+                            <td style="text-align: right; padding: 10px; border-top-right-radius: 8px; border-bottom-right-radius: 8px;" id="netToOfficeVal">&#8377;0.00</td>
                         </tr>
 
                     </table>
+
+                    <!-- Hidden fields for compatibility -->
+                    <span id="cashSalesVal" style="display: none;">&#8377;0.00</span>
+                    <span id="cashExpVal" style="display: none;">&#8377;0.00</span>
+                    <span id="expectedVal" style="display: none;">&#8377;0.00</span>
+                    <span id="actualVal" style="display: none;">&#8377;0.00</span>
 
                 </div>
 
@@ -1605,7 +1558,7 @@
                 const res = await fetch(`/api/reports/closure?date=${date}`);
 
                 const data = await res.json();
-
+                window._closureData = data;
 
 
                 // Meta
@@ -1680,65 +1633,90 @@
 
                 data.categories.forEach(cat => {
 
-                    cBody.innerHTML += `<tr><td style="font-weight: 700;">${cat.category}</td><td style="text-align: right; font-weight: 900;">\u20B9${cat.category_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td><td style="text-align: right;"><span style="color: var(--primary); font-weight: 800;">${cat.percent.toFixed(1)}%</span></td></tr>`;
+                    if (cat.category_sales > 0) {
+
+                        cBody.innerHTML += `<tr><td style="font-weight: 700;">${cat.category}</td><td style="text-align: right; font-weight: 900;">\u20B9${cat.category_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td><td style="text-align: right;"><span style="color: var(--primary); font-weight: 800;">${cat.percent.toFixed(1)}%</span></td></tr>`;
+
+                    }
 
                 });
 
 
 
-                // Expenses
+                // Populate dynamic expenses under CASH DEBIT EXPENSE
+                const dynBody = document.getElementById('dynamicExpBody');
+                let totalEnteredExpenses = 0;
+                if (dynBody) {
+                    dynBody.innerHTML = '';
+                    
+                    const filteredOffice = data.office_expenses.filter(e => !['TSC', 'BIZ'].includes(e.category) && e.amount > 0);
+                    const filteredShop = data.shop_expenses.filter(e => e.amount > 0);
+                    
+                    [...filteredOffice, ...filteredShop].forEach(e => {
+                        totalEnteredExpenses += e.amount;
+                        dynBody.innerHTML += `
+                            <tr class="entered-exp-row" data-amount="${e.amount}" style="color: var(--text-muted);">
+                                <td style="padding: 4px 8px;">${e.category}</td>
+                                <td style="text-align: right; padding: 4px 8px;">\u20B9${e.amount.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    });
+                }
 
-                const oBody = document.getElementById('officeExpBody'); oBody.innerHTML = '';
-
-                data.office_expenses.forEach(e => { oBody.innerHTML += `<tr><td>${e.category}</td><td style="text-align: right;">\u20B9${e.amount.toFixed(2)}</td></tr>`; });
-
-
-
-                const shBody = document.getElementById('shopExpBody'); shBody.innerHTML = '';
-
-                data.shop_expenses.forEach(e => { shBody.innerHTML += `<tr><td>${e.category}</td><td style="text-align: right;">\u20B9${e.amount.toFixed(2)}</td></tr>`; });
-
-                document.getElementById('totalShop').innerText = '\u20B9' + data.total_shop.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-
-
+                // Populate BIZ and TSC splits
+                if (document.getElementById('biz80Val')) {
+                    document.getElementById('biz80Val').innerText = '\u20B9' + data.biz_80.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                }
+                if (document.getElementById('biz20Val')) {
+                    document.getElementById('biz20Val').innerText = '\u20B9' + data.biz_20.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                }
+                if (document.getElementById('tsc80Val')) {
+                    document.getElementById('tsc80Val').innerText = '\u20B9' + data.tsc_80.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                }
+                if (document.getElementById('tsc20Val')) {
+                    document.getElementById('tsc20Val').innerText = '\u20B9' + data.tsc_20.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                }
 
                 // Balance Calc
+                if (document.getElementById('obVal')) {
+                    document.getElementById('obVal').innerText = '\u20B9' + data.balance.opening_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                }
 
-                document.getElementById('obVal').innerText = '\u20B9' + data.balance.opening_balance.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                if (document.getElementById('cashSalesVal')) {
+                    document.getElementById('cashSalesVal').innerText = '\u20B9' + data.sales.cash_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                }
 
-                document.getElementById('cashSalesVal').innerText = '\u20B9' + data.sales.cash_sales.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                if (document.getElementById('cashExpVal')) {
+                    document.getElementById('cashExpVal').innerText = '\u20B9' + data.total_expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                }
 
-                document.getElementById('cashExpVal').innerText = '\u20B9' + data.total_expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                if (document.getElementById('bizChargesVal')) {
+                    document.getElementById('bizChargesVal').innerText = '\u20B9' + data.biz_charges.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                }
 
-                document.getElementById('bizChargesVal').innerText = '\u20B9' + data.biz_charges.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-
-
+                if (document.getElementById('tscVal')) {
+                    document.getElementById('tscVal').innerText = '\u20B9' + data.tsc_total.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                }
 
                 const expected = data.balance.opening_balance + data.sales.cash_sales - data.total_expenses;
 
-                document.getElementById('expectedVal').innerText = '\u20B9' + expected.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-
-
-
-                // Denoms
-
-                if (data.denominations.length > 0) {
-
-                    data.denominations.forEach(d => {
-
-                        const inp = document.querySelector(`.denom-input[data-note="${d.note_value}"]`);
-
-                        if (inp) inp.value = d.count;
-
-                    });
-
-                } else {
-
-                    document.querySelectorAll('.denom-input').forEach(i => i.value = 0);
-
+                if (document.getElementById('expectedVal')) {
+                    document.getElementById('expectedVal').innerText = '\u20B9' + expected.toLocaleString('en-IN', { minimumFractionDigits: 2 });
                 }
 
+                if (document.getElementById('totalEnteredExpenseVal')) {
+                    document.getElementById('totalEnteredExpenseVal').innerText = '\u20B9' + data.total_expenses.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                }
 
+                // Denoms
+                if (data.denominations.length > 0) {
+                    data.denominations.forEach(d => {
+                        const inp = document.querySelector(`.denom-input[data-note="${d.note_value}"]`);
+                        if (inp) inp.value = d.count;
+                    });
+                } else {
+                    document.querySelectorAll('.denom-input').forEach(i => i.value = 0);
+                }
 
                 calcPhysical();
 
@@ -1766,19 +1744,34 @@
 
 
 
-            document.getElementById('actualCashDisplay').innerText = '\u20B9' + total.toLocaleString('en-IN');
+            if (document.getElementById('actualCashDisplay')) {
+                document.getElementById('actualCashDisplay').innerText = '\u20B9' + total.toLocaleString('en-IN');
+            }
 
-            document.getElementById('actualVal').innerText = '\u20B9' + total.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+            if (document.getElementById('actualVal')) {
+                document.getElementById('actualVal').innerText = '\u20B9' + total.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+            }
 
+            var report = window._closureData;
+            if (report) {
+                var cashSalesVal = report.sales.cash_sales || 0;
+                var obVal = report.balance.opening_balance || 0;
+                var totalExpense = report.total_expenses || 0;
 
+                var result = computeCashReport(cashSalesVal, totalExpense, obVal, total);
 
-            const toOffice = total;
-
-            document.getElementById('netToOfficeVal').innerText = '\u20B9' + toOffice.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-
-            document.getElementById('cfVal').innerText = '\u20B9' + toOffice.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-
-            document.getElementById('nextObVal').innerText = '\u20B92,500.00';
+                if (document.getElementById('cbVal')) {
+                    document.getElementById('cbVal').innerText = '\u20B9' + result.cashBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                }
+                if (document.getElementById('diffVal')) {
+                    var diff = result.difference;
+                    document.getElementById('diffVal').innerText = (diff >= 0 ? '+' : '-') + '\u20B9' + Math.abs(diff).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                    document.getElementById('diffVal').style.color = diff < 0 ? 'var(--danger)' : 'var(--success)';
+                }
+                if (document.getElementById('netToOfficeVal')) {
+                    document.getElementById('netToOfficeVal').innerText = '\u20B9' + result.cAtOffice.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                }
+            }
 
         }
 
@@ -1876,15 +1869,7 @@
 
 
 
-                const officeExp = Array.from(document.querySelectorAll('#officeExpBody tr')).map(tr => ({
-
-                    label: tr.querySelector('td:nth-child(1)').innerText.toUpperCase(),
-
-                    val: tr.querySelector('td:nth-child(2)').innerText
-
-                }));
-
-                const shopExp = Array.from(document.querySelectorAll('#shopExpBody tr')).map(tr => ({
+                const enteredExpenses = Array.from(document.querySelectorAll('#dynamicExpBody tr.entered-exp-row')).map(tr => ({
 
                     label: tr.querySelector('td:nth-child(1)').innerText.toUpperCase(),
 
@@ -1936,29 +1921,29 @@
 
                 // --- BUILD TABLE HELPERS (The "Previous" Bordered Table Format) ---
 
-                const Row = (label, val, bold = false) => `
+                 const Row = (label, val, bold = false) => `
 
-                    <tr style="${bold ? 'font-weight:bold;' : ''}">
+                     <tr style="${bold ? 'font-weight:bold;' : ''}">
 
-                        <td style="border: 1px solid black; padding: 6px 10px; text-transform: uppercase; width: 65%;">${label}</td>
+                         <td style="border: 1px solid black; padding: 4px 8px; text-transform: uppercase; width: 65%; font-size: 0.82rem;">${label}</td>
 
-                        <td style="border: 1px solid black; padding: 6px 10px; text-align: right;">${val}</td>
+                         <td style="border: 1px solid black; padding: 4px 8px; text-align: right; font-size: 0.82rem;">${val}</td>
 
-                    </tr>
+                     </tr>
 
-                `;
+                 `;
 
 
 
-                const SectionHeader = (label) => `
+                 const SectionHeader = (label) => `
 
-                    <tr style="background:#f1f5f9; font-weight:bold;">
+                     <tr style="background:#f1f5f9; font-weight:bold;">
 
-                        <td colspan="2" style="border: 1px solid black; padding: 6px 10px; text-transform: uppercase;">${label}</td>
+                         <td colspan="2" style="border: 1px solid black; padding: 4px 8px; text-transform: uppercase; font-size: 0.82rem;">${label}</td>
 
-                    </tr>
+                     </tr>
 
-                `;
+                 `;
 
 
 
@@ -1972,9 +1957,9 @@
 
                 tableRows += SectionHeader('PAYMENT METHOD');
 
-                tableRows += Row('CARD SALES:', cardSales);
-
                 tableRows += Row('CASH SALES:', cashSales);
+
+                tableRows += Row('CARD SALES:', cardSales);
 
                 tableRows += Row('UPI SALES:', upiSales);
 
@@ -1984,77 +1969,63 @@
 
                 tableRows += SectionHeader('CATEGORY');
 
-                catRows.forEach(c => { tableRows += Row(c.label + ':', c.val); });
+                catRows.forEach(c => {
+                    const valNum = parseFloat(c.val.replace(/[^\d.-]/g, '')) || 0;
+                    if (valNum > 0) {
+                        tableRows += Row(c.label + ':', c.val);
+                    }
+                });
 
                 tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
 
-                // Office Expenses
-                const filteredOfficeExp = officeExp.filter(e => !['TSC', 'BIZ'].includes(e.label));
-                tableRows += SectionHeader('OFFICE EXPENSE');
-                if (filteredOfficeExp.length > 0) {
-                    filteredOfficeExp.forEach(e => {
-                        tableRows += Row(e.label + ':', e.val);
-                    });
-                } else {
-                    tableRows += Row('NO OFFICE EXPENSE', '₹0.00');
-                }
-                tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
+                // CASH DEBIT EXPENSE consolidated section
+                tableRows += SectionHeader('CASH DEBIT EXPENSE');
 
-                // Shop Expenses
-                tableRows += SectionHeader('SHOP EXPENSE');
-                if (shopExp.length > 0) {
-                    shopExp.forEach(e => {
-                        tableRows += Row(e.label + ':', e.val);
-                    });
-                } else {
-                    tableRows += Row('NO SHOP EXPENSE', '₹0.00');
-                }
-                tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
+                // 1. Biz Breakdown
+                tableRows += Row('BIZ @ 80%:', biz83);
+                tableRows += Row('BIZ @ 20%:', biz17);
+                tableRows += Row('Biz:', bizTotal);
 
-                tableRows += SectionHeader('BIZ & TSC SUMMARY');
+                // 2. TSC Breakdown
+                tableRows += Row('TSC @ 80%:', tsc80);
+                tableRows += Row('TSC @ 20%:', tsc20);
+                tableRows += Row('TSC:', '\u20B9' + tscTotal);
 
-                tableRows += Row('TotalBiz:', bizTotal);
+                // 3. Entered Expenses
+                let totalEnteredExp = 0;
+                enteredExpenses.forEach(e => {
+                    const valNum = parseFloat(e.val.replace(/[^\d.-]/g, '')) || 0;
+                    totalEnteredExp += valNum;
+                    tableRows += Row(e.label + ':', e.val);
+                });
 
-                tableRows += Row('BIZ@80%:', biz83);
+                // 4. Total Expense
+                tableRows += Row('TOTAL EXPENSE:', totalExp, true);
 
-                tableRows += Row('BIZ@20%:', biz17);
-
-                tableRows += Row('Total TSC:', '\u20B9' + tscTotal);
-
-                tableRows += Row('TSC@80%:', tsc80);
-
-                tableRows += Row('TSC@20%:', tsc20);
-
-                tableRows += `<tr><td colspan="2" style="border:1px solid black; height: 5px;"></td></tr>`;
-
-
-
-                // Calculate actual C.B, discrepancy (+/-), and C @ OFF from user entries
+                // Calculate C @ OFF, C.B., and Difference
                 let diffStr = '₹0.00';
-                let actualCBText = '₹0.00';
+                let cbText = '₹0.00';
                 let cashOffText = '₹0.00';
                 try {
-                    const expectedNum = parseFloat(expectedCB.replace(/[^\d.-]/g, '')) || 0;
                     const obNum = parseFloat(ob.replace(/[^\d.-]/g, '')) || 0;
                     const countedNum = parseFloat(cb.replace(/[^\d.-]/g, '')) || 0;
+                    const expectedNum = parseFloat(expectedCB.replace(/[^\d.-]/g, '')) || 0;
+                    const cashOffNum = parseFloat(cashOff.replace(/[^\d.-]/g, '')) || 0;
                     
-                    const actualCBVal = countedNum + obNum;
-                    const diffVal = actualCBVal - expectedNum;
+                    const diffVal = countedNum - expectedNum;
                     
                     diffStr = (diffVal >= 0 ? '+' : '-') + '₹' + Math.abs(diffVal).toLocaleString('en-IN', { minimumFractionDigits: 2 });
-                    actualCBText = '₹' + actualCBVal.toLocaleString('en-IN', { minimumFractionDigits: 2 });
-                    cashOffText = '₹' + countedNum.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                    cbText = '₹' + expectedNum.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                    cashOffText = '₹' + cashOffNum.toLocaleString('en-IN', { minimumFractionDigits: 2 });
                 } catch(e) {
                     console.error(e);
                 }
-
-                tableRows += SectionHeader('CASH DEBIT EXPENSE');
 
                 tableRows += Row('O.B:', ob);
 
                 tableRows += Row('(+/-):', diffStr);
 
-                tableRows += Row('C.B:', actualCBText, true);
+                tableRows += Row('C.B:', cbText, true);
 
                 tableRows += Row('C @ OFF:', cashOffText, true);
 
@@ -2078,17 +2049,17 @@
 
                 const finalLayout = `
 
-                    <div style="background: white; color: black; font-family: 'Courier New', Courier, monospace; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <div style="background: white; color: black; font-family: 'Courier New', Courier, monospace; max-width: 100%; margin: 0 auto; padding: 10px;">
 
-                        <div style="text-align: center; margin-bottom: 20px;">
+                        <div style="text-align: center; margin-bottom: 8px;">
 
-                            <h2 style="margin: 0; text-transform: uppercase; font-size: 1.5rem; font-weight: 900;">Sagar Super</h2>
+                            <h2 style="margin: 0; text-transform: uppercase; font-size: 1.15rem; font-weight: 900;">Sagar Super</h2>
 
-                            <h3 style="margin: 5px 0; text-transform: uppercase; font-size: 1.1rem; font-weight: 700;">Final Report</h3>
+                            <h3 style="margin: 2px 0; text-transform: uppercase; font-size: 0.95rem; font-weight: 700;">Final Report</h3>
 
-                            ${counterLabel ? `<div style="margin-top: 6px; font-size: 0.95rem; font-weight: 700; text-transform: uppercase;">${counterLabel}</div>` : ''}
+                            ${counterLabel ? `<div style="margin-top: 4px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase;">${counterLabel}</div>` : ''}
 
-                            <p style="margin: 5px 0; font-size: 0.9rem;">Date: ${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')} &nbsp; Time: ${syncTime}<br>
+                            <p style="margin: 3px 0; font-size: 0.78rem;">Date: ${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')} &nbsp; Time: ${syncTime}<br>
 
                             Report Date: ${date.split('-').reverse().join('-')}</p>
 
@@ -2098,11 +2069,11 @@
 
                             <thead>
 
-                                <tr style="background: #e2e8f0; font-weight: bold;">
+                                <tr style="background: #e2e8f0; font-weight: bold; font-size: 0.8rem;">
 
-                                    <td style="border: 1px solid black; padding: 8px;">DESCRIPTION</td>
+                                    <td style="border: 1px solid black; padding: 4px 8px;">DESCRIPTION</td>
 
-                                    <td style="border: 1px solid black; padding: 8px; text-align: right;">AMOUNT</td>
+                                    <td style="border: 1px solid black; padding: 4px 8px; text-align: right;">AMOUNT</td>
 
                                 </tr>
 
@@ -2130,9 +2101,11 @@
 
                 // Modal Adjustment
 
-                document.querySelector('#previewModal .modal-content').style.maxWidth = '700px';
+                document.querySelector('#previewModal .modal-content').style.maxWidth = '480px';
+                document.querySelector('#previewModal .modal-content').style.maxHeight = '95vh';
 
                 document.querySelector('#previewModal .modal-body').style.background = '#f1f5f9';
+                document.querySelector('#previewModal .modal-body').style.padding = '10px';
 
                 document.getElementById('previewModal').style.display = 'flex';
 
@@ -2202,6 +2175,16 @@
 
 
 
+                const enteredExpenses = Array.from(document.querySelectorAll('#dynamicExpBody tr.entered-exp-row')).map(tr => ({
+
+                    label: tr.querySelector('td:nth-child(1)').innerText,
+
+                    val: tr.querySelector('td:nth-child(2)').innerText
+
+                }));
+
+
+
                 const payload = {
 
                     counter: counterLabel || admin,
@@ -2242,9 +2225,9 @@
 
                     denominations: denominations,
 
-                    office_expenses: officeExp,
+                    office_expenses: enteredExpenses,
 
-                    shop_expenses: shopExp
+                    shop_expenses: []
 
                 };
 

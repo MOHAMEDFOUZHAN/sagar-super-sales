@@ -16,6 +16,8 @@
 
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
+    <script src="{{ url_for('static', filename='assets/js/cash-calculator.js') }}"></script>
+
     <style>
 
         .report-card {
@@ -319,7 +321,7 @@
 
 
 
-                <!-- Section 3: Expenses & Bizz Breakdown -->
+                <!-- Section 3: CASH DEBIT EXPENSE Consolidated Section -->
 
                 <tr class="section-header">
 
@@ -327,102 +329,69 @@
 
                 </tr>
 
-                <tbody id="expenseRows"></tbody>
-
-                <tbody id="bizzCatRows"></tbody>
-
-                <tbody id="tscRows"></tbody>
-
-
-
-                <tr class="empty-row">
-
-                    <td colspan="2"></td>
-
-                </tr>
-
-                <tr class="section-header">
-
-                    <td colspan="2">SHOP EXP</td>
-
-                </tr>
-
-                <tbody id="shopExpRows"></tbody>
-
-
-
-                <tr class="empty-row">
-
-                    <td colspan="2"></td>
-
-                </tr>
-
+                <!-- 1. Biz Breakdown -->
                 <tr>
+                    <td style="padding-left: 20px; font-size: 0.9rem;">BIZ @ 83%</td>
+                    <td id="biz83Val">0.00</td>
+                </tr>
+                <tr>
+                    <td style="padding-left: 20px; font-size: 0.9rem;">GODOWN BIZ @ 17%</td>
+                    <td id="godownBizVal">0.00</td>
+                </tr>
+                <tr style="font-weight: bold;">
+                    <td>Biz</td>
+                    <td id="totalBizVal">0.00</td>
+                </tr>
 
-                    <td class="text-bold">TOTAL EXPENSE =</td>
+                <!-- 2. TSC Breakdown -->
+                <tr>
+                    <td style="padding-left: 20px; font-size: 0.9rem;">TSC @ 80%</td>
+                    <td id="tsc80Val">0.00</td>
+                </tr>
+                <tr>
+                    <td style="padding-left: 20px; font-size: 0.9rem;">TSC @ 20%</td>
+                    <td id="tsc20Val">0.00</td>
+                </tr>
+                <tr style="font-weight: bold;">
+                    <td>TSC</td>
+                    <td id="totalTscVal">0.00</td>
+                </tr>
 
-                    <td id="totalExpense">0.00</td>
+                <!-- 3. Entered Expenses -->
+                <tbody id="adminEnteredExpensesRows"></tbody>
 
+                <!-- 4. Total Expense Row -->
+                <tr style="font-weight: bold;">
+                    <td>TOTAL EXPENSE =</td>
+                    <td id="adminTotalExpenseVal">0.00</td>
                 </tr>
 
                 <tr class="empty-row">
-
                     <td colspan="2"></td>
-
                 </tr>
 
-
-
-                <!-- Section 4: Godown/Bizz Split -->
-
+                <!-- 5. O.B -->
                 <tr>
-
-                    <td class="text-bold">GODOWN BIZ @ 17%</td>
-
-                    <td id="godownBiz">0.00</td>
-
-                </tr>
-
-                <tr class="empty-row">
-
-                    <td colspan="2"></td>
-
-                </tr>
-
-
-
-                <!-- Section 5: Cash Balance Section -->
-
-                <tr>
-
                     <td class="text-bold">O.B =</td>
-
-                    <td id="openingBal">0.00</td>
-
+                    <td id="openingBalVal">0.00</td>
                 </tr>
 
+                <!-- 6. (+/-) -->
                 <tr>
-
                     <td class="text-bold">(+/- =)</td>
-
-                    <td id="cashPlusMinus">0.00</td>
-
+                    <td id="diffValPlusMinus">0.00</td>
                 </tr>
 
+                <!-- 7. C.B -->
                 <tr>
-
                     <td class="text-bold">C.B =</td>
-
-                    <td id="closingBal">0.00</td>
-
+                    <td id="closingBalVal">0.00</td>
                 </tr>
 
+                <!-- 8. C @ OFF -->
                 <tr>
-
-                    <td class="text-bold">CASH / OFF =</td>
-
-                    <td id="cashOff" style="color: red;">0.00</td>
-
+                    <td class="text-bold">C @ OFF =</td>
+                    <td id="cashOffVal" style="color: var(--success); font-weight: bold;">0.00</td>
                 </tr>
 
                 <tr class="empty-row">
@@ -430,6 +399,14 @@
                     <td colspan="2"></td>
 
                 </tr>
+
+                <!-- Hidden elements for backward compatibility -->
+                <span id="openingBal" style="display:none;">0.00</span>
+                <span id="closingBal" style="display:none;">0.00</span>
+                <span id="cashPlusMinus" style="display:none;">0.00</span>
+                <span id="cashOff" style="display:none;">0.00</span>
+                <span id="totalExpense" style="display:none;">0.00</span>
+                <span id="godownBiz" style="display:none;">0.00</span>
 
 
 
@@ -522,115 +499,111 @@
 
             (data.categories || []).forEach(c => {
 
-                catRows.innerHTML += `<tr><td class="text-bold">${c.category}</td><td>${(c.category_sales || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+                if ((c.category_sales || 0) > 0) {
+
+                    catRows.innerHTML += `<tr><td class="text-bold">${c.category}</td><td>${(c.category_sales || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+
+                }
 
             });
 
 
 
-            // Office Expenses
-
-            const expRows = document.getElementById('expenseRows');
-
-            expRows.innerHTML = '';
-
-            (data.office_expenses || []).forEach(e => {
-
-                expRows.innerHTML += `<tr><td>${(e.category || '').toUpperCase()}</td><td>${(e.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
-
-            });
-
-
-
-            // Bizz Breakdown
-
+            // Append GODOWN BIZ @ 17% to Category breakdown
             const totalBiz = data.biz_charges || 0;
+            const biz_17 = totalBiz * 0.17;
+            const catRows = document.getElementById('categoryRows');
+            if (catRows) {
+                catRows.innerHTML += `<tr><td class="text-bold">GODOWN BIZ @ 17%</td><td>${biz_17.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+            }
 
+            // Populate CASH DEBIT EXPENSE consolidated rows
+            const totalBiz = data.biz_charges || 0;
             const biz_83 = totalBiz * 0.83;
-
             const biz_17 = totalBiz * 0.17;
 
-            const bizzRows = document.getElementById('bizzCatRows');
+            // 1. Biz splits
+            if (document.getElementById('biz83Val')) {
+                document.getElementById('biz83Val').innerText = biz_83.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            }
+            if (document.getElementById('godownBizVal')) {
+                document.getElementById('godownBizVal').innerText = biz_17.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            }
+            const totalBizValElem = document.getElementById('totalBizVal');
+            if (totalBizValElem) {
+                totalBizValElem.innerText = totalBiz.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            }
 
-            bizzRows.innerHTML = '';
-
-            bizzRows.innerHTML += `<tr><td>BIZ @ 83%</td><td>${biz_83.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
-
-
-
-            // TSC
-
-            const tscRows = document.getElementById('tscRows');
-
+            // 2. TSC splits
             const tscTotal = data.tsc_total || 0;
-
             const tsc80 = tscTotal * 0.8;
-
             const tsc20 = tscTotal * 0.2;
+            if (document.getElementById('tsc80Val')) {
+                document.getElementById('tsc80Val').innerText = tsc80.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            }
+            if (document.getElementById('tsc20Val')) {
+                document.getElementById('tsc20Val').innerText = tsc20.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            }
+            const totalTscValElem = document.getElementById('totalTscVal');
+            if (totalTscValElem) {
+                totalTscValElem.innerText = tscTotal.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            }
 
-            tscRows.innerHTML = `
+            // 3. Entered Expenses & sum calculation
+            let totalEnteredExpenses = 0;
+            const adminExpRows = document.getElementById('adminEnteredExpensesRows');
+            if (adminExpRows) {
+                adminExpRows.innerHTML = '';
+                const filteredOffice = (data.office_expenses || []).filter(e => !['TSC', 'BIZ'].includes(e.category) && e.amount > 0);
+                const filteredShop = (data.shop_expenses || []).filter(e => e.amount > 0);
+                
+                [...filteredOffice, ...filteredShop].forEach(e => {
+                    totalEnteredExpenses += e.amount;
+                    adminExpRows.innerHTML += `<tr><td>${(e.category || '').toUpperCase()}</td><td>${(e.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+                });
+            }
 
-                <tr><td>TSC</td><td>${tscTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
-
-                <tr><td>TSC @ 80%</td><td>${tsc80.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
-
-                <tr><td>TSC @ 20%</td><td>${tsc20.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>
-
-            `;
-
-
-
-            // Shop Expenses
-
-            const shopRows = document.getElementById('shopExpRows');
-
-            shopRows.innerHTML = '';
-
-            (data.shop_expenses || []).forEach(e => {
-
-                shopRows.innerHTML += `<tr><td>${(e.category || '').toUpperCase()}</td><td>${(e.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
-
-            });
-
-
-
-            // Total Expense
-
-            document.getElementById('totalExpense').innerText = (data.total_expenses || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
-
-
-
-            // Godown Biz (17%)
-
-            document.getElementById('godownBiz').innerText = biz_17.toLocaleString(undefined, { minimumFractionDigits: 2 });
-
-
-
-            // Cash Balance
-
+            // 4. Total Expense (includes BIZ + TSC)
+            var totalExpense = data.total_expenses || 0;
+            if (document.getElementById('adminTotalExpenseVal')) {
+                document.getElementById('adminTotalExpenseVal').innerText = totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            }
+            // Cash Balance details
             const bal = data.balance || {};
+            const obVal = bal.opening_balance || 0;
+            const actualClosingVal = bal.actual_closing || 0; // physical counted total
 
-            document.getElementById('openingBal').innerText = (bal.opening_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+            var cashSales = s.cash_sales || 0;
+            var totalExpense = data.total_expenses || 0;
+            var result = computeCashReport(cashSales, totalExpense, obVal, actualClosingVal);
+            var netToOffice = result.cAtOffice;
+            var cbVal = result.cashBalance;
+            var diffVal = result.difference;
 
-            document.getElementById('closingBal').innerText = (bal.actual_closing || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+            if (document.getElementById('openingBalVal')) {
+                document.getElementById('openingBalVal').innerText = obVal.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            }
+            if (document.getElementById('cashOffVal')) {
+                document.getElementById('cashOffVal').innerText = netToOffice.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            }
+            if (document.getElementById('closingBalVal')) {
+                document.getElementById('closingBalVal').innerText = cbVal.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            }
+            if (document.getElementById('diffValPlusMinus')) {
+                document.getElementById('diffValPlusMinus').innerText = (diffVal >= 0 ? '+' : '') + diffVal.toLocaleString(undefined, { minimumFractionDigits: 2 });
+                document.getElementById('diffValPlusMinus').style.color = diffVal < 0 ? 'red' : 'green';
+            }
+            if (document.getElementById('totalCF')) {
+                document.getElementById('totalCF').innerText = '\u20B9' + cbVal.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            }
 
-            document.getElementById('cashOff').innerText = (bal.difference || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
-
-            document.getElementById('totalCF').innerText = '\u20B9' + (bal.actual_closing || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
-
-
-
-            // Denominations
-
-            const dRows = document.getElementById('denomRows');
-
-            dRows.innerHTML = '';
-
-            data.denominations.forEach(dn => {
-
-                dRows.innerHTML += `<tr><td>${dn.note_value} * ${dn.count}</td><td>${(dn.note_value * dn.count).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
-
-            });
+            // Set hidden fields for backward compatibility to prevent script errors
+            if (document.getElementById('openingBal')) document.getElementById('openingBal').innerText = obVal.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            if (document.getElementById('closingBal')) document.getElementById('closingBal').innerText = cbVal.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            if (document.getElementById('cashPlusMinus')) document.getElementById('cashPlusMinus').innerText = diffVal.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            if (document.getElementById('cashOff')) document.getElementById('cashOff').innerText = netToOffice.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            if (document.getElementById('totalExpense')) document.getElementById('totalExpense').innerText = totalExpense.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            if (document.getElementById('godownBiz')) document.getElementById('godownBiz').innerText = biz_17.toLocaleString(undefined, { minimumFractionDigits: 2 });;
 
         }
 

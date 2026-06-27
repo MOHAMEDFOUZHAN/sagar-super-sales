@@ -1,6 +1,5 @@
 flask
 mysql-connector-python
-psycopg2-binary
 fpdf2
 python-docx
 pypdf

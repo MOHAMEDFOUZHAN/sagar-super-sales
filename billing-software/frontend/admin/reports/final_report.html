@@ -233,7 +233,7 @@
 
                         <div class="summary-row">
 
-                            <div class="summary-label">OPENING BALANCE</div>
+                            <div class="summary-label">OPENING BALANCE (O.B)</div>
 
                             <div class="summary-value" id="valOpening">&#8377;0.00</div>
 
@@ -255,7 +255,7 @@
 
                         </div>
 
-                        <div class="summary-row">
+                        <div class="summary-row" style="border-top: 1px solid var(--glass-border); padding-top: 10px;">
 
                             <div class="summary-label">TOTAL EXPENSES</div>
 
@@ -263,11 +263,19 @@
 
                         </div>
 
-                        <div class="summary-row">
+                        <div class="summary-row" style="font-weight: bold;">
 
-                            <div class="summary-label">EXPECTED CASH CLOSING</div>
+                            <div class="summary-label">EXPECTED CASH CLOSING (C.B)</div>
 
                             <div class="summary-value" id="valExpected">&#8377;0.00</div>
+
+                        </div>
+
+                        <div class="summary-row" style="color: var(--success); font-weight: bold;">
+
+                            <div class="summary-label">C @ OFF (CASH @ OFFICE)</div>
+
+                            <div class="summary-value" id="valCashOff">&#8377;0.00</div>
 
                         </div>
 
@@ -448,9 +456,13 @@
 
 
 
-                const expected = data.balance.opening_balance + data.sales.cash_sales - data.total_expenses - data.biz_charges;
+                const expected = data.balance.opening_balance + data.sales.cash_sales - data.total_expenses;
 
                 document.getElementById('valExpected').innerText = '\u20B9' + expected.toFixed(2);
+
+                const cAtOffice = data.sales.cash_sales - data.total_expenses;
+
+                document.getElementById('valCashOff').innerText = '\u20B9' + cAtOffice.toFixed(2);
 
 
 

@@ -296,45 +296,7 @@
 
             </div>
 
-            <!-- 🧹 WIPE BOTH DATABASES (Test Mode) -->
-            <div class="glass-panel reset-card" style="border-color: rgba(251, 146, 60, 0.5); background: rgba(251, 146, 60, 0.04);">
 
-                <div style="display: flex; align-items: center; gap: 15px;">
-
-                    <div style="width: 50px; height: 50px; background: rgba(251, 146, 60, 0.15); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fb923c; font-size: 1.5rem;">
-                        <i class="fa-solid fa-cloud-slash"></i>
-                    </div>
-
-                    <div>
-                        <h2 style="font-size: 1.2rem; font-weight: 700;">Wipe BOTH Databases</h2>
-                        <p style="font-size: 0.8rem; color: #fb923c; font-weight: 700;">🧪 TEST MODE — LOCAL + CLOUD</p>
-                    </div>
-
-                </div>
-
-                <div class="warning-box" style="background: rgba(251, 146, 60, 0.12); border-left-color: #fb923c; color: #fed7aa;">
-                    <strong>⚙️ WHAT THIS DOES:</strong>
-                    <ul style="margin-left: 20px; margin-top: 5px;">
-                        <li>Deletes all Bills, Items, Expenses from <strong>local MySQL</strong>.</li>
-                        <li>Deletes all Bills, Items, Expenses from <strong>Supabase cloud</strong>.</li>
-                        <li>Resets bill sequences on both sides to zero.</li>
-                        <li><strong style="color:#fb923c;">KEEPS:</strong> Products, Categories, Users, Stock.</li>
-                        <li>Use this to get a clean identical state for testing sync.</li>
-                    </ul>
-                </div>
-
-                <div style="margin-top: 10px;">
-                    <label style="display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px;">CONFIRM ADMIN PASSWORD</label>
-                    <input type="password" id="pass_wipe_both" class="security-input" placeholder="••••••••">
-                </div>
-
-                <button onclick="wipeBothDbs()" style="background: linear-gradient(135deg, #ea580c, #9a3412); color: white; border: none; padding: 12px; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer; transition: all 0.2s; font-size: 0.95rem;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 5px 15px rgba(251,146,60,0.4)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
-                    <i class="fa-solid fa-trash-can"></i> WIPE BOTH LOCAL + CLOUD
-                </button>
-
-                <div id="wipe_both_status" style="font-size: 0.8rem; text-align: center; min-height: 20px;"></div>
-
-            </div>
 
             <div class="glass-panel reset-card" style="border-color: rgba(99, 102, 241, 0.3);">
                 <div style="display: flex; align-items: center; gap: 15px;">
@@ -440,45 +402,7 @@
             }
         }
 
-        async function wipeBothDbs() {
-            const password = document.getElementById('pass_wipe_both').value;
-            if (!password) {
-                showNotif('Please enter your admin password.', true);
-                return;
-            }
 
-            if (!confirm('⚠️ This will delete ALL bills and transactions from BOTH local MySQL and Supabase cloud.\n\nProducts and users will be kept.\n\nAre you sure?')) return;
-
-            const statusEl = document.getElementById('wipe_both_status');
-            statusEl.style.color = '#fb923c';
-            statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Wiping both databases...';
-
-            try {
-                const res = await fetch('/api/admin/system/wipe-both-dbs', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
-                });
-                const data = await res.json();
-
-                if (data.status === 'success') {
-                    const local = data.details?.local_mysql || '?';
-                    const cloud = data.details?.supabase_cloud || '?';
-                    statusEl.style.color = 'var(--success)';
-                    statusEl.innerHTML = `<i class="fa-solid fa-check-circle"></i> Done! Local: <strong>${local}</strong> | Cloud: <strong>${cloud}</strong>`;
-                    showNotif('Both databases wiped successfully! ✅');
-                    document.getElementById('pass_wipe_both').value = '';
-                } else {
-                    statusEl.style.color = 'var(--danger)';
-                    statusEl.innerHTML = '<i class="fa-solid fa-circle-xmark"></i> ' + data.message;
-                    showNotif(data.message, true);
-                }
-            } catch (err) {
-                statusEl.style.color = 'var(--danger)';
-                statusEl.innerHTML = 'Network error.';
-                showNotif('Network error occurred.', true);
-            }
-        }
 
 
 

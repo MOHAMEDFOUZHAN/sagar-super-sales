@@ -32,7 +32,6 @@ PyInstaller.__main__.run([
     '--collect-all', 'engineio',
     '--collect-all', 'socketio',
     '--collect-all', 'charset_normalizer',
-    '--collect-all', 'psycopg2',
     '--collect-all', 'mysql',
     '--name', 'SSMP',
     '--clean',              
