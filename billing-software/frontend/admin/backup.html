@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Backup — Maple Pro</title>
+    <meta name="description" content="Professional backup management system for MaplePro Billing. Create, restore, schedule and manage database backups.">
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* ===========================
+           BACKUP PAGE STYLES
+        =========================== */
+        .backup-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .backup-header h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, #818cf8 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .backup-header p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+
+        /* Status Cards */
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        .status-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 20px 22px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.3s var(--ease-out);
+            position: relative;
+            overflow: hidden;
+        }
+        .status-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: var(--card-accent, var(--primary));
+            opacity: 0.7;
+        }
+        .status-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(99,102,241,0.3);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        .status-icon {
+            width: 48px; height: 48px;
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+        .status-info .label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+        }
+        .status-info .value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 180px;
+        }
+        .status-info .sub {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        /* Section cards */
+        .section-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(12px);
+        }
+        .section-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .section-title i {
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        /* Settings Panel */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .setting-field label {
+            display: block;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 8px;
+        }
+        .setting-field input[type="text"],
+        .setting-field input[type="number"] {
+            width: 100%;
+            background: rgba(0,0,0,0.35);
+            border: 1px solid var(--glass-border);
+            color: #f1f5f9;
+            padding: 11px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .setting-field input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+        }
+
+        /* Interval radio group */
+        .interval-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .interval-option {
+            position: relative;
+        }
+        .interval-option input[type="radio"] {
+            position: absolute; opacity: 0; width: 0; height: 0;
+        }
+        .interval-option label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .interval-option input[type="radio"]:checked + label {
+            border-color: var(--primary);
+            background: rgba(99,102,241,0.12);
+            color: #818cf8;
+        }
+        .interval-option label:hover {
+            border-color: rgba(99,102,241,0.4);
+            color: #c7d2fe;
+        }
+
+        /* Toggle switch */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            background: rgba(0,0,0,0.2);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--glass-border);
+        }
+        .toggle-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+        .toggle-label small {
+            display: block;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-top: 2px;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 48px; height: 26px;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.1);
+            border-radius: 13px;
+            transition: 0.3s;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 18px; height: 18px;
+            left: 3px; bottom: 3px;
+            background: #94a3b8;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        .toggle-switch input:checked + .toggle-slider {
+            background: rgba(99,102,241,0.35);
+            border-color: var(--primary);
+        }
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(22px);
+            background: var(--primary);
+            box-shadow: 0 0 8px rgba(99,102,241,0.6);
+        }
+
+        /* Action buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-weight: 700;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #4f46e5;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(99,102,241,0.4);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+        .btn-success:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(16,185,129,0.4);
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+        }
+        .btn-warning:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(245,158,11,0.4);
+        }
+        .btn-danger-outline {
+            background: transparent;
+            border: 1px solid rgba(239,68,68,0.4);
+            color: #fca5a5;
+        }
+        .btn-danger-outline:hover:not(:disabled) {
+            background: rgba(239,68,68,0.12);
+            border-color: #ef4444;
+        }
+        .btn-ghost {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+        }
+        .btn-ghost:hover:not(:disabled) {
+            background: rgba(255,255,255,0.09);
+            color: #f1f5f9;
+        }
+        .btn-sm {
+            padding: 7px 14px;
+            font-size: 0.8rem;
+        }
+
+        /* Table */
+        .backup-table-wrap {
+            overflow-x: auto;
+            border-radius: var(--radius-md);
+        }
+        .backup-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .backup-table th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--glass-border);
+            white-space: nowrap;
+        }
+        .backup-table td {
+            padding: 13px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            color: #e2e8f0;
+            vertical-align: middle;
+        }
+        .backup-table tr:last-child td {
+            border-bottom: none;
+        }
+        .backup-table tr:hover td {
+            background: rgba(255,255,255,0.02);
+        }
+        .backup-table .filename {
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #c7d2fe;
+            max-width: 240px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+        .badge-success { background: rgba(16,185,129,0.15); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.2); }
+        .badge-danger  { background: rgba(239,68,68,0.15);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.2); }
+        .badge-info    { background: rgba(6,182,212,0.15);  color: #67e8f9; border: 1px solid rgba(6,182,212,0.2); }
+        .badge-purple  { background: rgba(168,85,247,0.15); color: #d8b4fe; border: 1px solid rgba(168,85,247,0.2); }
+        .badge-warning { background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.2); }
+
+        .action-btns {
+            display: flex;
+            gap: 6px;
+            flex-wrap: nowrap;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: var(--text-muted);
+        }
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+        .empty-state p { font-size: 0.9rem; }
+
+        /* Client blocked notice */
+        .client-notice {
+            display: none;
+            background: rgba(245,158,11,0.08);
+            border: 1px solid rgba(245,158,11,0.3);
+            border-left: 4px solid #f59e0b;
+            border-radius: var(--radius-md);
+            padding: 18px 20px;
+            margin-bottom: 24px;
+            color: #fcd34d;
+        }
+        .client-notice.show { display: flex; gap: 14px; align-items: flex-start; }
+        .client-notice i { font-size: 1.3rem; flex-shrink: 0; margin-top: 2px; }
+        .client-notice .notice-text strong { font-size: 0.95rem; display: block; margin-bottom: 4px; }
+        .client-notice .notice-text p { font-size: 0.82rem; opacity: 0.85; }
+
+        /* Settings row buttons */
+        .settings-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Toast notification */
+        #toast-container {
+            position: fixed;
+            bottom: 24px; right: 24px;
+            display: flex; flex-direction: column;
+            gap: 10px;
+            z-index: 9999;
+        }
+        .toast {
+            padding: 14px 20px;
+            border-radius: var(--radius-md);
+            font-size: 0.88rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.3s ease;
+            max-width: 380px;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        @keyframes slideIn {
+            from { transform: translateX(120%); opacity: 0; }
+            to   { transform: translateX(0);    opacity: 1; }
+        }
+        .toast-success { background: rgba(16,185,129,0.2);  border: 1px solid rgba(16,185,129,0.4);  color: #6ee7b7; }
+        .toast-error   { background: rgba(239,68,68,0.2);   border: 1px solid rgba(239,68,68,0.4);   color: #fca5a5; }
+        .toast-info    { background: rgba(99,102,241,0.2);  border: 1px solid rgba(99,102,241,0.4);  color: #a5b4fc; }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(6px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.2s ease;
+        }
+        .modal-overlay.show { display: flex; }
+        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+        .modal-box {
+            background: #0f172a;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            max-width: 480px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .modal-box h3 {
+            font-size: 1.15rem;
+            font-weight: 800;
+            margin-bottom: 14px;
+            color: #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .modal-box p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; }
+        .modal-box .warning-banner {
+            background: rgba(239,68,68,0.1);
+            border-left: 3px solid #ef4444;
+            border-radius: var(--radius-sm);
+            padding: 12px 14px;
+            margin: 16px 0;
+            color: #fca5a5;
+            font-size: 0.85rem;
+        }
+        .modal-actions { display: flex; gap: 10px; margin-top: 24px; justify-content: flex-end; }
+
+        /* Pulse dot for scheduler */
+        .pulse-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .pulse-dot.active {
+            background: #10b981;
+            box-shadow: 0 0 0 0 rgba(16,185,129,0.4);
+            animation: pulse-anim 1.5s infinite;
+        }
+        .pulse-dot.inactive { background: #64748b; }
+        @keyframes pulse-anim {
+            0%   { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
+            70%  { box-shadow: 0 0 0 8px rgba(16,185,129,0); }
+            100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+        }
+    </style>
+</head>
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <!-- Header -->
+        <div class="backup-header">
+            <div>
+                <h1><i class="fa-solid fa-database" style="font-size:1.5rem; -webkit-text-fill-color: #818cf8;"></i> Database Backup</h1>
+                <p>Automated backup management — Server-only operations enforced</p>
+            </div>
+            <button id="btn-backup-now" class="btn btn-success" onclick="triggerManualBackup()">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Backup Now
+            </button>
+        </div>
+
+        <!-- Client Machine Notice (shown if client) -->
+        <div id="client-notice" class="client-notice">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <div class="notice-text">
+                <strong>Client Machine — Read-Only Mode</strong>
+                <p>You are viewing this page from a Client PC. Backup creation, restore, and scheduling can only be performed on the <strong>Server machine</strong> (the one running MySQL locally). This view is read-only.</p>
+            </div>
+        </div>
+
+        <!-- Status Cards -->
+        <div class="status-grid">
+            <div class="status-card" style="--card-accent: #10b981;">
+                <div class="status-icon" style="background: rgba(16,185,129,0.12); color: #10b981;">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+                <div class="status-info">
+                    <div class="label">Last Backup</div>
+                    <div class="value" id="stat-last-name">—</div>
+                    <div class="sub" id="stat-last-time">No backup found</div>
+                </div>
+            </div>
+
+            <div class="status-card" style="--card-accent: #6366f1;">
+                <div class="status-icon" style="background: rgba(99,102,241,0.12); color: #818cf8;">
+                    <i class="fa-solid fa-calendar-clock"></i>
+                </div>
+                <div class="status-info">
+                    <div class="label">Next Scheduled</div>
+                    <div class="value" id="stat-next-time">—</div>
+                    <div class="sub" id="stat-next-label">Auto-backup disabled</div>
+                </div>
+            </div>
+
+            <div class="status-card" style="--card-accent: #06b6d4;">
+                <div class="status-icon" style="background: rgba(6,182,212,0.12); color: #06b6d4;">
+                    <i class="fa-solid fa-rotate"></i>
+                </div>
+                <div class="status-info">
+                    <div class="label">Auto Backup</div>
+                    <div class="value" id="stat-auto-status">
+                        <span class="pulse-dot inactive" id="stat-pulse"></span>&nbsp;Checking...
+                    </div>
+                    <div class="sub" id="stat-auto-interval">—</div>
+                </div>
+            </div>
+
+            <div class="status-card" style="--card-accent: #f59e0b;">
+                <div class="status-icon" style="background: rgba(245,158,11,0.12); color: #f59e0b;">
+                    <i class="fa-solid fa-folder-open"></i>
+                </div>
+                <div class="status-info">
+                    <div class="label">Available Backups</div>
+                    <div class="value" id="stat-count">0</div>
+                    <div class="sub" id="stat-max">of 30 maximum</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div class="section-card">
+            <div class="section-title">
+                <i class="fa-solid fa-sliders"></i> Backup Settings
+            </div>
+            <div class="settings-grid">
+                <!-- Backup Folder -->
+                <div class="setting-field" style="grid-column: 1/-1;">
+                    <label><i class="fa-solid fa-folder"></i> Backup Folder Path</label>
+                    <input type="text" id="setting-folder" placeholder="e.g. D:\Maple Backups" autocomplete="off">
+                </div>
+
+                <!-- Schedule Interval -->
+                <div class="setting-field">
+                    <label><i class="fa-solid fa-clock"></i> Backup Schedule</label>
+                    <div class="interval-group">
+                        <div class="interval-option">
+                            <input type="radio" name="interval" id="int-1h" value="1h">
+                            <label for="int-1h"><i class="fa-solid fa-hourglass-half"></i> 1 Hour</label>
+                        </div>
+                        <div class="interval-option">
+                            <input type="radio" name="interval" id="int-6h" value="6h">
+                            <label for="int-6h"><i class="fa-solid fa-hourglass-end"></i> 6 Hours</label>
+                        </div>
+                        <div class="interval-option">
+                            <input type="radio" name="interval" id="int-daily" value="daily" checked>
+                            <label for="int-daily"><i class="fa-solid fa-sun"></i> Daily</label>
+                        </div>
+                        <div class="interval-option">
+                            <input type="radio" name="interval" id="int-weekly" value="weekly">
+                            <label for="int-weekly"><i class="fa-solid fa-calendar-week"></i> Weekly</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Max Backups -->
+                <div class="setting-field">
+                    <label><i class="fa-solid fa-layer-group"></i> Maximum Backup Files</label>
+                    <input type="number" id="setting-max" min="5" max="200" value="30" style="width: 120px;">
+                </div>
+
+                <!-- Auto-enable toggle -->
+                <div class="setting-field" style="grid-column: 1/-1;">
+                    <div class="toggle-row">
+                        <div class="toggle-label">
+                            Enable Automatic Backup
+                            <small>Backup will run automatically on the selected schedule</small>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="setting-auto-enable" onchange="onAutoToggleChange()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-actions">
+                <button class="btn btn-primary" id="btn-save-settings" onclick="saveSettings()">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Settings
+                </button>
+                <button class="btn btn-success" id="btn-start-scheduler" onclick="startScheduler()">
+                    <i class="fa-solid fa-play"></i> Start Scheduler
+                </button>
+                <button class="btn btn-ghost" id="btn-stop-scheduler" onclick="stopScheduler()">
+                    <i class="fa-solid fa-stop"></i> Stop Scheduler
+                </button>
+            </div>
+        </div>
+
+        <!-- Backup Files Table -->
+        <div class="section-card">
+            <div class="section-title">
+                <i class="fa-solid fa-table-list"></i> Available Backups
+                <span id="backup-count-badge" class="badge badge-info" style="margin-left: 8px; font-size: 0.7rem;">Loading...</span>
+            </div>
+            <div class="backup-table-wrap">
+                <table class="backup-table">
+                    <thead>
+                        <tr>
+                            <th>Backup Name</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Size</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Location</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backup-tbody">
+                        <tr><td colspan="8"><div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading backups...</p></div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Backup History Log -->
+        <div class="section-card">
+            <div class="section-title">
+                <i class="fa-solid fa-scroll"></i> Backup History Log
+            </div>
+            <div class="backup-table-wrap">
+                <table class="backup-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Backup Name</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Size</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Duration</th>
+                            <th>Message</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody">
+                        <tr><td colspan="9"><div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i><p>Loading history...</p></div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Restore Confirmation Modal -->
+    <div class="modal-overlay" id="restore-modal">
+        <div class="modal-box">
+            <h3><i class="fa-solid fa-triangle-exclamation" style="color: #f59e0b;"></i> Confirm Database Restore</h3>
+            <p>You are about to restore the database from:</p>
+            <p style="margin-top: 10px; font-family: monospace; color: #818cf8; font-size: 0.9rem; background: rgba(99,102,241,0.08); padding: 10px 12px; border-radius: 8px;" id="restore-filename-display">—</p>
+            <div class="warning-banner">
+                <i class="fa-solid fa-database"></i>&nbsp;&nbsp;
+                <strong>This will overwrite the current database.</strong> All current data will be replaced with the backup contents. A safety backup will be created automatically before restoring.
+            </div>
+            <p style="font-size: 0.82rem;">This operation cannot be undone. Are you sure?</p>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="closeRestoreModal()">Cancel</button>
+                <button class="btn btn-warning" id="btn-confirm-restore" onclick="confirmRestore()">
+                    <i class="fa-solid fa-rotate-left"></i> Yes, Restore Now
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="delete-modal">
+        <div class="modal-box">
+            <h3><i class="fa-solid fa-trash" style="color: #ef4444;"></i> Delete Backup</h3>
+            <p>Are you sure you want to permanently delete:</p>
+            <p style="margin-top: 10px; font-family: monospace; color: #fca5a5; font-size: 0.85rem; background: rgba(239,68,68,0.08); padding: 10px 12px; border-radius: 8px;" id="delete-filename-display">—</p>
+            <p style="margin-top: 12px; font-size: 0.83rem;">This cannot be undone.</p>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="closeDeleteModal()">Cancel</button>
+                <button class="btn btn-danger-outline" id="btn-confirm-delete" onclick="confirmDelete()">
+                    <i class="fa-solid fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toast-container"></div>
+
+    <script>
+    // ========================================================
+    // MaplePro Backup Management — Frontend
+    // ========================================================
+
+    let isServer = false;
+    let pendingRestoreFile = null;
+    let pendingDeleteFile = null;
+
+    // ---- Initialise ----
+    document.addEventListener('DOMContentLoaded', () => {
+        loadStatus();
+        loadSettings();
+        loadBackupList();
+        loadHistory();
+        // Refresh status every 30s
+        setInterval(loadStatus, 30000);
+    });
+
+    // ---- Toast ----
+    function showToast(msg, type = 'info', duration = 4000) {
+        const icons = { success: 'fa-circle-check', error: 'fa-circle-xmark', info: 'fa-circle-info' };
+        const el = document.createElement('div');
+        el.className = `toast toast-${type}`;
+        el.innerHTML = `<i class="fa-solid ${icons[type] || icons.info}"></i> ${msg}`;
+        document.getElementById('toast-container').appendChild(el);
+        setTimeout(() => el.remove(), duration);
+    }
+
+    // ---- Status summary ----
+    async function loadStatus() {
+        try {
+            const res = await fetch('/api/admin/backup/status');
+            if (!res.ok) {
+                if (res.status === 403 || res.status === 401) {
+                    window.location.href = '/login';
+                }
+                return;
+            }
+            const contentType = res.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                // Not JSON (e.g. redirected to login page HTML)
+                window.location.href = '/login';
+                return;
+            }
+            const d = await res.json();
+            isServer = d.is_server;
+
+            // Client notice
+            document.getElementById('client-notice').classList.toggle('show', !isServer);
+            const nowBtn = document.getElementById('btn-backup-now');
+            if (!isServer) {
+                nowBtn.disabled = true;
+                nowBtn.title = 'Only available on Server machine';
+                document.querySelectorAll('#btn-start-scheduler, #btn-stop-scheduler, #btn-save-settings').forEach(b => b.disabled = true);
+            }
+
+            // Last backup
+            if (d.last_backup) {
+                document.getElementById('stat-last-name').textContent = d.last_backup.name.replace('Maple_Backup_', '').replace('.sql', '') || '—';
+                const formattedDate = formatDate(d.last_backup.date);
+                const formattedTime = formatTime(d.last_backup.time);
+                document.getElementById('stat-last-time').textContent = `${formattedDate} ${formattedTime} · ${d.last_backup.size_human}`;
+            } else {
+                document.getElementById('stat-last-name').textContent = 'No backups yet';
+                document.getElementById('stat-last-time').textContent = '—';
+            }
+
+            // Next scheduled
+            if (d.next_scheduled && d.scheduler_running) {
+                document.getElementById('stat-next-time').textContent = d.next_scheduled; // Already formatted by backend
+                document.getElementById('stat-next-label').textContent = d.interval_label;
+            } else {
+                document.getElementById('stat-next-time').textContent = 'Not Scheduled';
+                document.getElementById('stat-next-label').textContent = 'Enable auto-backup to activate';
+            }
+
+            // Auto backup status
+            const pulse = document.getElementById('stat-pulse');
+            const autoEl = document.getElementById('stat-auto-status');
+            if (d.auto_enabled && d.scheduler_running) {
+                pulse.className = 'pulse-dot active';
+                autoEl.innerHTML = `<span class="pulse-dot active" id="stat-pulse"></span>&nbsp;<span style="color:#10b981;">Active</span>`;
+            } else {
+                pulse.className = 'pulse-dot inactive';
+                autoEl.innerHTML = `<span class="pulse-dot inactive" id="stat-pulse"></span>&nbsp;<span style="color:#64748b;">Disabled</span>`;
+            }
+            document.getElementById('stat-auto-interval').textContent = d.interval_label || '—';
+
+            // Count
+            document.getElementById('stat-count').textContent = d.total_backups;
+            document.getElementById('stat-max').textContent = `of ${d.max_backups} maximum`;
+
+        } catch(e) { console.error('Status load failed:', e); }
+    }
+
+    // ---- Load Settings ----
+    async function loadSettings() {
+        try {
+            const res = await fetch('/api/admin/backup/settings');
+            if (!res.ok) return;
+            const contentType = res.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) return;
+            const d = await res.json();
+            document.getElementById('setting-folder').value = d.backup_folder || '';
+            document.getElementById('setting-max').value = d.max_backups || 30;
+            document.getElementById('setting-auto-enable').checked = !!d.auto_backup_enabled;
+            const interval = d.schedule_interval || 'daily';
+            const radio = document.querySelector(`input[name="interval"][value="${interval}"]`);
+            if (radio) radio.checked = true;
+        } catch(e) { console.error('Settings load failed:', e); }
+    }
+
+    // ---- Save Settings ----
+    async function saveSettings() {
+        const btn = document.getElementById('btn-save-settings');
+        const folder = document.getElementById('setting-folder').value.trim();
+        const maxB = parseInt(document.getElementById('setting-max').value) || 30;
+        const autoEn = document.getElementById('setting-auto-enable').checked;
+        const intervalEl = document.querySelector('input[name="interval"]:checked');
+        const interval = intervalEl ? intervalEl.value : 'daily';
+
+        if (!folder) { showToast('Please enter a backup folder path.', 'error'); return; }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Saving...';
+        try {
+            const res = await fetch('/api/admin/backup/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ backup_folder: folder, max_backups: maxB, auto_backup_enabled: autoEn, schedule_interval: interval })
+            });
+            const contentType = res.headers.get('content-type') || '';
+            if (!res.ok || !contentType.includes('application/json')) {
+                showToast('Save failed. Session might have expired.', 'error');
+                return;
+            }
+            const d = await res.json();
+            if (d.status === 'success') {
+                showToast('Settings saved successfully!', 'success');
+                loadStatus();
+            } else {
+                showToast(d.message || 'Save failed.', 'error');
+            }
+        } catch(e) {
+            showToast('Network error: ' + e.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Settings';
+        }
+    }
+
+    function onAutoToggleChange() {
+        // Just reflect in UI; actual save happens on "Save Settings"
+    }
+
+    // ---- Start Scheduler ----
+    async function startScheduler() {
+        if (!isServer) { showToast('Scheduler can only run on the Server machine.', 'error'); return; }
+        const intervalEl = document.querySelector('input[name="interval"]:checked');
+        const interval = intervalEl ? intervalEl.value : 'daily';
+        const btn = document.getElementById('btn-start-scheduler');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>';
+        try {
+            const res = await fetch('/api/admin/backup/schedule/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ interval })
+            });
+            const contentType = res.headers.get('content-type') || '';
+            if (!res.ok || !contentType.includes('application/json')) {
+                showToast('Failed to start scheduler.', 'error');
+                return;
+            }
+            const d = await res.json();
+            if (d.success) {
+                showToast(`Scheduler started: ${d.message}`, 'success');
+                loadStatus();
+            } else {
+                showToast(d.error || 'Failed to start scheduler.', 'error');
+            }
+        } catch(e) {
+            showToast('Error: ' + e.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-play"></i> Start Scheduler';
+        }
+    }
+
+    // ---- Stop Scheduler ----
+    async function stopScheduler() {
+        const btn = document.getElementById('btn-stop-scheduler');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>';
+        try {
+            const res = await fetch('/api/admin/backup/schedule/stop', { method: 'POST' });
+            const contentType = res.headers.get('content-type') || '';
+            if (!res.ok || !contentType.includes('application/json')) {
+                showToast('Failed to stop scheduler.', 'error');
+                return;
+            }
+            const d = await res.json();
+            if (d.success) {
+                showToast('Scheduler stopped.', 'info');
+                loadStatus();
+            } else {
+                showToast(d.error || 'Failed to stop scheduler.', 'error');
+            }
+        } catch(e) {
+            showToast('Error: ' + e.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Scheduler';
+        }
+    }
+
+    // ---- Manual Backup ----
+    async function triggerManualBackup() {
+        if (!isServer) { showToast('Backup can only be created on the Server machine.', 'error'); return; }
+        const btn = document.getElementById('btn-backup-now');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Creating Backup...';
+        showToast('Starting backup... this may take a moment.', 'info');
+        try {
+            const res = await fetch('/api/admin/backup/create', { method: 'POST' });
+            const contentType = res.headers.get('content-type') || '';
+            if (!res.ok || !contentType.includes('application/json')) {
+                showToast('❌ Backup failed. Session may have expired.', 'error');
+                return;
+            }
+            const d = await res.json();
+            if (d.success) {
+                showToast(`✅ Backup created: ${d.name} (${d.size_human}) in ${d.duration_sec}s`, 'success', 6000);
+                loadBackupList();
+                loadHistory();
+                loadStatus();
+            } else {
+                showToast('❌ Backup failed: ' + (d.error || 'Unknown error'), 'error', 7000);
+            }
+        } catch(e) {
+            showToast('Error: ' + e.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Backup Now';
+        }
+    }
+
+    // ---- Load Backup List ----
+    async function loadBackupList() {
+        try {
+            const res = await fetch('/api/admin/backup/list');
+            if (!res.ok) {
+                document.getElementById('backup-tbody').innerHTML = `<tr><td colspan="8"><div class="empty-state"><i class="fa-solid fa-circle-xmark"></i><p>Session Expired. Please log in again.</p></div></td></tr>`;
+                return;
+            }
+            const contentType = res.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                document.getElementById('backup-tbody').innerHTML = `<tr><td colspan="8"><div class="empty-state"><i class="fa-solid fa-circle-xmark"></i><p>Session Expired. Please log in again.</p></div></td></tr>`;
+                return;
+            }
+            const d = await res.json();
+            isServer = d.is_server;
+            const tbody = document.getElementById('backup-tbody');
+            const badge = document.getElementById('backup-count-badge');
+
+            if (!d.backups || d.backups.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">
+                    <i class="fa-solid fa-database"></i>
+                    <p>No backups found. Click <strong>Backup Now</strong> to create your first backup.</p>
+                </div></td></tr>`;
+                badge.textContent = '0 files';
+                return;
+            }
+
+            badge.textContent = `${d.backups.length} file${d.backups.length !== 1 ? 's' : ''}`;
+            tbody.innerHTML = d.backups.map(b => {
+                const actionsBtns = isServer ? `
+                    <button class="btn btn-warning btn-sm" title="Restore this backup" onclick="openRestoreModal('${esc(b.name)}')">
+                        <i class="fa-solid fa-rotate-left"></i> Restore
+                    </button>
+                    <a class="btn btn-ghost btn-sm" href="/api/admin/backup/download/${esc(b.name)}" download="${esc(b.name)}" title="Download SQL file">
+                        <i class="fa-solid fa-download"></i>
+                    </a>
+                    <button class="btn btn-danger-outline btn-sm" title="Delete this backup" onclick="openDeleteModal('${esc(b.name)}')">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                ` : `<span style="color: var(--text-muted); font-size: 0.78rem; font-style: italic;">Server only</span>`;
+
+                return `<tr>
+                    <td><span class="filename" title="${esc(b.name)}">${esc(b.name)}</span></td>
+                    <td>${esc(formatDate(b.date))}</td>
+                    <td>${esc(formatTime(b.time))}</td>
+                    <td><span style="font-weight:600;">${esc(b.size_human)}</span></td>
+                    <td><span class="badge badge-purple"><i class="fa-solid fa-hand"></i> Manual</span></td>
+                    <td><span class="badge ${b.valid ? 'badge-success' : 'badge-danger'}">
+                        <i class="fa-solid ${b.valid ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
+                        ${b.valid ? 'Valid' : 'Invalid'}
+                    </span></td>
+                    <td><span style="font-size:0.78rem; color:var(--text-muted);" title="${esc(b.location)}">${shortPath(b.location)}</span></td>
+                    <td><div class="action-btns">${actionsBtns}</div></td>
+                </tr>`;
+            }).join('');
+        } catch(e) {
+            document.getElementById('backup-tbody').innerHTML = `<tr><td colspan="8"><div class="empty-state"><i class="fa-solid fa-circle-xmark"></i><p>Failed to load backups: ${e.message}</p></div></td></tr>`;
+        }
+    }
+
+    // ---- Load History ----
+    async function loadHistory() {
+        try {
+            const res = await fetch('/api/admin/backup/history');
+            if (!res.ok) {
+                document.getElementById('history-tbody').innerHTML = `<tr><td colspan="9"><div class="empty-state"><p>Session Expired. Please log in again.</p></div></td></tr>`;
+                return;
+            }
+            const contentType = res.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                document.getElementById('history-tbody').innerHTML = `<tr><td colspan="9"><div class="empty-state"><p>Session Expired. Please log in again.</p></div></td></tr>`;
+                return;
+            }
+            const d = await res.json();
+            const tbody = document.getElementById('history-tbody');
+
+            if (!d.history || d.history.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><i class="fa-solid fa-scroll"></i><p>No backup history yet.</p></div></td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = d.history.map(h => {
+                const statusBadge = h.status === 'Success'
+                    ? `<span class="badge badge-success"><i class="fa-solid fa-circle-check"></i> Success</span>`
+                    : `<span class="badge badge-danger"><i class="fa-solid fa-circle-xmark"></i> Failed</span>`;
+                const typeBadge = h.backup_type === 'Manual'
+                    ? `<span class="badge badge-purple"><i class="fa-solid fa-hand"></i> Manual</span>`
+                    : h.backup_type && h.backup_type.startsWith('Safety')
+                        ? `<span class="badge badge-warning"><i class="fa-solid fa-shield-halved"></i> Safety</span>`
+                        : `<span class="badge badge-info"><i class="fa-solid fa-rotate"></i> Auto</span>`;
+
+                const sizeHuman = h.size_bytes > 0 ? humanSize(h.size_bytes) : '—';
+                const errTip = h.error_msg ? ` title="${esc(h.error_msg)}"` : '';
+
+                return `<tr>
+                    <td style="color:var(--text-muted); font-size:0.78rem;">${h.id}</td>
+                    <td><span class="filename" title="${esc(h.backup_name)}">${esc(h.backup_name)}</span></td>
+                    <td>${esc(formatDate(h.backup_date))}</td>
+                    <td>${esc(formatTime(h.backup_time))}</td>
+                    <td>${sizeHuman}</td>
+                    <td>${typeBadge}</td>
+                    <td>${statusBadge}</td>
+                    <td style="font-size:0.82rem;">${h.duration_sec ? h.duration_sec + 's' : '—'}</td>
+                    <td style="font-size:0.78rem; color:${h.error_msg ? '#fca5a5' : 'var(--text-muted)'};"${errTip}>
+                        ${h.error_msg ? `<i class="fa-solid fa-circle-exclamation" style="margin-right:4px;"></i>${esc(h.error_msg.substring(0,60))}${h.error_msg.length > 60 ? '...' : ''}` : (h.status === 'Success' ? 'Completed successfully' : '—')}
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch(e) {
+            document.getElementById('history-tbody').innerHTML = `<tr><td colspan="9"><div class="empty-state"><p>Failed to load history.</p></div></td></tr>`;
+        }
+    }
+
+    // ---- Restore ----
+    function openRestoreModal(filename) {
+        pendingRestoreFile = filename;
+        document.getElementById('restore-filename-display').textContent = filename;
+        document.getElementById('restore-modal').classList.add('show');
+    }
+    function closeRestoreModal() {
+        pendingRestoreFile = null;
+        document.getElementById('restore-modal').classList.remove('show');
+    }
+    async function confirmRestore() {
+        if (!pendingRestoreFile) return;
+        const btn = document.getElementById('btn-confirm-restore');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Restoring...';
+        showToast('Creating safety backup, then restoring... Please wait.', 'info', 10000);
+        try {
+            const res = await fetch('/api/admin/backup/restore', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: pendingRestoreFile })
+            });
+            const d = await res.json();
+            closeRestoreModal();
+            if (d.success) {
+                showToast(`✅ ${d.message} Safety backup: ${d.safety_backup}`, 'success', 8000);
+                loadBackupList();
+                loadHistory();
+                loadStatus();
+            } else {
+                showToast('❌ Restore failed: ' + (d.error || 'Unknown error'), 'error', 8000);
+            }
+        } catch(e) {
+            closeRestoreModal();
+            showToast('Error: ' + e.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Yes, Restore Now';
+        }
+    }
+
+    // ---- Delete ----
+    function openDeleteModal(filename) {
+        pendingDeleteFile = filename;
+        document.getElementById('delete-filename-display').textContent = filename;
+        document.getElementById('delete-modal').classList.add('show');
+    }
+    function closeDeleteModal() {
+        pendingDeleteFile = null;
+        document.getElementById('delete-modal').classList.remove('show');
+    }
+    async function confirmDelete() {
+        if (!pendingDeleteFile) return;
+        const btn = document.getElementById('btn-confirm-delete');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>';
+        try {
+            const res = await fetch('/api/admin/backup/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: pendingDeleteFile })
+            });
+            const d = await res.json();
+            closeDeleteModal();
+            if (d.success) {
+                showToast(`🗑 Deleted: ${pendingDeleteFile}`, 'info');
+                loadBackupList();
+                loadHistory();
+                loadStatus();
+            } else {
+                showToast('Delete failed: ' + (d.error || 'Unknown'), 'error');
+            }
+        } catch(e) {
+            closeDeleteModal();
+            showToast('Error: ' + e.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-trash"></i> Delete';
+        }
+    }
+
+    // ---- Utilities ----
+    function formatDate(dateStr) {
+        if (!dateStr || dateStr === '—') return '—';
+        // Convert YYYY-MM-DD to DD-MM-YYYY
+        const parts = dateStr.split('-');
+        if (parts.length === 3) {
+            return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+        return dateStr;
+    }
+
+    function formatTime(timeStr) {
+        if (!timeStr || timeStr === '—') return '—';
+        // Convert HH:MM:SS (24-hour) to hh:mm:ss AM/PM
+        const parts = timeStr.split(':');
+        if (parts.length >= 2) {
+            let hours = parseInt(parts[0]);
+            const minutes = parts[1];
+            const seconds = parts[2] || '00';
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // the hour '0' should be '12'
+            const strHours = hours < 10 ? '0' + hours : hours;
+            return `${strHours}:${minutes}:${seconds} ${ampm}`;
+        }
+        return timeStr;
+    }
+
+    function esc(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+    function shortPath(path) {
+        if (!path) return '—';
+        const parts = path.replace(/\\/g,'/').split('/');
+        if (parts.length <= 2) return path;
+        return '.../' + parts.slice(-2).join('/');
+    }
+    function humanSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+        if (bytes < 1073741824) return (bytes/1048576).toFixed(2) + ' MB';
+        return (bytes/1073741824).toFixed(2) + ' GB';
+    }
+
+    // Close modals on overlay click
+    document.getElementById('restore-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeRestoreModal(); });
+    document.getElementById('delete-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeDeleteModal(); });
+    </script>
+</body>
+</html>

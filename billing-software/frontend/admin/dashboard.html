@@ -668,7 +668,56 @@
                 </div>
             </div>
         </div>
-    
+
+        <!-- =============================================
+             BACKUP STATUS CARD
+        ============================================= -->
+        <div class="dashboard-row" style="margin-top: 20px;">
+            <div class="card glass" style="border: 1px solid var(--glass-border); border-radius: var(--radius-lg); padding: 24px; background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <div style="width:40px; height:40px; border-radius:12px; background:rgba(99,102,241,0.12); display:flex; align-items:center; justify-content:center; color:#818cf8; font-size:1.2rem;">
+                            <i class="fa-solid fa-database"></i>
+                        </div>
+                        <div>
+                            <div style="font-size:1rem; font-weight:800; color:#f1f5f9;">Backup Status</div>
+                            <div style="font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; margin-top:2px;">Automatic Backup System</div>
+                        </div>
+                    </div>
+                    <a href="/admin/backup" style="padding:8px 16px; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.25); border-radius:8px; color:#818cf8; font-size:0.8rem; font-weight:700; text-decoration:none; display:flex; align-items:center; gap:6px; transition:all 0.2s;" onmouseover="this.style.background='rgba(99,102,241,0.2)'" onmouseout="this.style.background='rgba(99,102,241,0.12)'">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i> Manage Backups
+                    </a>
+                </div>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:16px;" id="dash-backup-grid">
+                    <!-- Last Backup -->
+                    <div style="background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.15); border-radius:12px; padding:16px;">
+                        <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#10b981; margin-bottom:8px;"><i class="fa-solid fa-clock-rotate-left"></i> Last Backup</div>
+                        <div id="dash-last-name" style="font-size:0.88rem; font-weight:700; color:#f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+                        <div id="dash-last-time" style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">Checking...</div>
+                    </div>
+                    <!-- Next Scheduled -->
+                    <div style="background:rgba(99,102,241,0.06); border:1px solid rgba(99,102,241,0.15); border-radius:12px; padding:16px;">
+                        <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#818cf8; margin-bottom:8px;"><i class="fa-solid fa-calendar-clock"></i> Next Scheduled</div>
+                        <div id="dash-next-time" style="font-size:0.85rem; font-weight:700; color:#f1f5f9;">—</div>
+                        <div id="dash-next-label" style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">—</div>
+                    </div>
+                    <!-- Auto Status -->
+                    <div style="background:rgba(6,182,212,0.06); border:1px solid rgba(6,182,212,0.15); border-radius:12px; padding:16px;">
+                        <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#06b6d4; margin-bottom:8px;"><i class="fa-solid fa-rotate"></i> Auto Backup</div>
+                        <div id="dash-auto-status" style="font-size:0.95rem; font-weight:800;">—</div>
+                        <div id="dash-auto-interval" style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">—</div>
+                    </div>
+                    <!-- Available -->
+                    <div style="background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.15); border-radius:12px; padding:16px;">
+                        <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#f59e0b; margin-bottom:8px;"><i class="fa-solid fa-folder-open"></i> Available</div>
+                        <div id="dash-count" style="font-size:1.4rem; font-weight:800; color:#f1f5f9;">—</div>
+                        <div id="dash-max" style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">of 30 max</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- END BACKUP STATUS CARD -->
+
 <style>
     @media print {
         .dynamic-footer {
@@ -962,6 +1011,73 @@
         initDashboard();
         loadGroqApiKey();
         initZeroStockAlerts();
+        loadBackupStatus();
+        setInterval(loadBackupStatus, 60000); // refresh every 60s
+
+        async function loadBackupStatus() {
+            function fmtD(dateStr) {
+                if (!dateStr) return '';
+                const parts = dateStr.split('-');
+                return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : dateStr;
+            }
+            function fmtT(timeStr) {
+                if (!timeStr) return '';
+                const parts = timeStr.split(':');
+                if (parts.length >= 2) {
+                    let hours = parseInt(parts[0]);
+                    const minutes = parts[1];
+                    const seconds = parts[2] || '00';
+                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                    hours = hours % 12;
+                    hours = hours ? hours : 12;
+                    const strHours = hours < 10 ? '0' + hours : hours;
+                    return `${strHours}:${minutes}:${seconds} ${ampm}`;
+                }
+                return timeStr;
+            }
+
+            try {
+                const res = await fetch('/api/admin/backup/status');
+                if (!res.ok) return;
+                const d = await res.json();
+
+                // Last backup
+                if (d.last_backup) {
+                    document.getElementById('dash-last-name').textContent =
+                        d.last_backup.name.replace('Maple_Backup_','').replace('.sql','') || d.last_backup.name;
+                    document.getElementById('dash-last-time').textContent =
+                        fmtD(d.last_backup.date) + ' ' + fmtT(d.last_backup.time) + ' · ' + d.last_backup.size_human;
+                } else {
+                    document.getElementById('dash-last-name').textContent = 'No backup yet';
+                    document.getElementById('dash-last-time').textContent = 'Click Manage Backups to create one';
+                }
+
+                // Next scheduled
+                if (d.scheduler_running && d.next_scheduled) {
+                    document.getElementById('dash-next-time').textContent = d.next_scheduled;
+                    document.getElementById('dash-next-label').textContent = d.interval_label;
+                } else {
+                    document.getElementById('dash-next-time').textContent = 'Not Scheduled';
+                    document.getElementById('dash-next-label').textContent = 'Enable auto-backup in Backup Settings';
+                }
+
+                // Auto status
+                const autoEl = document.getElementById('dash-auto-status');
+                if (d.auto_enabled && d.scheduler_running) {
+                    autoEl.innerHTML = '<span style="color:#10b981;">● Active</span>';
+                } else {
+                    autoEl.innerHTML = '<span style="color:#64748b;">○ Disabled</span>';
+                }
+                document.getElementById('dash-auto-interval').textContent = d.interval_label || '—';
+
+                // Count
+                document.getElementById('dash-count').textContent = d.total_backups;
+                document.getElementById('dash-max').textContent = 'of ' + d.max_backups + ' maximum';
+            } catch(e) {
+                // Fail silently — backup status is supplementary info
+            }
+        }
+
         // --- REAL-TIME STREAM LISTENER ---
         const eventSource = new EventSource("/api/realtime/stream");
         eventSource.addEventListener("billing_update", (event) => {

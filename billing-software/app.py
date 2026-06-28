@@ -139,6 +139,22 @@ def init_self_healing_db():
             ai_diagnosis TEXT
         )
     """)
+    # Backup history table — stores log of every backup operation
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS backup_history (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            backup_name  TEXT NOT NULL,
+            backup_date  TEXT,
+            backup_time  TEXT,
+            size_bytes   INTEGER DEFAULT 0,
+            backup_type  TEXT DEFAULT 'Manual',
+            status       TEXT DEFAULT 'Unknown',
+            duration_sec REAL DEFAULT 0,
+            error_msg    TEXT DEFAULT '',
+            location     TEXT DEFAULT '',
+            created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -5432,6 +5448,156 @@ def api_stock_transfer():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+# ===========================================================================
+# BACKUP SYSTEM ROUTES
+# ===========================================================================
+from backend.backup import get_backup_manager
+
+@app.route('/admin/backup')
+def admin_backup():
+    """Render the Backup Management admin page."""
+    if session.get('role') != 'admin':
+        return redirect(url_for('login'))
+    return render_template('admin/backup.html')
+
+@app.route('/api/admin/backup/status')
+def api_backup_status():
+    """Return backup status summary for dashboard card."""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    bm = get_backup_manager()
+    return jsonify(bm.get_status_summary())
+
+@app.route('/api/admin/backup/list')
+def api_backup_list():
+    """Return list of available backup files."""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    bm = get_backup_manager()
+    return jsonify({'backups': bm.get_backup_list(), 'is_server': bm.is_server_machine()})
+
+@app.route('/api/admin/backup/create', methods=['POST'])
+def api_backup_create():
+    """Trigger a manual backup. SERVER ONLY."""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    bm = get_backup_manager()
+    if not bm.is_server_machine():
+        return jsonify({'error': 'Backup creation is only allowed on the Server machine.', 'client_blocked': True}), 403
+    result = bm.create_backup(backup_type='Manual')
+    status_code = 200 if result.get('success') else 500
+    return jsonify(result), status_code
+
+@app.route('/api/admin/backup/restore', methods=['POST'])
+def api_backup_restore():
+    """Restore a backup. SERVER ONLY."""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    bm = get_backup_manager()
+    if not bm.is_server_machine():
+        return jsonify({'error': 'Restore is only allowed on the Server machine.', 'client_blocked': True}), 403
+    data = request.json or {}
+    filename = data.get('filename', '').strip()
+    if not filename:
+        return jsonify({'error': 'filename is required'}), 400
+    import posixpath
+    # Security: strip any directory traversal attempts
+    filename = os.path.basename(filename)
+    settings = bm.load_settings()
+    filepath = os.path.join(settings.get('backup_folder', ''), filename)
+    result = bm.restore_backup(filepath)
+    status_code = 200 if result.get('success') else 500
+    return jsonify(result), status_code
+
+@app.route('/api/admin/backup/download/<path:filename>')
+def api_backup_download(filename):
+    """Download a backup .sql file."""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    filename = os.path.basename(filename)  # prevent path traversal
+    if not filename.startswith('Maple_Backup_') or not filename.endswith('.sql'):
+        return jsonify({'error': 'Invalid filename'}), 400
+    bm = get_backup_manager()
+    settings = bm.load_settings()
+    folder = settings.get('backup_folder', '')
+    filepath = os.path.join(folder, filename)
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'File not found'}), 404
+    from flask import send_file
+    return send_file(filepath, as_attachment=True, download_name=filename, mimetype='application/sql')
+
+@app.route('/api/admin/backup/delete', methods=['POST'])
+def api_backup_delete():
+    """Delete a specific backup file. SERVER ONLY."""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    bm = get_backup_manager()
+    if not bm.is_server_machine():
+        return jsonify({'error': 'Delete is only allowed on the Server machine.'}), 403
+    data = request.json or {}
+    filename = os.path.basename(data.get('filename', '').strip())
+    result = bm.delete_backup(filename)
+    return jsonify(result), (200 if result.get('success') else 400)
+
+@app.route('/api/admin/backup/history')
+def api_backup_history():
+    """Return backup log history."""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    bm = get_backup_manager()
+    return jsonify({'history': bm.get_history(100)})
+
+@app.route('/api/admin/backup/settings', methods=['GET'])
+def api_backup_settings_get():
+    """Return current backup settings."""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    bm = get_backup_manager()
+    settings = bm.load_settings()
+    settings['is_server'] = bm.is_server_machine()
+    return jsonify(settings)
+
+@app.route('/api/admin/backup/settings', methods=['POST'])
+def api_backup_settings_save():
+    """Save backup settings."""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    bm = get_backup_manager()
+    data = request.json or {}
+    allowed_keys = {'backup_folder', 'schedule_interval', 'max_backups', 'auto_backup_enabled'}
+    filtered = {k: v for k, v in data.items() if k in allowed_keys}
+    try:
+        bm.save_settings(filtered)
+        return jsonify({'status': 'success', 'message': 'Settings saved.'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/admin/backup/schedule/start', methods=['POST'])
+def api_backup_schedule_start():
+    """Start or change the automatic backup schedule. SERVER ONLY."""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    bm = get_backup_manager()
+    if not bm.is_server_machine():
+        return jsonify({'error': 'Scheduler only runs on the Server machine.'}), 403
+    data = request.json or {}
+    interval = data.get('interval')  # optional — reads from settings if not provided
+    result = bm.start_scheduler(interval)
+    return jsonify(result)
+
+@app.route('/api/admin/backup/schedule/stop', methods=['POST'])
+def api_backup_schedule_stop():
+    """Stop the automatic backup scheduler."""
+    if session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+    bm = get_backup_manager()
+    result = bm.stop_scheduler()
+    return jsonify(result)
+
+# ===========================================================================
+# END BACKUP SYSTEM ROUTES
+# ===========================================================================
+
 import threading
 import webbrowser
 import time
@@ -5483,6 +5649,14 @@ if __name__ == '__main__':
             print("[Startup] stock_transfers table ready.")
     except Exception as _e:
         print(f"[Startup] Table check skipped: {_e}")
+
+    # Initialize Backup Manager and restore active schedule if enabled
+    try:
+        _bm = get_backup_manager()
+        _bm.auto_start_on_launch()
+        print('[Startup] Backup system initialized.')
+    except Exception as _bm_err:
+        print(f'[Startup] Backup system init skipped: {_bm_err}')
 
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
