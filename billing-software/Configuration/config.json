@@ -9,8 +9,5 @@
     "AUTO_START_LARAGON": false,
     "SERVER_HOST": "0.0.0.0",
     "SERVER_PORT": 5004,
-    "WAITRESS_THREADS": 50,
-    "SCAN_MODE": "manual",
-    "DATABASE_MODE": "local",
-    "CLOUD_ENABLED": false
+    "WAITRESS_THREADS": 50
 }

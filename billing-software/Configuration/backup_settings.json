@@ -1,0 +1,6 @@
+{
+    "backup_folder": "C:\\Users\\fouzh\\Documents\\Maple Backups",
+    "schedule_interval": "1h",
+    "max_backups": 30,
+    "auto_backup_enabled": true
+}

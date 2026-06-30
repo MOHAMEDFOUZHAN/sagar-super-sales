@@ -448,10 +448,11 @@
             const minInput = document.getElementById('min_threshold');
             if (p.unit === 'GM') {
                 stockInput.value = (p.current_stock / 1000).toFixed(3);
-                minInput.value = (p.min_threshold / 1000).toFixed(3);
+                // Use nullish coalescing: only fall back to 25 if truly null/undefined
+                minInput.value = (p.min_threshold != null ? p.min_threshold / 1000 : 25).toFixed(3);
             } else {
-                stockInput.value = p.current_stock || 0;
-                minInput.value = p.min_threshold || 25;
+                stockInput.value = p.current_stock != null ? p.current_stock : 0;
+                minInput.value = p.min_threshold != null ? p.min_threshold : 25;
             }
             
             document.getElementById('modalTitle').innerText = 'Edit Product Specs';
@@ -475,7 +476,9 @@
             const id = document.getElementById('productId').value;
             const unit = document.getElementById('unit').value;
             const rawStock = parseFloat(document.getElementById('current_stock').value) || 0;
-            const rawMin = parseFloat(document.getElementById('min_threshold').value) || 25;
+            // Safe fallback: only use 25 if the field is truly empty, not if the user typed a low number
+            const minRaw = document.getElementById('min_threshold').value;
+            const rawMin = minRaw !== '' && minRaw != null ? parseFloat(minRaw) : 25;
 
             const current_stock = unit === 'GM' ? Math.round(rawStock * 1000) : Math.round(rawStock);
             const min_threshold = unit === 'GM' ? Math.round(rawMin * 1000) : Math.round(rawMin);
@@ -490,6 +493,8 @@
                 unit: unit,
                 expiry_date: document.getElementById('expiry_date').value || null,
                 min_threshold: min_threshold,
+                // current_stock is only used for new product inserts.
+                // For edits, the backend intentionally ignores this to protect live stock data.
                 current_stock: current_stock
             };
 
