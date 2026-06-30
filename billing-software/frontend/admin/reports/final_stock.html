@@ -157,12 +157,13 @@
                 </button>
             </div>
 
-            <div class="print-only-header">
-                <h1 style="margin: 0; font-size: 20pt; text-align: center;">SAGAR SUPER</h1>
-                <h2 style="margin: 5px 0; font-size: 14pt; text-align: center;">Final Stock Report</h2>
-                <div style="display: flex; justify-content: space-between; margin-top: 15px; border-bottom: 1px solid #000; padding-bottom: 5px; font-size: 10pt;">
-                    <span id="printDateRange">Period: </span>
-                    <span id="printCategory" style="font-weight: bold;"></span>
+            <div class="print-only-header" style="text-align: center;">
+                <h1 style="margin: 0; font-size: 20pt;">SAGAR SUPER</h1>
+                <h2 style="margin: 5px 0; font-size: 14pt;">Final Stock Report</h2>
+                <div style="border-bottom: 1px solid #000; padding-bottom: 8px; margin-top: 15px; font-size: 10pt; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                    <span id="printDateRange" style="font-weight: bold;">Period: </span>
+                    <span id="printTime" style="font-size: 9pt; color: #555;">Printed at: </span>
+                    <span id="printCategory" style="font-weight: bold;">Category: All Categories</span>
                 </div>
             </div>
 
@@ -170,6 +171,7 @@
                 <div style="text-align: center; margin-bottom: 20px;" class="hide-on-print">
                     <h2 id="categoryDisplay" style="color: var(--primary); margin-bottom: 4px;">All Categories</h2>
                     <p id="dateDisplay" style="color: var(--text-muted); font-size: 0.9rem;"></p>
+                    <p id="timeDisplay" style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;"></p>
                 </div>
 
                 <div class="table-wrapper">
@@ -210,8 +212,14 @@
             
             const startF = new Date(start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
             const endF = new Date(end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: true});
+            
             document.getElementById('printDateRange').innerText = `Period: ${startF} to ${endF}`;
             document.getElementById('dateDisplay').innerText = `Period: ${startF} to ${endF}`;
+            document.getElementById('timeDisplay').innerText = `Generated at: ${timeStr}`;
+            document.getElementById('printTime').innerText = `Printed at: ${now.toLocaleDateString('en-GB')} ${timeStr}`;
 
             const tbody = document.getElementById('stockContent');
             tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Loading stock details...</td></tr>';
@@ -306,10 +314,10 @@
     </script>
     <script>
         window.addEventListener('beforeprint', function() {
-            const d = document.getElementById('printDateRange');
+            const d = document.getElementById('printTime');
             if (d) {
                 const n = new Date();
-                d.textContent = d.textContent.trim() + '    Printed at: ' + n.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: true});
+                d.textContent = 'Printed at: ' + n.toLocaleDateString('en-GB') + ' ' + n.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: true});
             }
         });
     </script>
