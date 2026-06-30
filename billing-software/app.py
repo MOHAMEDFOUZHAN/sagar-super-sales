@@ -1055,43 +1055,8 @@ def evolve_brain_realtime(bill_id=None):
 
         log_healing_event('NEURAL_CORE', 'CALIBRATING', '', f'Initializing network weight optimization for {bill_display}.')
         
-        updated_thresholds = 0
-        
-        # Batch query: fetch 30-day sales for ALL products at once instead of N+1
-        cursor.execute("""
-            SELECT bi.product_name, SUM(bi.qty) as total_sold
-            FROM bill_items bi
-            JOIN bills b ON bi.bill_id = b.id
-            WHERE b.status != 'Cancelled' AND b.bill_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            GROUP BY bi.product_name
-        """)
-        sales_map = {}
-        for row in cursor.fetchall():
-            name = row['product_name']
-            sales_map[name] = float((row['total_sold']) or 0)
-        
-        # Batch query: fetch current thresholds for ALL products at once
-        cursor.execute("SELECT name, min_threshold FROM products WHERE name IN (%s)" % ','.join(['%s'] * max(len(products_to_update), 1)), tuple(products_to_update) if products_to_update else ())
-        threshold_map = {}
-        for row in cursor.fetchall():
-            threshold_map[row['name']] = float(row['min_threshold'] or 0)
-        
-        # Update thresholds in batch
-        updates_to_apply = []
-        for name in products_to_update:
-            total_sold = sales_map.get(name, 0)
-            daily_rate = total_sold / 30.0
-            suggested_min = max(5.0, math.ceil(daily_rate * 10.0))
-            current_min = threshold_map.get(name, 0)
-            
-            if suggested_min != current_min:
-                updates_to_apply.append((suggested_min, name))
-                log_healing_event('NEURAL_CORE', 'THRESHOLD_ADJUSTED', '', f"Optimized '{name}' safety stock to {suggested_min} (Rate: {daily_rate:.2f}/day)")
-                updated_thresholds += 1
-        
-        # Execute batch updates
-        if updates_to_apply:
-            cursor.executemany("UPDATE products SET min_threshold = %s WHERE name = %s", updates_to_apply)
+        # AI threshold calibration has been disabled. Safety stock thresholds are managed manually.
+        pass
             
         # 2. Adjust category forecasting multipliers in seasonal_history based on recent sales velocity
         cursor.execute("""
@@ -1141,7 +1106,7 @@ def evolve_brain_realtime(bill_id=None):
         conn.close()
         
         # Write successful finish log
-        log_msg = f"Network calibration complete. Optimized {updated_thresholds} thresholds & {updated_categories} category parameters."
+        log_msg = f"Network calibration complete. Optimized {updated_categories} category parameters."
         log_healing_event('NEURAL_CORE', 'SUCCESS', '', log_msg)
         
         recent_logs = fetch_recent_neural_logs(limit=10)
@@ -2938,6 +2903,10 @@ def admin_reports_final_report():
 def admin_reports_final_sales_report():
     return render_template('admin/reports/final_sales_report.html')
 
+@app.route('/admin/reports/final-stock')
+def admin_reports_final_stock():
+    return render_template('admin/reports/final_stock.html')
+
 @app.route('/admin/reports/change-sales')
 def admin_reports_change_sales():
     return render_template('admin/reports/change_sales.html')
@@ -4213,6 +4182,178 @@ def get_daily_stock_report():
         print(f"[Daily Stock Report Endpoint Error] {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/reports/final-stock')
+def get_final_stock_report_api():
+    start_date = request.args.get('start')
+    end_date = request.args.get('end')
+    
+    conn = get_db_connection()
+    if not conn: return jsonify([])
+    cursor = conn.cursor(dictionary=True)
+    
+    try:
+        if start_date and end_date:
+            start_dt = f"{start_date} 00:00:00"
+            end_dt = f"{end_date} 23:59:59"
+            
+            # 1. Fetch all products
+            cursor.execute("SELECT id, barcode, name, category, current_stock, unit FROM products")
+            products = cursor.fetchall()
+            
+            # Sort products database-agnostically
+            def get_sort_key(p):
+                bc = p.get('barcode') or ''
+                try:
+                    return (0, float(bc), bc)
+                except ValueError:
+                    return (1, 0.0, bc)
+            products.sort(key=get_sort_key)
+            
+            # Map products by ID
+            results = {}
+            for p in products:
+                results[p['id']] = {
+                    'barcode': p['barcode'],
+                    'name': p['name'],
+                    'category': p['category'],
+                    'unit': p['unit'],
+                    'current_stock': float(p['current_stock'] or 0),
+                    'sales_after': 0.0,
+                    'transfers_in_after': 0.0,
+                    'transfers_out_after': 0.0,
+                    'adjustments_after': 0.0,
+                    'returns_after': 0.0,
+                    'voids_after': 0.0,
+                }
+            
+            # 2. Sales after range
+            cursor.execute("""
+                SELECT p.id, COALESCE(SUM(bi.qty), 0) as qty
+                FROM bill_items bi
+                JOIN bills b ON bi.bill_id = b.id
+                JOIN products p ON bi.product_name = p.name
+                WHERE b.bill_date > %s AND b.status != 'Cancelled'
+                GROUP BY p.id
+            """, (end_dt,))
+            for row in cursor.fetchall():
+                if row['id'] in results:
+                    results[row['id']]['sales_after'] = float(row['qty'])
+                    
+            # 3. Transfers after range
+            try:
+                cursor.execute("""
+                    SELECT p.id, st.transfer_type, COALESCE(SUM(st.qty), 0) as qty
+                    FROM stock_transfers st
+                    JOIN products p ON st.product_barcode = p.barcode
+                    WHERE st.transfer_date > %s
+                    GROUP BY p.id, st.transfer_type
+                """, (end_dt,))
+                for row in cursor.fetchall():
+                    pid = row['id']
+                    if pid in results:
+                        ttype = row['transfer_type'].upper()
+                        if ttype == 'IN':
+                            results[pid]['transfers_in_after'] = float(row['qty'])
+                        elif ttype == 'OUT':
+                            results[pid]['transfers_out_after'] = float(row['qty'])
+            except Exception as e:
+                print(f"[Final Stock Report Transfers After Error] {e}")
+                
+            # 4. Adjustments after range
+            cursor.execute("""
+                SELECT product_id, COALESCE(SUM(qty_change), 0) as qty
+                FROM stock_movements
+                WHERE created_at > %s AND movement_type = 'ADJUSTMENT'
+                GROUP BY product_id
+            """, (end_dt,))
+            for row in cursor.fetchall():
+                pid = row['product_id']
+                if pid in results:
+                    results[pid]['adjustments_after'] = float(row['qty'])
+            
+            # Determine return date column name
+            ret_col = "return_date"
+            try:
+                cursor.execute("SELECT return_date FROM returns_log LIMIT 1")
+                cursor.fetchall()
+            except Exception:
+                ret_col = "returned_at"
+                
+            # 5. Returns after range
+            cursor.execute(f"""
+                SELECT p.id, COALESCE(SUM(r.qty), 0) as qty
+                FROM returns_log r
+                JOIN products p ON r.product_code = p.barcode
+                WHERE r.{ret_col} > %s AND r.action = 'restock'
+                GROUP BY p.id
+            """, (end_dt,))
+            for row in cursor.fetchall():
+                if row['id'] in results:
+                    results[row['id']]['returns_after'] = float(row['qty'])
+                    
+            # 6. Voids after range
+            try:
+                cursor.execute("""
+                    SELECT p.id, COALESCE(SUM(bi.qty), 0) as qty
+                    FROM bill_items bi
+                    JOIN bills b ON bi.bill_id = b.id
+                    JOIN products p ON bi.product_name = p.name
+                    JOIN audit_logs al ON al.table_name = 'bills' AND al.record_id = b.id
+                    WHERE b.bill_date <= %s AND al.action_time > %s AND al.action IN ('CANCEL_BILL_PROCESS', 'VOID_BILL', 'DELETE_BILL')
+                    GROUP BY p.id
+                """, (end_dt, end_dt))
+                for row in cursor.fetchall():
+                    if row['id'] in results:
+                        results[row['id']]['voids_after'] = float(row['qty'])
+            except Exception as e:
+                print(f"[Final Stock Report Voids After Error] {e}")
+                
+            # Assemble report data
+            report_data = []
+            for pid, r in results.items():
+                closing_stock = (
+                    r['current_stock']
+                    + r['sales_after']
+                    - r['returns_after']
+                    - r['voids_after']
+                    - r['transfers_in_after']
+                    + r['transfers_out_after']
+                    - r['adjustments_after']
+                )
+                
+                report_data.append({
+                    'barcode': r['barcode'],
+                    'name': r['name'],
+                    'category': r['category'],
+                    'unit': r['unit'],
+                    'qty': closing_stock,
+                    'godown': ''
+                })
+            conn.close()
+            return jsonify(report_data)
+        else:
+            # Fallback to simple current stock report
+            cursor.execute("SELECT barcode, name, category, current_stock as qty, unit FROM products")
+            data = cursor.fetchall()
+            
+            # Sort products database-agnostically
+            def get_sort_key(p):
+                bc = p.get('barcode') or ''
+                try:
+                    return (0, float(bc), bc)
+                except ValueError:
+                    return (1, 0.0, bc)
+            data.sort(key=get_sort_key)
+            conn.close()
+            for row in data:
+                row['qty'] = float(row['qty'] or 0)
+                row['godown'] = ''
+            return jsonify(data)
+    except Exception as e:
+        if conn: conn.close()
+        print(f"[Final Stock Report Endpoint Error] {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/reports/daily-position')
 def get_daily_position_report():
     conn = get_db_connection()
@@ -5243,6 +5384,11 @@ def inventory_products(prod_id=None):
         for p in res:
             p['price'] = float(p['price'] or 0)
             p['bizz'] = float(p.get('bizz') or 0)
+            # Ensure min_threshold and current_stock are never null in the API response.
+            # If the DB has NULL (possible on older client data), the JS fallback || 25
+            # would silently reset the threshold to 25 on the next product save.
+            p['min_threshold'] = int(p['min_threshold'] or 25)
+            p['current_stock'] = float(p['current_stock'] or 0)
             if p.get('expiry_date'): p['expiry_date'] = p['expiry_date'].isoformat()
         return jsonify(res)
         
@@ -5251,11 +5397,15 @@ def inventory_products(prod_id=None):
         pid = data.get('id')
         try:
             if pid:
+                # NOTE: current_stock is intentionally excluded from the edit UPDATE.
+                # Stock levels are managed exclusively by the billing route (consume_locked_stock)
+                # and the /api/inventory/stock-adjust route. Updating current_stock here would
+                # overwrite live stock with a stale form snapshot and corrupt inventory records.
                 cursor.execute("""
-                    UPDATE products SET barcode=%s, name=%s, category=%s, price=%s, bizz=%s, unit=%s, expiry_date=%s, min_threshold=%s, current_stock=%s
+                    UPDATE products SET barcode=%s, name=%s, category=%s, price=%s, bizz=%s, unit=%s, expiry_date=%s, min_threshold=%s
                     WHERE id = %s
-                """, (data['barcode'], data['name'], data['category'], data['price'], data['bizz'], 
-                      data.get('unit', 'PCS'), data.get('expiry_date'), data.get('min_threshold', 25), data.get('current_stock', 0), pid))
+                """, (data['barcode'], data['name'], data['category'], data['price'], data['bizz'],
+                      data.get('unit', 'PCS'), data.get('expiry_date'), data.get('min_threshold') or 25, pid))
                 log_audit(cursor, 'EDIT_PRODUCT', 'products', pid, None, data['name'])
             else:
                 cursor.execute("""

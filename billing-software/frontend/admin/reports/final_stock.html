@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final Stock Report - Sagar Super</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .report-container { padding: 20px; }
+
+        .filter-panel {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            margin-bottom: 25px;
+            background: var(--glass-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--glass-border);
+            flex-wrap: wrap;
+        }
+
+        .stock-table { width: 100%; border-collapse: collapse; }
+
+        .stock-table th {
+            background: rgba(255,255,255,0.05);
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid var(--glass-border);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+        }
+
+        .stock-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--text-main);
+        }
+
+        .stock-qty { font-weight: 800; color: var(--primary); }
+        
+        .col-code { font-family: monospace; color: var(--text-muted); width: 15%; }
+        .col-name { font-weight: 600; width: 45%; }
+        .col-qty { text-align: right; width: 15%; padding-right: 24px !important; }
+        .col-godown { width: 25%; border-left: 1px dashed var(--glass-border); }
+
+        /* Category Dropdown custom styling */
+        .cat-select {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 10px 38px 10px 14px;
+            border-radius: var(--radius-md);
+            font-size: 0.9rem;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            cursor: pointer;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            min-width: 200px;
+            font-family: inherit;
+        }
+        .cat-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.18);
+        }
+        .cat-select option {
+            background: #1a1d2e;
+            color: var(--text-main);
+        }
+
+        /* Result count badge */
+        .result-count {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            padding: 4px 12px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            white-space: nowrap;
+            align-self: center;
+        }
+
+        .print-only-header { display: none; }
+
+        @media print {
+            .main-content { padding: 0 !important; margin: 0 !important; }
+            .filter-panel, .section-header, footer { display: none !important; }
+            .print-only-header { display: block !important; margin-bottom: 20px; }
+            .glass-panel { border: none !important; background: transparent !important; box-shadow: none !important; }
+            .stock-table th { border-bottom: 2px solid #000 !important; color: #000 !important; }
+            .stock-table td { border-bottom: 1px solid #ccc !important; color: #000 !important; }
+            .col-godown { border-left: 1px dashed #ccc !important; }
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>Final Stock Report</h1>
+                <p style="color: var(--text-muted);">Remaining inventory list with godown verification sheet.</p>
+            </div>
+            <button class="btn btn-primary btn-print" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Report
+            </button>
+        </header>
+
+        <div class="report-container">
+            <div class="filter-panel">
+                <!-- Search box -->
+                <div class="form-group" style="flex: 1; min-width: 200px; margin: 0;">
+                    <div style="position: relative;">
+                        <input type="text" id="stockSearch" class="input-dark"
+                            placeholder="Search by product name or code..."
+                            oninput="applyFilters()"
+                            style="padding-left: 38px;">
+                        <i class="fa-solid fa-search" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;"></i>
+                    </div>
+                </div>
+
+                <!-- From Date picker -->
+                <div class="form-group" style="margin: 0; display:flex; flex-direction:column; gap:5px;">
+                    <label style="font-size: 0.7rem; color: var(--text-muted); font-weight:600; letter-spacing:0.05em;">FROM DATE</label>
+                    <input type="date" id="startDate" class="input-dark" style="height: 38px;" onchange="loadReport()">
+                </div>
+
+                <!-- To Date picker -->
+                <div class="form-group" style="margin: 0; display:flex; flex-direction:column; gap:5px;">
+                    <label style="font-size: 0.7rem; color: var(--text-muted); font-weight:600; letter-spacing:0.05em;">TO DATE</label>
+                    <input type="date" id="endDate" class="input-dark" style="height: 38px;" onchange="loadReport()">
+                </div>
+
+                <!-- Category Dropdown -->
+                <div style="display:flex;flex-direction:column;gap:5px;">
+                    <label style="font-size:0.7rem;color:var(--text-muted);font-weight:600;letter-spacing:0.05em;">CATEGORY</label>
+                    <select id="catFilter" class="cat-select" onchange="applyFilters()">
+                        <option value="">All Categories</option>
+                    </select>
+                </div>
+
+                <!-- Result counter -->
+                <span id="resultCount" class="result-count">0 items</span>
+
+                <!-- Refresh -->
+                <button class="btn btn-primary" onclick="loadReport()" style="white-space:nowrap;">
+                    <i class="fa-solid fa-sync"></i> REFRESH
+                </button>
+            </div>
+
+            <div class="print-only-header">
+                <h1 style="margin: 0; font-size: 20pt; text-align: center;">SAGAR SUPER</h1>
+                <h2 style="margin: 5px 0; font-size: 14pt; text-align: center;">Final Stock Report</h2>
+                <div style="display: flex; justify-content: space-between; margin-top: 15px; border-bottom: 1px solid #000; padding-bottom: 5px; font-size: 10pt;">
+                    <span id="printDateRange">Period: </span>
+                    <span id="printCategory" style="font-weight: bold;"></span>
+                </div>
+            </div>
+
+            <div class="glass-panel">
+                <div style="text-align: center; margin-bottom: 20px;" class="hide-on-print">
+                    <h2 id="categoryDisplay" style="color: var(--primary); margin-bottom: 4px;">All Categories</h2>
+                    <p id="dateDisplay" style="color: var(--text-muted); font-size: 0.9rem;"></p>
+                </div>
+
+                <div class="table-wrapper">
+                    <table class="stock-table" id="stockTable">
+                        <thead>
+                            <tr>
+                                <th class="col-code">CODE</th>
+                                <th class="col-name">ITEM NAME</th>
+                                <th class="col-qty" style="text-align: right; padding-right: 24px;">QTY</th>
+                                <th class="col-godown">GODOWN</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stockContent">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <footer class="dynamic-footer" style="margin-top:40px;padding:20px 0;border-top:1px solid rgba(255,255,255,0.08);text-align:center;color:#94a3b8;font-size:0.85rem;">
+            <p>© 2025 Sagar Nilgiri Products | Sagar Super Maple Pro</p>
+        </footer>
+    </main>
+
+    <script>
+        let fullStockData = [];
+
+        // Set default dates to today
+        const now = new Date();
+        const todayStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+        document.getElementById('startDate').value = todayStr;
+        document.getElementById('endDate').value = todayStr;
+
+        async function loadReport() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            
+            const startF = new Date(start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const endF = new Date(end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            document.getElementById('printDateRange').innerText = `Period: ${startF} to ${endF}`;
+            document.getElementById('dateDisplay').innerText = `Period: ${startF} to ${endF}`;
+
+            const tbody = document.getElementById('stockContent');
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Loading stock details...</td></tr>';
+
+            try {
+                const res = await fetch(`/api/reports/final-stock?start=${start}&end=${end}`);
+                fullStockData = await res.json();
+
+                buildCategoryDropdown(fullStockData);
+                applyFilters();
+            } catch (err) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px;color:#ef4444;">Failed to load. Try refreshing.</td></tr>';
+                console.error(err);
+            }
+        }
+
+        function buildCategoryDropdown(data) {
+            const catSelect = document.getElementById('catFilter');
+            const currentVal = catSelect.value; // preserve selection on refresh
+
+            // Collect unique categories (sorted alphabetically)
+            const cats = [...new Set(data.map(item => (item.category || 'General').trim()))]
+                            .sort((a, b) => a.localeCompare(b));
+
+            catSelect.innerHTML = '<option value="">All Categories</option>';
+            cats.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                if (cat === currentVal) opt.selected = true;
+                catSelect.appendChild(opt);
+            });
+        }
+
+        function applyFilters() {
+            const query     = document.getElementById('stockSearch').value.toLowerCase().trim();
+            const catSelect = document.getElementById('catFilter');
+            const selCat    = catSelect.value.toLowerCase();
+
+            const filtered = fullStockData.filter(item => {
+                const matchCat  = !selCat || (item.category || 'General').toLowerCase() === selCat;
+                const matchText = !query  ||
+                    item.name.toLowerCase().includes(query) ||
+                    (item.barcode && item.barcode.toLowerCase().includes(query));
+                return matchCat && matchText;
+            });
+
+            const printCat = document.getElementById('printCategory');
+            const catDisp  = document.getElementById('categoryDisplay');
+            if (catSelect.value) {
+                printCat.textContent = 'Category: ' + catSelect.value;
+                catDisp.textContent = catSelect.value;
+            } else {
+                printCat.textContent = 'Category: All Categories';
+                catDisp.textContent = 'All Categories';
+            }
+
+            renderStock(filtered);
+        }
+
+        function renderStock(data) {
+            const tbody = document.getElementById('stockContent');
+            tbody.innerHTML = '';
+
+            document.getElementById('resultCount').textContent =
+                data.length + ' item' + (data.length !== 1 ? 's' : '');
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--text-muted);">No products found for selected filters.</td></tr>';
+                return;
+            }
+
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                
+                const fmt = (val) => {
+                    const num = parseFloat(val || 0);
+                    return Number.isInteger(num) ? num.toString() : num.toFixed(1);
+                };
+
+                tr.innerHTML = `
+                    <td class="col-code">${item.barcode || '-'}</td>
+                    <td class="col-name">${item.name}</td>
+                    <td class="col-qty stock-qty">${fmt(item.qty)}</td>
+                    <td class="col-godown"></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        loadReport();
+    </script>
+    <script>
+        window.addEventListener('beforeprint', function() {
+            const d = document.getElementById('printDateRange');
+            if (d) {
+                const n = new Date();
+                d.textContent = d.textContent.trim() + '    Printed at: ' + n.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: true});
+            }
+        });
+    </script>
+</body>
+</html>
