@@ -1034,29 +1034,9 @@ def evolve_brain_realtime(bill_id=None):
             return
         cursor = conn.cursor(dictionary=True)
         
-        # 1. Fetch items/products to evolve
-        products_to_update = []
-        bill_display = "All Products"
-        
-        if bill_id:
-            cursor.execute("SELECT product_name FROM bill_items WHERE bill_id = %s", (bill_id,))
-            items = cursor.fetchall()
-            products_to_update = [item['product_name'] for item in items]
-            bill_display = f"Bill ID {bill_id}"
-        else:
-            # Calibrate all active products that have been sold in last 30 days
-            cursor.execute("""
-                SELECT DISTINCT bi.product_name 
-                FROM bill_items bi
-                JOIN bills b ON bi.bill_id = b.id
-                WHERE b.status != 'Cancelled' AND b.bill_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            """)
-            products_to_update = [r['product_name'] for r in cursor.fetchall()]
-
+        # 1. Initialize calibration log
+        bill_display = f"Bill ID {bill_id}" if bill_id else "All Products"
         log_healing_event('NEURAL_CORE', 'CALIBRATING', '', f'Initializing network weight optimization for {bill_display}.')
-        
-        # AI threshold calibration has been disabled. Safety stock thresholds are managed manually.
-        pass
             
         # 2. Adjust category forecasting multipliers in seasonal_history based on recent sales velocity
         cursor.execute("""
@@ -3521,9 +3501,9 @@ def get_closure_report():
             LEFT JOIN products p ON bi.product_name = p.name
             WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter}{cat_filter}
         """, tuple(query_params))
-        total_biz = float(cursor.fetchone()['total_bizz'] or 0)
-        biz_80 = total_biz * 0.8
-        biz_20 = total_biz * 0.2
+        total_biz = round(float(cursor.fetchone()['total_bizz'] or 0))
+        biz_80 = round(total_biz * 0.8)
+        biz_20 = total_biz - biz_80
 
         # 3. TSC (80/20 split) - TSC is generally on the total bill, but for departmental reports, 
         # we calculate it proportionally to the departmental sales if a filter is active.
@@ -3542,9 +3522,9 @@ def get_closure_report():
                 WHERE DATE(b.bill_date) = %s AND b.status != 'Cancelled'{user_filter.replace('b.', '')}
             """, tuple(query_params))
         
-        total_tsc = float(cursor.fetchone()['total_tsc'] or 0)
-        tsc_80 = total_tsc * 0.8
-        tsc_20 = total_tsc * 0.2
+        total_tsc = round(float(cursor.fetchone()['total_tsc'] or 0))
+        tsc_80 = round(total_tsc * 0.8)
+        tsc_20 = total_tsc - tsc_80
 
         # 4. Categories (Filtered)
         cursor.execute(f"""
@@ -3579,7 +3559,7 @@ def get_closure_report():
         expenses_raw = cursor.fetchall()
         office_exps = []
         shop_exps = []
-        total_exc = total_biz + total_tsc
+        total_exc = 0.0
         for e in expenses_raw:
             amt = float(e['amount'] or 0)
             total_exc += amt
@@ -3802,7 +3782,7 @@ def save_closure():
         cursor.execute("SELECT SUM(tsc_amount) FROM bills WHERE DATE(bill_date) = %s AND status!='Cancelled'", (report_date,))
         total_tsc = float(cursor.fetchone()[0] or 0)
         
-        expected_closing = opening_bal + cash_sales - (total_exp + total_biz + total_tsc)
+        expected_closing = opening_bal + (cash_sales - total_exp)
         diff = actual_closing - expected_closing
         
         cursor.execute("""
@@ -3880,8 +3860,7 @@ def save_shift_data():
         for d in data.get('denominations', []):
             actual_closing += (int(d['note_value']) * int(d['count']))
             
-        total_expense = total_exp + total_biz + total_tsc
-        expected_closing = opening_bal + cash_sales - total_expense
+        expected_closing = opening_bal + (cash_sales - total_exp)
         diff = actual_closing - expected_closing
 
         cursor.execute("""

@@ -377,7 +377,7 @@
                 </tr>
 
                 <!-- 6. (+/-) -->
-                <tr>
+                <tr style="display: none;">
                     <td class="text-bold">(+/- =)</td>
                     <td id="diffValPlusMinus">0.00</td>
                 </tr>
@@ -510,43 +510,40 @@
 
 
             // Append GODOWN BIZ @ 17% to Category breakdown
-            const totalBiz = data.biz_charges || 0;
-            const biz_17 = totalBiz * 0.17;
+            const totalBiz = Math.round(data.biz_charges || 0);
+            const biz_17 = Math.round(totalBiz * 0.17);
+            const biz_83 = totalBiz - biz_17;
             const catRows = document.getElementById('categoryRows');
             if (catRows) {
-                catRows.innerHTML += `<tr><td class="text-bold">GODOWN BIZ @ 17%</td><td>${biz_17.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td></tr>`;
+                catRows.innerHTML += `<tr><td class="text-bold">GODOWN BIZ @ 17%</td><td>${biz_17.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td></tr>`;
             }
 
             // Populate CASH DEBIT EXPENSE consolidated rows
-            const totalBiz = data.biz_charges || 0;
-            const biz_83 = totalBiz * 0.83;
-            const biz_17 = totalBiz * 0.17;
-
             // 1. Biz splits
             if (document.getElementById('biz83Val')) {
-                document.getElementById('biz83Val').innerText = biz_83.toLocaleString(undefined, { minimumFractionDigits: 2 });
+                document.getElementById('biz83Val').innerText = biz_83.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
             }
             if (document.getElementById('godownBizVal')) {
-                document.getElementById('godownBizVal').innerText = biz_17.toLocaleString(undefined, { minimumFractionDigits: 2 });
+                document.getElementById('godownBizVal').innerText = biz_17.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
             }
             const totalBizValElem = document.getElementById('totalBizVal');
             if (totalBizValElem) {
-                totalBizValElem.innerText = totalBiz.toLocaleString(undefined, { minimumFractionDigits: 2 });
+                totalBizValElem.innerText = totalBiz.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
             }
 
             // 2. TSC splits
-            const tscTotal = data.tsc_total || 0;
-            const tsc80 = tscTotal * 0.8;
-            const tsc20 = tscTotal * 0.2;
+            const tscTotal = Math.round(data.tsc_total || 0);
+            const tsc80 = Math.round(tscTotal * 0.8);
+            const tsc20 = tscTotal - tsc80;
             if (document.getElementById('tsc80Val')) {
-                document.getElementById('tsc80Val').innerText = tsc80.toLocaleString(undefined, { minimumFractionDigits: 2 });
+                document.getElementById('tsc80Val').innerText = tsc80.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
             }
             if (document.getElementById('tsc20Val')) {
-                document.getElementById('tsc20Val').innerText = tsc20.toLocaleString(undefined, { minimumFractionDigits: 2 });
+                document.getElementById('tsc20Val').innerText = tsc20.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
             }
             const totalTscValElem = document.getElementById('totalTscVal');
             if (totalTscValElem) {
-                totalTscValElem.innerText = tscTotal.toLocaleString(undefined, { minimumFractionDigits: 2 });
+                totalTscValElem.innerText = tscTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
             }
 
             // 3. Entered Expenses & sum calculation
@@ -574,8 +571,8 @@
             const actualClosingVal = bal.actual_closing || 0; // physical counted total
 
             var cashSales = s.cash_sales || 0;
-            var totalExpense = data.total_expenses || 0;
-            var result = computeCashReport(cashSales, totalExpense, obVal, actualClosingVal);
+            var totalExpenseForReport = data.total_expenses || 0;
+            var result = computeCashReport(cashSales, totalExpenseForReport, obVal, actualClosingVal);
             var netToOffice = result.cAtOffice;
             var cbVal = result.cashBalance;
             var diffVal = result.difference;

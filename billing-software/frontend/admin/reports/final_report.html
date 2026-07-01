@@ -297,7 +297,7 @@
 
                         </div>
 
-                        <div class="summary-row">
+                        <div class="summary-row" style="display: none;">
 
                             <div class="summary-label">DIFFERENCE (OVERAGE/SHORTAGE)</div>
 
@@ -456,13 +456,15 @@
 
 
 
-                const expected = data.balance.opening_balance + data.sales.cash_sales - data.total_expenses;
-
-                document.getElementById('valExpected').innerText = '\u20B9' + expected.toFixed(2);
-
                 const cAtOffice = data.sales.cash_sales - data.total_expenses;
 
                 document.getElementById('valCashOff').innerText = '\u20B9' + cAtOffice.toFixed(2);
+
+
+
+                const expected = data.balance.opening_balance + cAtOffice;
+
+                document.getElementById('valExpected').innerText = '\u20B9' + expected.toFixed(2);
 
 
 
@@ -524,17 +526,17 @@
 
 
 
-                document.getElementById('valBizTotal').innerText = '\u20B9' + data.biz_charges.toFixed(2);
+                document.getElementById('valBizTotal').innerText = '\u20B9' + Math.round(data.biz_charges).toFixed(0);
 
-                document.getElementById('valBiz80').innerText = '\u20B9' + (data.biz_charges * 0.8).toFixed(2);
+                document.getElementById('valBiz80').innerText = '\u20B9' + Math.round(data.biz_charges * 0.8).toFixed(0);
 
-                const tscTotal = data.tsc_total || 0;
+                const tscTotal = Math.round(data.tsc_total || 0);
 
-                document.getElementById('valTscTotal').innerText = '\u20B9' + tscTotal.toFixed(2);
+                document.getElementById('valTscTotal').innerText = '\u20B9' + tscTotal.toFixed(0);
 
-                document.getElementById('valTsc80').innerText = '\u20B9' + (tscTotal * 0.8).toFixed(2);
+                document.getElementById('valTsc80').innerText = '\u20B9' + Math.round(tscTotal * 0.8).toFixed(0);
 
-                document.getElementById('valTsc20').innerText = '\u20B9' + (tscTotal * 0.2).toFixed(2);
+                document.getElementById('valTsc20').innerText = '\u20B9' + (tscTotal - Math.round(tscTotal * 0.8)).toFixed(0);
 
 
 

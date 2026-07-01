@@ -233,10 +233,13 @@ def build_closure_report(data: dict, width: int = 42) -> bytes:
 
     # Helper to clean and format amount
     def fmt_amt(val) -> str:
-        if not val: return "Rs.0.00"
+        if not val: return "Rs.0"
         cleaned = str(val).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
         try:
-            return f"Rs.{float(cleaned):,.2f}"
+            val_float = float(cleaned)
+            if val_float.is_integer():
+                return f"Rs.{int(val_float):,}"
+            return f"Rs.{val_float:,.2f}"
         except Exception:
             return f"Rs.{cleaned}"
 
@@ -282,12 +285,19 @@ def build_closure_report(data: dict, width: int = 42) -> bytes:
                 except Exception:
                     pass
 
+        # Get BIZZ and TSC values from payload
+        biz_str = str(data.get('biz_total', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
+        biz_val = float(biz_str) if biz_str else 0.0
+        
+        tsc_str = str(data.get('tsc_total', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
+        tsc_val = float(tsc_str) if tsc_str else 0.0
+
         ob_str = str(data.get('ob', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
         ob_val = float(ob_str) if ob_str else 0.0
         
         counted_str = str(data.get('cb', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
         counted_val = float(counted_str) if counted_str else 0.0
-        
+
         # Formula 1: C @ OFF = Cash Sales - Total Expense
         net_to_office = cash_sales_val - total_exp_val
 
@@ -309,7 +319,6 @@ def build_closure_report(data: dict, width: int = 42) -> bytes:
         counted_display = fmt_amt(data.get('cb', '0.00'))
 
     emit(f"{'O.B:':<24}{fmt_amt(data.get('ob', '0.00')):>18}")
-    emit(f"{'(+/-):':<24}{diff_str:>18}")
     payload += BOLD_ON
     emit(f"{'C.B:':<24}{cb_display:>18}")
     emit(f"{'C @ OFF:':<24}{cash_off_display:>18}")

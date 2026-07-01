@@ -1351,7 +1351,7 @@
                         </tr>
 
                         <!-- 5. (+/-) Discrepancy -->
-                        <tr style="font-weight: 800;">
+                        <tr style="font-weight: 800; display: none;">
                             <td style="padding: 6px 8px;">(+/-)</td>
                             <td style="text-align: right; padding: 6px 8px;" id="diffVal">&#8377;0.00</td>
                         </tr>
@@ -1591,21 +1591,21 @@
 
                 // Bizz Breakdown (Top Panel)
 
-                document.getElementById('biz80Val').innerText = '\u20B9' + data.biz_80.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('biz80Val').innerText = '\u20B9' + Math.round(data.biz_80).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-                document.getElementById('biz20Val').innerText = '\u20B9' + data.biz_20.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('biz20Val').innerText = '\u20B9' + Math.round(data.biz_20).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-                document.getElementById('totalBizCharges').innerText = data.biz_charges.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('totalBizCharges').innerText = Math.round(data.biz_charges).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 
 
                 // TSC Breakdown
 
-                document.getElementById('tsc80Val').innerText = '\u20B9' + data.tsc_80.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('tsc80Val').innerText = '\u20B9' + Math.round(data.tsc_80).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-                document.getElementById('tsc20Val').innerText = '\u20B9' + data.tsc_20.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('tsc20Val').innerText = '\u20B9' + Math.round(data.tsc_20).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-                document.getElementById('totalTscVal').innerText = data.tsc_total.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                document.getElementById('totalTscVal').innerText = Math.round(data.tsc_total).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 
 
@@ -2022,8 +2022,6 @@
                 }
 
                 tableRows += Row('O.B:', ob);
-
-                tableRows += Row('(+/-):', diffStr);
 
                 tableRows += Row('C.B:', cbText, true);
 
