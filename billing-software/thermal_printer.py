@@ -274,49 +274,9 @@ def build_closure_report(data: dict, width: int = 42) -> bytes:
     emit(f"{'TOTAL EXPENSE:':<24}{fmt_amt(str(total_exp_val)):>18}")
     emit("-" * width)
 
-    # 5. Cash Audit calculations (O.B, Discrepancy, C.B, C @ OFF)
-    try:
-        cash_sales_val = 0.0
-        for pm in data.get('payments', []):
-            if str(pm.get('label', '')).upper() == 'CASH':
-                pm_str = str(pm.get('val', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
-                try:
-                    cash_sales_val = float(pm_str)
-                except Exception:
-                    pass
-
-        # Get BIZZ and TSC values from payload
-        biz_str = str(data.get('biz_total', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
-        biz_val = float(biz_str) if biz_str else 0.0
-        
-        tsc_str = str(data.get('tsc_total', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
-        tsc_val = float(tsc_str) if tsc_str else 0.0
-
-        ob_str = str(data.get('ob', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
-        ob_val = float(ob_str) if ob_str else 0.0
-        
-        counted_str = str(data.get('cb', '0.00')).replace('Rs.', '').replace('₹', '').replace(',', '').replace(' ', '').strip()
-        counted_val = float(counted_str) if counted_str else 0.0
-
-        # Formula 1: C @ OFF = Cash Sales - Total Expense
-        net_to_office = cash_sales_val - total_exp_val
-
-        # Formula 2: Cash Balance (C.B.) = C @ OFF + Opening Balance
-        cb_val = net_to_office + ob_val
-
-        # Formula 3: Difference = Closing Cash Count (counted_val) - Cash Balance (cb_val)
-        diff_val = counted_val - cb_val
-        
-        diff_sign = "+" if diff_val >= 0 else "-"
-        diff_str = f"Rs.{diff_sign}{abs(diff_val):,.2f}"
-        cb_display = f"Rs.{cb_val:,.2f}"
-        cash_off_display = f"Rs.{net_to_office:,.2f}"
-        counted_display = f"Rs.{counted_val:,.2f}"
-    except Exception:
-        diff_str = "Rs.0.00"
-        cb_display = fmt_amt(data.get('expected', '0.00'))
-        cash_off_display = fmt_amt(data.get('cash_off', '0.00'))
-        counted_display = fmt_amt(data.get('cb', '0.00'))
+    # 5. Cash Audit values (O.B, C.B, C @ OFF)
+    cb_display = fmt_amt(data.get('expected', '0.00'))
+    cash_off_display = fmt_amt(data.get('cash_off', '0.00'))
 
     emit(f"{'O.B:':<24}{fmt_amt(data.get('ob', '0.00')):>18}")
     payload += BOLD_ON

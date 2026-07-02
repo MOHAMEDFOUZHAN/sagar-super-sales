@@ -869,7 +869,7 @@ def fetch_brain_state_stats(cursor):
     expenses_count = (expenses_count[0] if isinstance(expenses_count, tuple) else expenses_count.get('COUNT(*)', 0)) if expenses_count else 0
 
     # 5. Low stock alerts count
-    cursor.execute("SELECT COUNT(*) FROM products WHERE current_stock <= min_threshold")
+    cursor.execute("SELECT COUNT(*) FROM products WHERE name NOT LIKE '[DELETED] %' AND current_stock <= min_threshold")
     low_stock_count = cursor.fetchone()
     low_stock_count = (low_stock_count[0] if isinstance(low_stock_count, tuple) else low_stock_count.get('COUNT(*)', 0)) if low_stock_count else 0
 
@@ -959,7 +959,7 @@ def generate_brain_cognitive_insight(cursor):
     """)
     top_cat = cursor.fetchone()
     
-    cursor.execute("SELECT name, current_stock FROM products WHERE current_stock <= min_threshold LIMIT 5")
+    cursor.execute("SELECT name, current_stock FROM products WHERE name NOT LIKE '[DELETED] %' AND current_stock <= min_threshold LIMIT 5")
     low_stock = cursor.fetchall()
     
     groq_api_key = os.environ.get("GROQ_API_KEY", "")
@@ -1133,7 +1133,7 @@ def get_ai_insight():
         """)
         top_cat = cursor.fetchone()
         
-        cursor.execute("SELECT name, current_stock FROM products WHERE current_stock <= min_threshold LIMIT 5")
+        cursor.execute("SELECT name, current_stock FROM products WHERE name NOT LIKE '[DELETED] %' AND current_stock <= min_threshold LIMIT 5")
         low_stock = cursor.fetchall()
         
         groq_api_key = os.environ.get("GROQ_API_KEY", "")
@@ -4136,7 +4136,7 @@ def get_daily_stock_report():
             return jsonify(report_data)
         else:
             # Fallback to simple current stock report
-            cursor.execute("SELECT barcode, name, category, current_stock as stock, unit FROM products")
+            cursor.execute("SELECT barcode, name, category, current_stock as stock, unit FROM products WHERE name NOT LIKE '[DELETED] %'")
             data = cursor.fetchall()
             
             # Sort products in Python to be database-agnostic (handles MySQL and Postgres)
@@ -4176,7 +4176,7 @@ def get_final_stock_report_api():
             end_dt = f"{end_date} 23:59:59"
             
             # 1. Fetch all products
-            cursor.execute("SELECT id, barcode, name, category, current_stock, unit FROM products")
+            cursor.execute("SELECT id, barcode, name, category, current_stock, unit FROM products WHERE name NOT LIKE '[DELETED] %'")
             products = cursor.fetchall()
             
             # Sort products database-agnostically
@@ -4312,7 +4312,7 @@ def get_final_stock_report_api():
             return jsonify(report_data)
         else:
             # Fallback to simple current stock report
-            cursor.execute("SELECT barcode, name, category, current_stock as qty, unit FROM products")
+            cursor.execute("SELECT barcode, name, category, current_stock as qty, unit FROM products WHERE name NOT LIKE '[DELETED] %'")
             data = cursor.fetchall()
             
             # Sort products database-agnostically
@@ -4613,7 +4613,7 @@ def search_products():
     if not conn: return jsonify([])
     cursor = conn.cursor(dictionary=True)
     
-    cursor.execute("SELECT * FROM products WHERE (name LIKE %s OR barcode = %s) LIMIT 20", (f'%{q}%', q))
+    cursor.execute("SELECT * FROM products WHERE name NOT LIKE '[DELETED] %' AND (name LIKE %s OR barcode = %s) LIMIT 20", (f'%{q}%', q))
     products = cursor.fetchall()
     conn.close()
     for p in products:
@@ -5172,14 +5172,14 @@ def get_stock_alerts():
     cursor.execute("""
         SELECT barcode, name, category, current_stock as stock, unit, min_threshold
         FROM products 
-        WHERE current_stock <= min_threshold
+        WHERE name NOT LIKE '[DELETED] %' AND current_stock <= min_threshold
     """)
     low_stock = cursor.fetchall()
 
     cursor.execute("""
         SELECT barcode, name, category, expiry_date, current_stock as stock
         FROM products 
-        WHERE expiry_date IS NOT NULL AND expiry_date <= %s
+        WHERE name NOT LIKE '[DELETED] %' AND expiry_date IS NOT NULL AND expiry_date <= %s
         ORDER BY expiry_date ASC
     """, (expiring_soon_threshold.isoformat(),))
     expiring_soon = cursor.fetchall()
@@ -5189,6 +5189,7 @@ def get_stock_alerts():
         SELECT COUNT(*) as total,
                SUM(CASE WHEN current_stock <= min_threshold THEN 1 ELSE 0 END) as low_count
         FROM products
+        WHERE name NOT LIKE '[DELETED] %'
     """)
     summary = cursor.fetchone()
     
@@ -5357,7 +5358,7 @@ def inventory_products(prod_id=None):
     cursor = conn.cursor(dictionary=True)
     
     if request.method == 'GET':
-        cursor.execute("SELECT * FROM products ORDER BY category, name")
+        cursor.execute("SELECT * FROM products WHERE name NOT LIKE '[DELETED] %' ORDER BY category, name")
         res = cursor.fetchall()
         conn.close()
         for p in res:
@@ -5404,7 +5405,12 @@ def inventory_products(prod_id=None):
     elif request.method == 'DELETE':
         pid = prod_id or request.json.get('id')
         try:
-            cursor.execute("DELETE FROM products WHERE id = %s", (pid,))
+            # Soft delete: rename product name to [DELETED] ... and clear barcode (free it up)
+            cursor.execute("SELECT name FROM products WHERE id = %s", (pid,))
+            p_row = cursor.fetchone()
+            if p_row:
+                new_name = f"[DELETED] {p_row['name']}"
+                cursor.execute("UPDATE products SET name = %s, barcode = NULL WHERE id = %s", (new_name, pid))
             conn.commit(); conn.close()
             socketio.emit('stock_updated', {'type': 'product_mutation'})
             return jsonify({'status': 'success'})
