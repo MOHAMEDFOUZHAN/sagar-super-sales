@@ -3338,7 +3338,15 @@ def get_master_report():
     """)
     sales = cursor.fetchall()
     
-    cursor.execute("""
+    exp_filter = ""
+    if session.get('role') == 'sales':
+        uname = session.get('username', '').lower()
+        if uname in ['counter1', 'counter2']:
+            exp_filter = " WHERE (description = 'OIL' OR description IS NULL)"
+        elif uname in ['counter3', 'counter4']:
+            exp_filter = " WHERE description = 'CHOCOLATE'"
+            
+    cursor.execute(f"""
         SELECT 
             expense_date as date,
             CONCAT('EXP-', LPAD(id, 5, '0')) as id,
@@ -3351,7 +3359,7 @@ def get_master_report():
             'Expense' as category,
             'Cash' as mode,
             'Paid' as status
-        FROM expenses
+        FROM expenses{exp_filter}
         ORDER BY id ASC
     """)
     expenses = cursor.fetchall()
@@ -3555,7 +3563,15 @@ def get_closure_report():
                 categories.append({'category': 'CHOCOLATES', 'category_sales': 0.0, 'percent': 0.0})
 
         # 5. Expenses
-        cursor.execute("SELECT * FROM expenses WHERE DATE(expense_date) = %s", (report_date,))
+        exp_filter = ""
+        exp_params = [report_date]
+        if session.get('role') == 'sales':
+            uname = session.get('username', '').lower()
+            if uname in ['counter1', 'counter2']:
+                exp_filter = " AND (description = 'OIL' OR description IS NULL)"
+            elif uname in ['counter3', 'counter4']:
+                exp_filter = " AND description = 'CHOCOLATE'"
+        cursor.execute(f"SELECT * FROM expenses WHERE DATE(expense_date) = %s{exp_filter}", tuple(exp_params))
         expenses_raw = cursor.fetchall()
         office_exps = []
         shop_exps = []
@@ -3769,17 +3785,28 @@ def save_closure():
     if not conn: return jsonify({'status': 'error', 'message': 'DB Fail'})
     
     try:
+        user_filter = ""
+        exp_filter = ""
+        if session.get('role') == 'sales':
+            uname = session.get('username', '').lower()
+            if uname in ['counter1', 'counter2']:
+                user_filter = " AND created_by IN ('counter1', 'counter2')"
+                exp_filter = " AND (description = 'OIL' OR description IS NULL)"
+            elif uname in ['counter3', 'counter4']:
+                user_filter = " AND created_by IN ('counter3', 'counter4')"
+                exp_filter = " AND description = 'CHOCOLATE'"
+
         cursor = conn.cursor()
-        cursor.execute("SELECT SUM(total_amount) FROM bills WHERE DATE(bill_date) = %s AND UPPER(payment_mode)='CASH' AND status!='Cancelled'", (report_date,))
+        cursor.execute(f"SELECT SUM(total_amount) FROM bills WHERE DATE(bill_date) = %s AND UPPER(payment_mode)='CASH' AND status!='Cancelled'{user_filter}", (report_date,))
         cash_sales = float(cursor.fetchone()[0] or 0)
         
-        cursor.execute("SELECT SUM(amount) FROM expenses WHERE DATE(expense_date) = %s", (report_date,))
+        cursor.execute(f"SELECT SUM(amount) FROM expenses WHERE DATE(expense_date) = %s{exp_filter}", (report_date,))
         total_exp = float(cursor.fetchone()[0] or 0)
         
-        cursor.execute("SELECT SUM(bizz_amount) FROM bill_items bi JOIN bills b ON bi.bill_id = b.id WHERE DATE(b.bill_date) = %s AND b.status!='Cancelled'", (report_date,))
+        cursor.execute(f"SELECT SUM(bizz_amount) FROM bill_items bi JOIN bills b ON bi.bill_id = b.id WHERE DATE(b.bill_date) = %s AND b.status!='Cancelled'{user_filter}", (report_date,))
         total_biz = float(cursor.fetchone()[0] or 0)
         
-        cursor.execute("SELECT SUM(tsc_amount) FROM bills WHERE DATE(bill_date) = %s AND status!='Cancelled'", (report_date,))
+        cursor.execute(f"SELECT SUM(tsc_amount) FROM bills WHERE DATE(bill_date) = %s AND status!='Cancelled'{user_filter}", (report_date,))
         total_tsc = float(cursor.fetchone()[0] or 0)
         
         expected_closing = opening_bal + (cash_sales - total_exp)
@@ -3826,33 +3853,40 @@ def save_shift_data():
         # Note: If multiple users save at same time, this might be tricky, but usually one counter one saving.
         # Actually, let's filter by created_by if we want to isolate.
         user = session.get('username', 'SYSTEM')
-        
-        # We don't necessarily want to DELETE all expenses if other counters saved some.
-        # But wait, the expenses table doesn't have a 'counter' column in my head.
-        # Let's check the schema.
+        user_lower = str(user).lower()
+        if user_lower in ['counter1', 'counter2']:
+            section_tag = 'OIL'
+            user_filter = " AND created_by IN ('counter1', 'counter2')"
+            exp_filter = " AND (description = 'OIL' OR description IS NULL)"
+        elif user_lower in ['counter3', 'counter4']:
+            section_tag = 'CHOCOLATE'
+            user_filter = " AND created_by IN ('counter3', 'counter4')"
+            exp_filter = " AND description = 'CHOCOLATE'"
+        else:
+            section_tag = 'GENERAL'
+            user_filter = ""
+            exp_filter = ""
         
         for exp in data.get('expenses', []):
-            # Check if exists for this date/category/user (if we add user)
-            # For now, let's just INSERT.
             cursor.execute("""
-                INSERT INTO expenses (category, amount, expense_date, expense_group)
-                VALUES (%s, %s, %s, %s)
-            """, (exp['category'], exp['amount'], report_date, exp['expense_group']))
+                INSERT INTO expenses (category, amount, expense_date, expense_group, description)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (exp['category'], exp['amount'], report_date, exp.get('expense_group', 'OFFICE'), section_tag))
 
         # 2. Save Balance & Denominations
         opening_bal = float(data.get('opening_balance', 2500))
         
         # We need to calculate expected closing to save it correctly
-        cursor.execute("SELECT SUM(total_amount) FROM bills WHERE DATE(bill_date) = %s AND UPPER(payment_mode)='CASH' AND status!='Cancelled'", (report_date,))
+        cursor.execute(f"SELECT SUM(total_amount) FROM bills WHERE DATE(bill_date) = %s AND UPPER(payment_mode)='CASH' AND status!='Cancelled'{user_filter}", (report_date,))
         cash_sales = float(cursor.fetchone()[0] or 0)
         
-        cursor.execute("SELECT SUM(amount) FROM expenses WHERE DATE(expense_date) = %s", (report_date,))
+        cursor.execute(f"SELECT SUM(amount) FROM expenses WHERE DATE(expense_date) = %s{exp_filter}", (report_date,))
         total_exp = float(cursor.fetchone()[0] or 0)
         
-        cursor.execute("SELECT SUM(bizz_amount) FROM bill_items bi JOIN bills b ON bi.bill_id = b.id WHERE DATE(b.bill_date) = %s AND b.status!='Cancelled'", (report_date,))
+        cursor.execute(f"SELECT SUM(bizz_amount) FROM bill_items bi JOIN bills b ON bi.bill_id = b.id WHERE DATE(b.bill_date) = %s AND b.status!='Cancelled'{user_filter}", (report_date,))
         total_biz = float(cursor.fetchone()[0] or 0)
         
-        cursor.execute("SELECT SUM(tsc_amount) FROM bills WHERE DATE(bill_date) = %s AND status!='Cancelled'", (report_date,))
+        cursor.execute(f"SELECT SUM(tsc_amount) FROM bills WHERE DATE(bill_date) = %s AND status!='Cancelled'{user_filter}", (report_date,))
         total_tsc = float(cursor.fetchone()[0] or 0)
         
         # Denominations Total
@@ -4468,7 +4502,14 @@ def get_all_expenses():
     conn = get_db_connection()
     if conn:
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM expenses ORDER BY id DESC LIMIT 500")
+        exp_filter = ""
+        if session.get('role') == 'sales':
+            uname = session.get('username', '').lower()
+            if uname in ['counter1', 'counter2']:
+                exp_filter = " WHERE (description = 'OIL' OR description IS NULL)"
+            elif uname in ['counter3', 'counter4']:
+                exp_filter = " WHERE description = 'CHOCOLATE'"
+        cursor.execute(f"SELECT * FROM expenses{exp_filter} ORDER BY id DESC LIMIT 500")
         exps = cursor.fetchall()
         conn.close()
         for e in exps:
@@ -4734,7 +4775,14 @@ def get_stats():
     cursor.execute(f"SELECT COUNT(*) FROM bills WHERE DATE(bill_date) = %s AND status != 'Cancelled'{user_filter}", tuple(query_params))
     bill_count = cursor.fetchone()[0]
     
-    cursor.execute("SELECT SUM(amount) FROM expenses WHERE DATE(expense_date) = %s", (today,))
+    exp_filter = ""
+    if session.get('role') == 'sales':
+        uname = session.get('username', '').lower()
+        if uname in ['counter1', 'counter2']:
+            exp_filter = " AND (description = 'OIL' OR description IS NULL)"
+        elif uname in ['counter3', 'counter4']:
+            exp_filter = " AND description = 'CHOCOLATE'"
+    cursor.execute(f"SELECT SUM(amount) FROM expenses WHERE DATE(expense_date) = %s{exp_filter}", (today,))
     expenses = cursor.fetchone()[0] or 0
     
     # Fetch Bizz Charges (loyalty rewards paid in cash)
