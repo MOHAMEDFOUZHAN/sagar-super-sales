@@ -89,6 +89,47 @@
     </div>
     
     <ul class="nav-menu">
+        {% if session.get('role') == 'godown' %}
+        <!-- Godown Navigation Menu -->
+        <li>
+            <a href="/godown/dashboard"
+                class="nav-link {{ 'active' if request.endpoint == 'godown_dashboard' else '' }}">
+                <i class="fa-solid fa-gauge-high"></i> Dashboard
+            </a>
+        </li>
+        <li>
+            <a href="/godown/stock/transfer"
+                class="nav-link {{ 'active' if 'stock_transfer' in request.endpoint else '' }}">
+                <i class="fa-solid fa-truck-ramp-box"></i> Stock Transfer
+            </a>
+        </li>
+        <li class="nav-item-dropdown {{ 'expanded' if is_reports_active else '' }}">
+            <div class="nav-dropdown-header {{ 'parent-active' if is_reports_active else '' }}">
+                <span><i class="fa-solid fa-file-invoice-dollar"></i> Reports</span>
+                <i class="fa-solid fa-chevron-down toggle-caret"></i>
+            </div>
+            <ul class="sub-menu {{ 'show' if is_reports_active else '' }}">
+                <li>
+                    <a href="/godown/reports/daily-stock"
+                        class="nav-link {{ 'active' if 'daily_stock' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-boxes-stacked"></i> Daily Stock Report
+                    </a>
+                </li>
+                <li>
+                    <a href="/godown/reports/final-stock"
+                        class="nav-link {{ 'active' if 'final_stock' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-warehouse"></i> Final Stock Report
+                    </a>
+                </li>
+                <li>
+                    <a href="/godown/reports/transfer-report"
+                        class="nav-link {{ 'active' if 'transfer_report' in request.endpoint else '' }}">
+                        <i class="fa-solid fa-truck-arrow-right"></i> Transfer Report
+                    </a>
+                </li>
+            </ul>
+        </li>
+        {% else %}
         <!-- Dashboard (Direct Link) -->
         <li>
             <a href="{{ url_for('admin_dashboard') }}"
@@ -336,6 +377,7 @@
                 </li>
             </ul>
         </li>
+        {% endif %}
     </ul>
 
     <div style="margin-top: auto;">

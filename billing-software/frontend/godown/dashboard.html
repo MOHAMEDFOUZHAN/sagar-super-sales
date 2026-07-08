@@ -1,36 +1,252 @@
-<!-- Godown Dashboard Placeholder -->
-
 <!DOCTYPE html>
-
-<html>
-
-
-
+<html lang="en">
 <head>
-
-    <title>Godown Dashboard</title>
-
-</head>
-
-
-
-<body>
-
-    <h1>Godown Dashboard - Coming Soon</h1>
-
-
-<style>
-    @media print {
-        .dynamic-footer {
-            display: none !important;
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Godown Dashboard - Sagar Super</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .quick-actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
         }
-    }
-</style>
-<footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
-    <p>© 2025 Sagar Nilgiri Products | <span class="maple-pro">Maple Pro</span></p>
-</footer>
+        .action-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01));
+            border: 1px solid var(--glass-border);
+            padding: 30px;
+            border-radius: var(--radius-lg);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            transition: all 0.3s var(--ease-out);
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+        }
+        .action-card:hover {
+            transform: translateY(-8px);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--primary);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+        }
+        .action-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: white;
+        }
+        .action-card.primary-theme .action-icon {
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+        }
+        .action-card.success-theme .action-icon {
+            background: linear-gradient(135deg, #10b981, #059669);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+        }
+        .action-card.warning-theme .action-icon {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            box-shadow: 0 8px 20px rgba(245, 158, 11, 0.3);
+        }
+        .action-card.info-theme .action-icon {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+        }
+        .action-info h3 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            color: var(--text-main);
+        }
+        .action-info p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin: 0;
+            line-height: 1.5;
+        }
+        
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .kpi-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .kpi-icon-small {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            background: rgba(255,255,255,0.04);
+            color: var(--text-muted);
+        }
+        .kpi-info-small h4 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin: 0;
+            color: white;
+        }
+        .kpi-info-small p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        @media print {
+            .dynamic-footer {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% include 'admin/sidebar.html' %}
+
+    <main class="main-content">
+        <header class="section-header">
+            <div>
+                <h1>Godown Portal</h1>
+                <p style="color: var(--text-muted);">Manage inventory replenishment and stock transfers between Godown and retail counters.</p>
+            </div>
+        </header>
+
+        <!-- KPI Summary Cards (Dynamic) -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-icon-small"><i class="fa-solid fa-box"></i></div>
+                <div class="kpi-info-small">
+                    <h4 id="stat-total-products">-</h4>
+                    <p>Total Products</p>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon-small" style="color: #6ee7b7;"><i class="fa-solid fa-boxes-packing"></i></div>
+                <div class="kpi-info-small">
+                    <h4 id="stat-total-stock">-</h4>
+                    <p>Total Stock Items</p>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon-small" style="color: #fca5a5;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div class="kpi-info-small">
+                    <h4 id="stat-low-stock" style="color: #fca5a5;">-</h4>
+                    <p>Low Stock Items</p>
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-icon-small" style="color: #ef4444;"><i class="fa-solid fa-circle-xmark"></i></div>
+                <div class="kpi-info-small">
+                    <h4 id="stat-out-of-stock" style="color: #ef4444;">-</h4>
+                    <p>Out of Stock</p>
+                </div>
+            </div>
+        </div>
+
+        <h2 style="margin-bottom: 20px; font-weight: 700; color: white;">Quick Actions & Navigation</h2>
+        
+        <div class="quick-actions-grid">
+            <!-- Stock Transfer -->
+            <a href="/godown/stock/transfer" class="action-card primary-theme">
+                <div class="action-icon">
+                    <i class="fa-solid fa-truck-ramp-box"></i>
+                </div>
+                <div class="action-info">
+                    <h3>Stock Transfer</h3>
+                    <p>Replenish retail shop stock. Moves inventory out of Godown to the active Shop counters.</p>
+                </div>
+            </a>
+
+            <!-- Daily Stock Report -->
+            <a href="/godown/reports/daily-stock" class="action-card success-theme">
+                <div class="action-icon">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                </div>
+                <div class="action-info">
+                    <h3>Daily Stock Report</h3>
+                    <p>Monitor current stock quantities, categories, units, and critical reorder threshold warnings.</p>
+                </div>
+            </a>
+
+            <!-- Final Stock Report -->
+            <a href="/godown/reports/final-stock" class="action-card warning-theme">
+                <div class="action-icon">
+                    <i class="fa-solid fa-warehouse"></i>
+                </div>
+                <div class="action-info">
+                    <h3>Final Stock Report</h3>
+                    <p>Analyze opening stock, purchases, sales, and closing stock valuation metrics.</p>
+                </div>
+            </a>
+
+            <!-- Transfer Report -->
+            <a href="/godown/reports/transfer-report" class="action-card info-theme">
+                <div class="action-icon">
+                    <i class="fa-solid fa-truck-arrow-right"></i>
+                </div>
+                <div class="action-info">
+                    <h3>Stock Transfer Report</h3>
+                    <p>Audit trail of all previous inventory movements between Godown and retail shop locations.</p>
+                </div>
+            </a>
+        </div>
+        
+        <footer class="dynamic-footer" style="margin-top: 40px; padding: 20px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; color: #94a3b8; font-size: 0.85rem; font-family: 'Inter', sans-serif; letter-spacing: 0.05em; width: 100%;">
+            <p>© 2025 Sagar Nilgiri Products | <span class="maple-pro">Maple Pro</span></p>
+        </footer>
+    </main>
+
+    <script>
+        async function loadDashboardStats() {
+            try {
+                const res = await fetch('/api/inventory/products');
+                const products = await res.json();
+                
+                let totalProducts = products.length;
+                let totalStock = 0;
+                let lowStockCount = 0;
+                let outOfStockCount = 0;
+
+                products.forEach(p => {
+                    let stock = parseFloat(p.current_stock) || 0;
+                    let threshold = parseInt(p.min_threshold) || 25;
+                    
+                    totalStock += stock;
+                    if (stock <= 0) {
+                        outOfStockCount++;
+                    } else if (stock <= threshold) {
+                        lowStockCount++;
+                    }
+                });
+
+                document.getElementById('stat-total-products').innerText = totalProducts;
+                document.getElementById('stat-total-stock').innerText = Math.round(totalStock);
+                document.getElementById('stat-low-stock').innerText = lowStockCount;
+                document.getElementById('stat-out-of-stock').innerText = outOfStockCount;
+            } catch (err) {
+                console.error("Failed to load godown dashboard stats:", err);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadDashboardStats);
+    </script>
 </body>
-
-
-
 </html>

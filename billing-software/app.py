@@ -94,6 +94,25 @@ if os.path.exists(env_path):
                 key, val = line.split("=", 1)
                 os.environ[key.strip()] = val.strip().strip('"').strip("'")
 
+GODOWN_USERS_FILE = os.path.join(base_dir, "Configuration", "godown_users.json")
+
+def load_godown_users():
+    try:
+        if os.path.exists(GODOWN_USERS_FILE):
+            with open(GODOWN_USERS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error loading godown users: {e}")
+    return ['godown']
+
+def save_godown_users(users_list):
+    try:
+        os.makedirs(os.path.dirname(GODOWN_USERS_FILE), exist_ok=True)
+        with open(GODOWN_USERS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(users_list, f, indent=4)
+    except Exception as e:
+        print(f"Error saving godown users: {e}")
+
 # Safe win32 window automation support
 try:
     import win32gui
@@ -808,6 +827,7 @@ def reset_database_route():
             default_users = [
                 ('admin', 'admin123', 'admin'),
                 ('counter', '123', 'sales'),
+                ('godown', 'godown123', 'sales'),
                 ('accountant', 'account123', 'account')
             ]
             cursor.executemany("INSERT IGNORE INTO users (username, password_hash, role) VALUES (%s, %s, %s)", default_users)
@@ -1398,6 +1418,7 @@ def check_and_init_db():
             ('counter2', '123', 'sales'),
             ('counter3', '123', 'sales'),
             ('counter4', '123', 'sales'),
+            ('godown', 'godown123', 'sales'),
             ('accountant', 'account123', 'account')
         ]
         cursor.executemany("INSERT IGNORE INTO users (username, password_hash, role) VALUES (%s, %s, %s)", default_users)
@@ -1494,12 +1515,19 @@ def login():
             if user and user['password_hash'] == password: 
                 session['user_id'] = user['id']
                 session['username'] = user['username']
-                session['role'] = user['role']
                 
-                if user.get('role') == 'admin':
+                godown_users = load_godown_users()
+                if user['username'] in godown_users:
+                    session['role'] = 'godown'
+                else:
+                    session['role'] = user['role']
+                
+                if session['role'] == 'admin':
                     return redirect(url_for('admin_dashboard'))
-                elif user.get('role') == 'account':
+                elif session['role'] == 'account':
                     return redirect(url_for('account_dashboard'))
+                elif session['role'] == 'godown':
+                    return redirect(url_for('godown_dashboard'))
                 return redirect(url_for('sales_dashboard'))
             else:
                 flash('Invalid credentials. Please try again.', 'error')
@@ -1518,6 +1546,36 @@ def admin_dashboard():
     if session.get('role') != 'admin':
         return redirect(url_for('login'))
     return render_template('admin/dashboard.html')
+
+@app.route('/godown/dashboard')
+def godown_dashboard():
+    if session.get('role') not in ['admin', 'godown']:
+        return redirect(url_for('login'))
+    return render_template('godown/dashboard.html')
+
+@app.route('/godown/stock/transfer')
+def godown_stock_transfer():
+    if session.get('role') not in ['admin', 'godown']:
+        return redirect(url_for('login'))
+    return render_template('admin/stock/stock_transfer.html')
+
+@app.route('/godown/reports/daily-stock')
+def godown_reports_daily_stock():
+    if session.get('role') not in ['admin', 'godown']:
+        return redirect(url_for('login'))
+    return render_template('admin/reports/daily_stock.html')
+
+@app.route('/godown/reports/final-stock')
+def godown_reports_final_stock():
+    if session.get('role') not in ['admin', 'godown']:
+        return redirect(url_for('login'))
+    return render_template('admin/reports/final_stock.html')
+
+@app.route('/godown/reports/transfer-report')
+def godown_reports_transfer_report():
+    if session.get('role') not in ['admin', 'godown']:
+        return redirect(url_for('login'))
+    return render_template('admin/reports/transfer_report.html')
 
 @app.route('/account/dashboard')
 def account_dashboard():
@@ -2791,6 +2849,10 @@ def manage_users():
     if request.method == 'GET':
         cursor.execute("SELECT id, username, role FROM users")
         users = cursor.fetchall()
+        godown_users = load_godown_users()
+        for u in users:
+            if u['username'] in godown_users:
+                u['role'] = 'godown'
         conn.close()
         return jsonify(users)
         
@@ -2801,14 +2863,35 @@ def manage_users():
         password = data.get('password')
         role = data.get('role', 'sales')
         
+        db_role = 'sales' if role == 'godown' else role
+        
         try:
+            old_username = None
+            if uid:
+                cursor.execute("SELECT username FROM users WHERE id=%s", (uid,))
+                old_row = cursor.fetchone()
+                if old_row:
+                    old_username = old_row['username']
+
+            godown_users = load_godown_users()
+            if old_username and old_username in godown_users:
+                godown_users.remove(old_username)
+                
+            if role == 'godown':
+                if username not in godown_users:
+                    godown_users.append(username)
+            else:
+                if username in godown_users:
+                    godown_users.remove(username)
+            save_godown_users(godown_users)
+
             if uid:
                 if password:
-                    cursor.execute("UPDATE users SET username=%s, password_hash=%s, role=%s WHERE id=%s", (username, password, role, uid))
+                    cursor.execute("UPDATE users SET username=%s, password_hash=%s, role=%s WHERE id=%s", (username, password, db_role, uid))
                 else:
-                    cursor.execute("UPDATE users SET username=%s, role=%s WHERE id=%s", (username, role, uid))
+                    cursor.execute("UPDATE users SET username=%s, role=%s WHERE id=%s", (username, db_role, uid))
             else:
-                cursor.execute("INSERT INTO users (username, password_hash, role) VALUES (%s, %s, %s)", (username, password, role))
+                cursor.execute("INSERT INTO users (username, password_hash, role) VALUES (%s, %s, %s)", (username, password, db_role))
             
             conn.commit()
             conn.close()
@@ -2821,8 +2904,17 @@ def manage_users():
 def delete_user(uid):
     conn = get_db_connection()
     if not conn: return jsonify({'status': 'error', 'message': 'DB Fail'}), 500
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
     try:
+        cursor.execute("SELECT username FROM users WHERE id = %s", (uid,))
+        user_row = cursor.fetchone()
+        if user_row:
+            username = user_row['username']
+            godown_users = load_godown_users()
+            if username in godown_users:
+                godown_users.remove(username)
+                save_godown_users(godown_users)
+
         cursor.execute("DELETE FROM users WHERE id = %s", (uid,))
         conn.commit()
         conn.close()
@@ -5555,7 +5647,7 @@ def api_stock_transfer():
     
     # Enforce role-based transfer rules strictly on backend
     role = session.get('role')
-    if role == 'admin':
+    if role in ['admin', 'godown']:
         transfer_type = 'IN'
         from_loc = 'Godown'
         to_loc = 'Shop'

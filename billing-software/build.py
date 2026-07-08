@@ -20,7 +20,7 @@ PyInstaller.__main__.run([
     '--noconfirm',
     '--onefile',             
     '--windowed',            
-    '--icon', 'frontend/images/app_icon.ico',
+    '--icon', 'frontend/images/logo.ico',
     '--add-data', 'frontend;frontend',
     '--add-data', 'database;database',
     '--add-data', '.env;.',
